@@ -111,7 +111,6 @@ type Dag struct {
 
 	exitChan chan struct{}
 	enddChan chan struct{}
-	errChan  chan error
 
 	checkpoint *types.Checkpoint
 }
@@ -127,7 +126,6 @@ func New(eth Backend, mux *event.TypeMux, creatorConfig *creator.Config) *Dag {
 		finalizer:  fin,
 		exitChan:   make(chan struct{}),
 		enddChan:   make(chan struct{}),
-		errChan:    make(chan error),
 	}
 	return d
 }
@@ -152,12 +150,28 @@ func (d *Dag) HandleFinalize(data *types.FinalizationParams) *types.Finalization
 	}
 	d.setLastFinalizeApiSlot()
 
+	if d.isCpUnacceptable(data.Checkpoint) {
+		lfHeader := d.bc.GetLastFinalizedHeader()
+		lfHash := lfHeader.Hash()
+		res.LFSpine = &lfHash
+		if cp := d.bc.GetLastCoordinatedCheckpoint(); cp != nil {
+			res.CpEpoch = &cp.FinEpoch
+			res.CpRoot = &cp.Root
+		}
+		log.Warn("Handle Finalize: ignore bad finalization",
+			"result", res,
+			"resEpoch", *res.CpEpoch,
+			"resSpine", res.LFSpine.Hex(),
+			"resRoot", res.CpRoot.Hex(),
+		)
+		return res
+	}
+
 	//skip if synchronising
 	if d.downloader.Synchronising() {
 		errStr := errSynchronization.Error()
 		res.Error = &errStr
 		log.Error("Handle Finalize: response (busy)", "result", res, "err", errStr)
-		// 		return res
 	}
 
 	d.bc.DagMuLock()
@@ -299,7 +313,7 @@ func (d *Dag) HandleFinalize(data *types.FinalizationParams) *types.Finalization
 		"resSpine", res.LFSpine.Hex(),
 		"resRoot", res.CpRoot.Hex(),
 	)
-	log.Info("^^^^^^^^^^^^ TIME",
+	log.Info("TIME",
 		"elapsed", common.PrettyDuration(time.Since(start)),
 		"func:", "Finalize",
 	)
@@ -313,7 +327,7 @@ func (d *Dag) HandleFinalize(data *types.FinalizationParams) *types.Finalization
 // 4. if chain head reached - switch off sync mode
 func (d *Dag) handleSyncUnloadedBlocks(baseSpine common.Hash, spines common.HashArray, cp *types.Checkpoint) error {
 	defer func(start time.Time) {
-		log.Info("^^^^^^^^^^^^ TIME",
+		log.Info("TIME",
 			"elapsed", common.PrettyDuration(time.Since(start)),
 			"func:", "dag.handleSyncUnloadedBlocks",
 		)
@@ -594,7 +608,6 @@ func (d *Dag) exitProcedurre() {
 	d.bc.DagMuLock()
 	d.bc.DagMuUnlock()
 	close(d.exitChan)
-	close(d.errChan)
 	d.enddChan <- struct{}{}
 }
 
@@ -608,12 +621,6 @@ func (d *Dag) workLoop() {
 		case <-d.exitChan:
 			slotTicker.Done()
 			d.exitProcedurre()
-			return
-		case err := <-d.errChan:
-			close(d.errChan)
-			close(d.exitChan)
-			slotTicker.Done()
-			log.Error("Dag worker stopped with error", "error", err)
 			return
 		case slot := <-slotTicker.C():
 			if slot == 0 {
@@ -632,7 +639,7 @@ func (d *Dag) workLoop() {
 				continue
 			}
 			currentEpoch := d.bc.GetSlotInfo().SlotToEpoch(d.bc.GetSlotInfo().CurrentSlot())
-			log.Debug("######### curEpoch to eraInfo toEpoch", "epoch", currentEpoch, "d.bc.GetEraInfo().ToEpoch()", d.bc.GetEraInfo().ToEpoch())
+			log.Debug("curEpoch to eraInfo toEpoch", "epoch", currentEpoch, "d.bc.GetEraInfo().ToEpoch()", d.bc.GetEraInfo().ToEpoch())
 
 			var (
 				err          error
@@ -660,22 +667,11 @@ func (d *Dag) workLoop() {
 				"endTransSlot", endTransitionSlot,
 			)
 
-			// TODO: uncomment this code for subnetwork support, add subnet and get it to the creators getter (line 253)
-			//if d.bc.Config().IsForkSlotSubNet1(currentSlot) {
-			//	creators, err = d.bc.ValidatorStorage().GetCreatorsBySlot(d.bc, currentSlot,subnet)
-			//	if err != nil {
-			//		d.errChan <- err
-			//	}
-			//} else {}
-			// TODO: move it to else condition
-
 			slotCreators, err = d.bc.ValidatorStorage().GetCreatorsBySlot(d.bc, slot)
 			if err != nil {
-				d.errChan <- err
+				log.Error("Create block: get creators failed", "slot", slot, "error", err)
+				continue
 			}
-
-			// todo check
-			log.Info("CheckShuffle - dag SlotCreators", "slot", slot, "creators", slotCreators)
 
 			go d.work(slot, slotCreators)
 		}
@@ -791,4 +787,25 @@ func (d *Dag) resetCheckpoint() {
 // isSlotLocked compare incoming epoch/slot with the latest epoch/slot of chain.
 func (d *Dag) isSlotLocked(slot uint64) bool {
 	return slot <= d.bc.GetLastFinalizedHeader().Slot
+}
+
+// isCpUnacceptable returns true if provided cp is unacceptable.
+// Fixes sync by skipping of fault finalization.
+func (d *Dag) isCpUnacceptable(cp *types.Checkpoint) bool {
+	if cp == nil {
+		return true
+	}
+	conf := d.bc.Config()
+	if len(conf.AcceptCpRootOnFinEpoch) == 0 {
+		return false
+	}
+	if fEpochs, ok := conf.AcceptCpRootOnFinEpoch[cp.Root]; ok {
+		for _, ep := range fEpochs {
+			if cp.FinEpoch == ep {
+				return false
+			}
+		}
+		return true
+	}
+	return false
 }

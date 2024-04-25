@@ -54,7 +54,9 @@ func ReadAllCanonicalHashes(db ethdb.Iteratee, from uint64, to uint64, limit int
 		if bytes.Compare(it.Key(), end) >= 0 {
 			break
 		}
-		if key := it.Key(); len(key) == len(headerPrefix)+8+1 && bytes.Equal(key[len(key)-1:], headerHashSuffix) {
+		//key := it.Key()
+		//if len(key) == len(finalizedHashByNumberPrefix)+8 {
+		if key := it.Key(); len(key) == len(headerPrefix)+8+2 && bytes.Equal(key[len(key)-1:], headerHashSuffix) {
 			numbers = append(numbers, binary.BigEndian.Uint64(key[len(headerPrefix):len(headerPrefix)+8]))
 			hashes = append(hashes, common.BytesToHash(it.Value()))
 			// If the accumulated entries reaches the limit threshold, return.
@@ -906,6 +908,12 @@ func parseValidatorSyncKey(validatorSyncKey []byte) (initTxHash common.Hash) {
 }
 
 func decodeValidatorSync(initTxHash common.Hash, data []byte) *types.ValidatorSync {
+	unm := &types.ValidatorSync{}
+	err := unm.UnmarshalJSON(data)
+	if err == nil {
+		return unm
+	}
+	// Depracated
 	//InitTxHash common.Hash - parse from key
 	// <OpType><Creator><index><procEpoch><txHash><amountBigInt>`
 	minSize := 76
@@ -931,23 +939,8 @@ func decodeValidatorSync(initTxHash common.Hash, data []byte) *types.ValidatorSy
 	return res
 }
 
-func encodeValidatorSync(vs types.ValidatorSync) []byte {
-	//InitTxHash common.Hash - put in key
-	// <OpType><Creator><index><procEpoch><txHash><amountBigInt>`
-	var data []byte
-	data = append(data, encodeBlockNumber(uint64(vs.OpType))...)
-	data = append(data, vs.Creator.Bytes()...)
-	data = append(data, encodeBlockNumber(vs.Index)...)
-	data = append(data, encodeBlockNumber(vs.ProcEpoch)...)
-	txh := vs.TxHash
-	if txh == nil {
-		txh = &common.Hash{}
-	}
-	data = append(data, txh.Bytes()...)
-	if vs.Amount != nil {
-		data = append(data, vs.Amount.Bytes()...)
-	}
-	return data
+func encodeValidatorSync(vs types.ValidatorSync) ([]byte, error) {
+	return vs.MarshalJSON()
 }
 
 // ReadValidatorSync retrieves the ValidatorSync data.
@@ -961,9 +954,24 @@ func WriteValidatorSync(db ethdb.KeyValueWriter, vs *types.ValidatorSync) {
 	if vs == nil {
 		return
 	}
+
+	log.Info("=== ValidatorSync: WriteValidatorSync ===",
+		"Index", vs.Index,
+		"ProcEpoch", vs.ProcEpoch,
+		"OpType", vs.OpType,
+		"Amount", vs.Amount.String(),
+		"Balance", vs.Balance.String(),
+		"TxHash", fmt.Sprintf("%#x", vs.TxHash),
+		"InitTxHash", vs.InitTxHash.Hex(),
+		"Creator", vs.Creator.Hex(),
+	)
+
 	key := validatorSyncKey(vs.InitTxHash)
-	enc := encodeValidatorSync(*vs)
-	if err := db.Put(key, enc); err != nil {
+	enc, err := encodeValidatorSync(*vs)
+	if err != nil {
+		log.Crit("Failed to store ValidatorSync data", "err", err)
+	}
+	if err = db.Put(key, enc); err != nil {
 		log.Crit("Failed to store ValidatorSync data", "err", err)
 	}
 }
@@ -1141,7 +1149,7 @@ func ReadCurrentEra(db ethdb.KeyValueReader) uint64 {
 	key := currentEraPrefix
 	valueBytes, err := db.Get(key)
 	if err != nil {
-		log.Warn("Failed to read current era", "err", err)
+		log.Crit("Failed to read current era", "err", err)
 	}
 	return binary.BigEndian.Uint64(valueBytes)
 }
