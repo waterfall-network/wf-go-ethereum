@@ -159,6 +159,7 @@ type blockChain interface {
 	Genesis() *types.Block
 	SubscribeChainHeadEvent(ch chan<- ChainHeadEvent) event.Subscription
 	SubscribeProcessing(ch chan<- *types.BlockTransactions) event.Subscription
+	SubscribeCancelProcessing(ch chan<- *types.BlockTransactions) event.Subscription
 	SubscribeRemoveTxFromPool(ch chan<- types.Transactions) event.Subscription
 	// FinSynchronising returns whether the downloader is currently retrieving finalized blocks.
 	FinSynchronising() bool
@@ -286,6 +287,8 @@ type TxPool struct {
 	queueTxEventCh  chan *types.Transaction
 	processingCh    chan *types.BlockTransactions
 	processingSub   event.Subscription
+	cancelProcCh    chan *types.BlockTransactions
+	cancelProcSub   event.Subscription
 	rmTxCh          chan types.Transactions
 	rmTxSub         event.Subscription
 	reorgDoneCh     chan chan struct{}
@@ -322,6 +325,7 @@ func NewTxPool(config TxPoolConfig, chainconfig *params.ChainConfig, chain block
 		reqPromoteCh:    make(chan *accountSet),
 		queueTxEventCh:  make(chan *types.Transaction),
 		processingCh:    make(chan *types.BlockTransactions, 1),
+		cancelProcCh:    make(chan *types.BlockTransactions, 1),
 		rmTxCh:          make(chan types.Transactions, 1),
 		reorgDoneCh:     make(chan chan struct{}),
 		reorgShutdownCh: make(chan struct{}),
@@ -375,6 +379,7 @@ func NewTxPool(config TxPoolConfig, chainconfig *params.ChainConfig, chain block
 	// Subscribe events from blockchain and start the main event loop.
 	pool.chainHeadSub = pool.chain.SubscribeChainHeadEvent(pool.chainHeadCh)
 	pool.processingSub = pool.chain.SubscribeProcessing(pool.processingCh)
+	pool.cancelProcSub = pool.chain.SubscribeCancelProcessing(pool.cancelProcCh)
 	pool.rmTxSub = pool.chain.SubscribeRemoveTxFromPool(pool.rmTxCh)
 
 	pool.wg.Add(1)
@@ -494,7 +499,23 @@ func (pool *TxPool) loop() {
 					pool.moveToProcessingAccelerated(txs)
 				}
 			}()
+		case txs := <-pool.cancelProcCh:
+			func() {
+				defer func(tStart time.Time) {
+					log.Info("^^^^^^^^^^^^ TIME txpool cancel processing block txs",
+						"elapsed", common.PrettyDuration(time.Since(tStart)),
+						"func:", "cancelProcCh",
+						"txs", len(txs.Transactions),
+						"block", txs.BlockHash.Hex(),
+					)
+				}(time.Now())
 
+				pool.mu.Lock()
+				defer pool.mu.Unlock()
+
+				pool.cancelProcessingBlockTxs(txs)
+				//	todo run reorg ?
+			}()
 		case txs := <-pool.rmTxCh:
 			func() {
 				defer func(tStart time.Time) {
@@ -523,6 +544,7 @@ func (pool *TxPool) Stop() {
 	// Unsubscribe subscriptions registered from blockchain
 	pool.chainHeadSub.Unsubscribe()
 	pool.processingSub.Unsubscribe()
+	pool.cancelProcSub.Unsubscribe()
 	pool.rmTxSub.Unsubscribe()
 	pool.wg.Wait()
 
@@ -1626,6 +1648,56 @@ func (pool *TxPool) moveToProcessingAccelerated(txs *types.BlockTransactions) {
 			}
 		}()
 		wg2.Wait()
+	}
+}
+
+func (pool *TxPool) cancelProcessingBlockTxs(txs *types.BlockTransactions) {
+	transactions := txs.Transactions
+	blockHash := txs.BlockHash
+	for i := len(transactions) - 1; i >= 0; i-- {
+		btx := transactions[i]
+		txHash := btx.Hash()
+		// retrieving sender addr of tx
+		var addr common.Address
+		if pAddr := types.SenderFromCache(pool.signer, btx); pAddr == nil {
+			// get pooled tx
+			poolTx := pool.all.Get(btx.Hash())
+			if poolTx == nil {
+				continue
+			}
+			sndr, err := types.Sender(pool.signer, poolTx) // already validated during insertion
+			if err != nil {
+				log.Error("TxPool: cancel processing: get sender failed",
+					"txHash", txHash.Hex(),
+					"blHash", blockHash.Hex(),
+					"err", err.Error())
+				return
+			}
+			addr = sndr
+			//cache sender to block tx
+			types.CacheSender(pool.signer, &sndr, btx)
+		} else {
+			addr = *pAddr
+		}
+
+		//check processing txList exists
+		if pool.processing[addr] == nil {
+			continue
+		}
+		//rm tx blockHash
+		pool.processing[addr].RmTxBlockHash(txHash, blockHash)
+
+		if len(pool.processing[addr].GetTxBlocksHashes(txHash)) > 0 {
+			continue
+		}
+
+		pool.processing[addr].Delete(btx)
+		if pool.processing[addr].Empty() {
+			delete(pool.processing, addr)
+		}
+
+		isLocal := pool.locals.containsTx(btx)
+		pool.enqueueTx(txHash, btx, isLocal, false)
 	}
 }
 

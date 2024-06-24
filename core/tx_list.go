@@ -460,6 +460,17 @@ func (l *txList) PutTxBlockHash(txHash common.Hash, blockHash common.Hash) {
 	}
 }
 
+func (l *txList) RmTxBlockHash(txHash common.Hash, blockHash common.Hash) {
+	v := l.txs.blocksHashes[txHash]
+	upBlHashes := make(common.HashArray, 0, len(v))
+	for _, bh := range v {
+		if blockHash != bh {
+			upBlHashes = append(upBlHashes, bh)
+		}
+	}
+	l.txs.blocksHashes[txHash] = upBlHashes
+}
+
 // priceHeap is a heap.Interface implementation over transactions for retrieving
 // price-sorted transactions to discard when the pool fills up. If baseFee is set
 // then the heap is sorted based on the effective tip based on the given base fee.

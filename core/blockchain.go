@@ -198,6 +198,7 @@ type BlockChain struct {
 	logsFeed       event.Feed
 	blockProcFeed  event.Feed
 	processingFeed event.Feed
+	cancelProcFeed event.Feed
 	rmTxFeed       event.Feed
 	scope          event.SubscriptionScope
 	genesisBlock   *types.Block
@@ -949,6 +950,14 @@ func (bc *BlockChain) rmBlockData(hash common.Hash, slot *uint64) {
 		return
 	}
 	//collect related data
+	block := bc.GetBlock(context.Background(), hash)
+	if block != nil {
+		sl := block.Slot()
+		slot = &sl
+		// handle pooled txs
+		go bc.CancelProcessingTxs(block)
+	}
+
 	if slot == nil {
 		hdr := rawdb.ReadHeader(bc.db, hash)
 		if hdr != nil {
@@ -4602,6 +4611,19 @@ func (bc *BlockChain) WriteTxLookupEntry(txIndex int, txHash, blockHash common.H
 		return true
 	}
 	return false
+}
+
+func (bc *BlockChain) cancelProcessingTxs(txs *types.BlockTransactions) {
+	bc.cancelProcFeed.Send(txs)
+}
+
+func (bc *BlockChain) CancelProcessingTxs(block *types.Block) {
+	if block == nil {
+		return
+	}
+	txs := types.NewBlockTransactions(block.Hash())
+	txs.Transactions = block.Transactions()
+	bc.cancelProcessingTxs(txs)
 }
 
 func (bc *BlockChain) moveTxsToProcessing(txs *types.BlockTransactions) {
