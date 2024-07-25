@@ -748,6 +748,12 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	if tx.GasFeeCapIntCmp(tx.GasTipCap()) < 0 {
 		return ErrTipAboveFeeCap
 	}
+	//check gas price
+	curBaseFee := pool.chain.GetLastFinalizedHeader().BaseFee
+	_, err := tx.EffectiveGasTip(curBaseFee)
+	if err != nil {
+		return err
+	}
 	// Make sure the transaction is signed properly.
 	from, err := types.Sender(pool.signer, tx)
 	if err != nil {
