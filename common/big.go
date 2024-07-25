@@ -28,6 +28,7 @@ var (
 	Big3      = big.NewInt(3)
 	Big0      = big.NewInt(0)
 	Big32     = big.NewInt(32)
+	Big100    = big.NewInt(100)
 	Big256    = big.NewInt(256)
 	Big257    = big.NewInt(257)
 	BigGwei   = new(big.Int).SetUint64(1_000_000_000)

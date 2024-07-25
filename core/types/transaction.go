@@ -40,6 +40,9 @@ var (
 	errEmptyTypedTx         = errors.New("empty typed transaction bytes")
 )
 
+// MinerBaseFeeTolerancePrc defines tolerance to reduce BaseFee, in %.
+const MinerBaseFeeTolerancePrc int64 = 5
+
 // Transaction types.
 const (
 	LegacyTxType = iota
@@ -462,7 +465,8 @@ type TxWithMinerFee struct {
 // miner gasTipCap if a base fee is provided.
 // Returns error in case of a negative effective miner gasTipCap.
 func NewTxWithMinerFee(tx *Transaction, baseFee *big.Int) (*TxWithMinerFee, error) {
-	minerFee, err := tx.EffectiveGasTip(baseFee)
+	toleranceBaseFee := MinerBaseFeeWithTolerance(baseFee)
+	minerFee, err := tx.EffectiveGasTip(toleranceBaseFee)
 	if err != nil {
 		return nil, err
 	}
@@ -470,6 +474,16 @@ func NewTxWithMinerFee(tx *Transaction, baseFee *big.Int) (*TxWithMinerFee, erro
 		tx:       tx,
 		minerFee: minerFee,
 	}, nil
+}
+
+// MinerBaseFeeWithTolerance calculate reduced by tolerance BaseFee value.
+func MinerBaseFeeWithTolerance(baseFee *big.Int) *big.Int {
+	if baseFee == nil {
+		return nil
+	}
+	v := new(big.Int).Mul(baseFee, big.NewInt(MinerBaseFeeTolerancePrc))
+	tolerance := new(big.Int).Div(v, common.Big100)
+	return new(big.Int).Sub(baseFee, tolerance)
 }
 
 // TxByPriceAndTime implements both the sort and the heap interface, making it useful
