@@ -28,7 +28,10 @@ type ValidatorSync interface {
 	Amount() *big.Int
 	WithdrawalAddress() *common.Address
 	Balance() *big.Int
+	ActivationEpoch() uint64
+	ExitEpoch() uint64
 	Version() VersionValSyncOp
+	Print() string
 }
 
 type Exit interface {

@@ -180,6 +180,8 @@ func getValSyncTxData(valSyncOp types.ValidatorSync, withdrawal *common.Address,
 		valSyncOp.Amount,
 		withdrawal,
 		valSyncOp.Balance,
+		valSyncOp.ActivationEpoch,
+		valSyncOp.ExitEpoch,
 	); err != nil {
 		return nil, err
 	}
@@ -266,6 +268,9 @@ func getValSyncVersionBySlot(conf *params.ChainConfig, slot uint64) operation.Ve
 	var ver operation.VersionValSyncOp
 	if conf.IsForkSlotDelegate(slot) {
 		ver = operation.Ver1
+	}
+	if conf.IsForkSlotValSyncProc(slot) {
+		ver = operation.Ver2
 	}
 	return ver
 }

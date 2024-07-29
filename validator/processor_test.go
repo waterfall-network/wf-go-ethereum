@@ -611,7 +611,7 @@ func TestTestProcessorDeposit_DelegatingStake(t *testing.T) {
 }
 
 func TestProcessorActivate(t *testing.T) {
-	activateOperation, err := operation.NewValidatorSyncOperation(0, types.Activate, initTxHash, procEpoch, 0, testmodels.Addr2, nil, &withdrawalAddress, nil)
+	activateOperation, err := operation.NewValidatorSyncOperation(0, types.Activate, initTxHash, procEpoch, 0, testmodels.Addr2, nil, &withdrawalAddress, nil, 0, 0)
 	testutils.AssertNoError(t, err)
 
 	ctrl = gomock.NewController(t)
@@ -1150,7 +1150,7 @@ func TestProcessorExit_DelegatingStake(t *testing.T) {
 }
 
 func TestProcessorDeactivate(t *testing.T) {
-	deactivateOp, err := operation.NewValidatorSyncOperation(0, types.Deactivate, initTxHash, procEpoch, 0, testmodels.Addr4, nil, &withdrawalAddress, nil)
+	deactivateOp, err := operation.NewValidatorSyncOperation(0, types.Deactivate, initTxHash, procEpoch, 0, testmodels.Addr4, nil, &withdrawalAddress, nil, 0, 0)
 	testutils.AssertNoError(t, err)
 
 	ctrl = gomock.NewController(t)
@@ -1655,7 +1655,7 @@ func TestProcessorWithdrawal_DelegatingStake(t *testing.T) {
 }
 
 func TestProcessorUpdateBalance(t *testing.T) {
-	updateBalanceOperation, err := operation.NewValidatorSyncOperation(0, types.UpdateBalance, initTxHash, procEpoch, 0, testmodels.Addr6, value, &withdrawalAddress, nil)
+	updateBalanceOperation, err := operation.NewValidatorSyncOperation(0, types.UpdateBalance, initTxHash, procEpoch, 0, testmodels.Addr6, value, &withdrawalAddress, nil, 0, 0)
 	testutils.AssertNoError(t, err)
 
 	ctrl = gomock.NewController(t)
@@ -1930,6 +1930,7 @@ func TestProcessorUpdateBalance_DelegatingStake(t *testing.T) {
 					opValue,
 					&withdrawalAddress,
 					balance,
+					0, 0,
 				)
 				testutils.AssertNoError(t, err)
 
@@ -2063,6 +2064,7 @@ func TestProcessorUpdateBalance_DelegatingStake(t *testing.T) {
 					opValue,
 					&withdrawalAddress,
 					balance,
+					0, 0,
 				)
 				testutils.AssertNoError(t, err)
 				bc.EXPECT().GetValidatorSyncData(
@@ -2195,6 +2197,7 @@ func TestProcessorUpdateBalance_DelegatingStake(t *testing.T) {
 					opValue,
 					&withdrawalAddress,
 					balance,
+					0, 0,
 				)
 				testutils.AssertNoError(t, err)
 
@@ -2330,7 +2333,7 @@ func TestProcessorValidatorSyncProcessing(t *testing.T) {
 
 	processor := NewProcessor(ctx, stateDb, bc)
 
-	activateOperation, err := operation.NewValidatorSyncOperation(0, types.Activate, initTxHash, procEpoch, testIndex, testCreatorAddress, big.NewInt(123), &withdrawalAddress, nil)
+	activateOperation, err := operation.NewValidatorSyncOperation(0, types.Activate, initTxHash, procEpoch, testIndex, testCreatorAddress, big.NewInt(123), &withdrawalAddress, nil, 0, 0)
 	testutils.AssertNoError(t, err)
 
 	opData, err := operation.EncodeToBytes(activateOperation)

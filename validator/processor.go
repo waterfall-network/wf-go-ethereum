@@ -946,13 +946,8 @@ func (p *Processor) validatorUpdateBalance(op operation.ValidatorSync) ([]byte, 
 
 func (p *Processor) applyDelegatingStakeRules(op operation.ValidatorSync, validator *valStore.Validator) ([]byte, error) {
 	log.Info("Validator update balance: apply delegate rules: start",
-		"opCode", op.OpCode(),
-		"InitTxHash", op.InitTxHash().Hex(),
-		"amount", op.Amount().String(),
-		"balance", op.Balance().String(),
-		"procEpoch", op.ProcEpoch(),
-		"vIndex", op.Index(),
-		"creator", op.Creator().Hex(),
+		"slot", p.ctx.Slot,
+		"op", op.Print(),
 		"blHash", p.ctx.BlockHash.Hex(),
 	)
 
