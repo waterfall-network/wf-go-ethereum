@@ -187,7 +187,6 @@ func (d *Dag) HandleFinalize(data *types.FinalizationParams) *types.Finalization
 			"cp.Root", fmt.Sprintf("%#x", data.Checkpoint.Root),
 			"baseSpine", fmt.Sprintf("%#x", data.BaseSpine),
 			"spines", data.Spines,
-			"ValSyncData", data.ValSyncData,
 			"\u2692", params.BuildId)
 	} else {
 		log.Info("Handle Finalize: start",
@@ -198,20 +197,12 @@ func (d *Dag) HandleFinalize(data *types.FinalizationParams) *types.Finalization
 			"cp.BaseSpine", fmt.Sprintf("%#x", data.Checkpoint.Spine),
 			"baseSpine", nil,
 			"spines", data.Spines,
-			"ValSyncData", data.ValSyncData,
 			"\u2692", params.BuildId)
 	}
 
 	if data.ValSyncData != nil {
 		for _, vs := range data.ValSyncData {
-			log.Info("received validator sync",
-				"OpType", vs.OpType,
-				"Index", vs.Index,
-				"Creator", vs.Creator.Hex(),
-				"ProcEpoch", vs.ProcEpoch,
-				"Amount", vs.Amount,
-				"InitTxHash", vs.InitTxHash.Hex(),
-			)
+			log.Info("received validator sync", "op", vs.Print())
 		}
 	}
 
