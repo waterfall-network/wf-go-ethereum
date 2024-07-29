@@ -67,13 +67,7 @@ func CreateValidatorSyncTx(
 	log.Info("Validator sync tx data",
 		"slot", slot,
 		"ver", opVer,
-		"Creator", valSyncOp.Creator.Hex(),
-		"ProcEpoch", valSyncOp.ProcEpoch,
-		"OpType", valSyncOp.OpType,
-		"Amount", valSyncOp.Amount.String(),
-		"Balance", valSyncOp.Balance.String(),
-		"Index", valSyncOp.Index,
-		"InitTxHash", valSyncOp.InitTxHash.Hex(),
+		"op", valSyncOp.Print(),
 		"from", from.Hex(),
 	)
 
@@ -215,14 +209,7 @@ func GetPendingValidatorSyncData(bc *core.BlockChain) map[common.Hash]*types.Val
 	for k, vs := range valSyncOps {
 		log.Info("=== ValidatorSync: GetPendingValidatorSyncData ===",
 			"slot", si.CurrentSlot(),
-			"Index", vs.Index,
-			"ProcEpoch", vs.ProcEpoch,
-			"OpType", vs.OpType,
-			"Amount", vs.Amount.String(),
-			"Balance", vs.Balance.String(),
-			"TxHash", fmt.Sprintf("%#x", vs.TxHash),
-			"InitTxHash", vs.InitTxHash.Hex(),
-			"Creator", vs.Creator.Hex(),
+			"op", vs.Print(),
 		)
 
 		if vs.TxHash != nil {
@@ -232,14 +219,7 @@ func GetPendingValidatorSyncData(bc *core.BlockChain) map[common.Hash]*types.Val
 		if saved != nil {
 			log.Info("=== ValidatorSync: GetPendingValidatorSyncData === saved",
 				"slot", si.CurrentSlot(),
-				"Index", saved.Index,
-				"ProcEpoch", saved.ProcEpoch,
-				"OpType", saved.OpType,
-				"Amount", saved.Amount.String(),
-				"Balance", saved.Balance.String(),
-				"TxHash", fmt.Sprintf("%#x", saved.TxHash),
-				"InitTxHash", saved.InitTxHash.Hex(),
-				"Creator", saved.Creator.Hex(),
+				"op", saved.Print(),
 			)
 		} else {
 			log.Info("=== ValidatorSync: GetPendingValidatorSyncData === saved nill",
@@ -263,16 +243,8 @@ func GetPendingValidatorSyncData(bc *core.BlockChain) map[common.Hash]*types.Val
 					}
 					bc.SetValidatorSyncData(vs)
 					log.Warn("=== ValidatorSync: GetPendingValidatorSyncData: stale op removed",
-						"OpType", vs.OpType,
-						"currEpoch", currEpoch,
-						"ProcEpoch", vs.ProcEpoch,
-						"Index", vs.Index,
-						"OpType", vs.OpType,
-						"Amount", vs.Amount.String(),
-						"Balance", vs.Balance.String(),
-						"TxHash", fmt.Sprintf("%#x", vs.TxHash),
-						"InitTxHash", vs.InitTxHash.Hex(),
-						"Creator", vs.Creator.Hex(),
+						"slot", si.CurrentSlot(),
+						"op", vs.Print(),
 					)
 					continue
 				}
@@ -282,14 +254,7 @@ func GetPendingValidatorSyncData(bc *core.BlockChain) map[common.Hash]*types.Val
 				vsPending[k] = vs
 				log.Info("=== ValidatorSync: GetPendingValidatorSyncData === 11111",
 					"slot", si.CurrentSlot(),
-					"ProcEpoch", vs.ProcEpoch,
-					"Index", vs.Index,
-					"OpType", vs.OpType,
-					"Amount", vs.Amount.String(),
-					"Balance", vs.Balance.String(),
-					"TxHash", fmt.Sprintf("%#x", vs.TxHash),
-					"InitTxHash", vs.InitTxHash.Hex(),
-					"Creator", vs.Creator.Hex(),
+					"op", vs.Print(),
 				)
 			}
 		}
