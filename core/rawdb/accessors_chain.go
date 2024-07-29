@@ -955,16 +955,7 @@ func WriteValidatorSync(db ethdb.KeyValueWriter, vs *types.ValidatorSync) {
 		return
 	}
 
-	log.Info("=== ValidatorSync: WriteValidatorSync ===",
-		"Index", vs.Index,
-		"ProcEpoch", vs.ProcEpoch,
-		"OpType", vs.OpType,
-		"Amount", vs.Amount.String(),
-		"Balance", vs.Balance.String(),
-		"TxHash", fmt.Sprintf("%#x", vs.TxHash),
-		"InitTxHash", vs.InitTxHash.Hex(),
-		"Creator", vs.Creator.Hex(),
-	)
+	log.Info("=== ValidatorSync: WriteValidatorSync ===", "op", vs.Print())
 
 	key := validatorSyncKey(vs.InitTxHash)
 	enc, err := encodeValidatorSync(*vs)

@@ -17,7 +17,9 @@
 package rawdb
 
 import (
+	"bytes"
 	"fmt"
+	"math"
 	"math/big"
 	"reflect"
 	"testing"
@@ -149,13 +151,15 @@ func TestValidatorSyncWf_Ok(t *testing.T) {
 	db := NewMemoryDatabase()
 
 	src_1 := &types.ValidatorSync{
-		OpType:     2,
-		ProcEpoch:  45645,
-		Index:      45645,
-		Creator:    common.Address{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
-		Amount:     new(big.Int),
-		TxHash:     &common.Hash{7, 8, 9},
-		InitTxHash: common.Hash{1, 2, 3},
+		OpType:          2,
+		ProcEpoch:       45645,
+		Index:           45645,
+		Creator:         common.Address{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+		Amount:          new(big.Int),
+		TxHash:          &common.Hash{7, 8, 9},
+		InitTxHash:      common.Hash{1, 2, 3},
+		ActivationEpoch: 645,
+		ExitEpoch:       math.MaxUint64,
 	}
 	src_1.Amount.SetString("32789456000000", 10)
 
@@ -167,6 +171,39 @@ func TestValidatorSyncWf_Ok(t *testing.T) {
 
 	DeleteValidatorSync(db, src_1.InitTxHash)
 	if entry := ReadValidatorSync(db, src_1.InitTxHash); entry != nil {
+		t.Fatalf("ValidatorSync D-R failed:  %#v != nil", entry)
+	}
+}
+
+func TestValidatorSyncWf_deprecatedJsonV0_Ok(t *testing.T) {
+	db := NewMemoryDatabase()
+
+	//deprecated json data
+	src_1 := []byte("{\"initTxHash\":\"0x0102030000000000000000000000000000000000000000000000000000000000\"," +
+		"\"opType\":\"0x2\",\"procEpoch\":\"0xb24d\",\"index\":\"0xb24d\"," +
+		"\"creator\":\"0xffffffffffffffffffffffffffffffffffffffff\",\"amount\":\"0x1dd263e09400\"," +
+		"\"txHash\":null,\"balance\":\"0x3ab5108a71400\"}")
+
+	exp := []byte("{\"initTxHash\":\"0x0102030000000000000000000000000000000000000000000000000000000000\",\"opType\":\"0x2\"," +
+		"\"procEpoch\":\"0xb24d\",\"index\":\"0xb24d\",\"creator\":\"0xffffffffffffffffffffffffffffffffffffffff\"," +
+		"\"amount\":\"0x1dd263e09400\",\"txHash\":null,\"balance\":\"0x3ab5108a71400\",\"activationEpoch\":\"0x0\",\"exitEpoch\":\"0x0\"}")
+
+	initTx := common.HexToHash("0x0102030000000000000000000000000000000000000000000000000000000000")
+	if err := db.Put(validatorSyncKey(initTx), src_1); err != nil {
+		t.Fatalf("Failed to store ValidatorSync: %s", err)
+	}
+
+	entry := ReadValidatorSync(db, initTx)
+	if entry == nil {
+		t.Fatalf("ValidatorSync W-R failed:  read nill")
+	}
+	entryJson, _ := entry.MarshalJSON()
+	if !bytes.Equal(entryJson, exp) {
+		t.Fatalf("ValidatorSync W-R failed:  %s != %s", entryJson, exp)
+	}
+
+	DeleteValidatorSync(db, initTx)
+	if entry := ReadValidatorSync(db, initTx); entry != nil {
 		t.Fatalf("ValidatorSync D-R failed:  %#v != nil", entry)
 	}
 }

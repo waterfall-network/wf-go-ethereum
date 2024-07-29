@@ -136,24 +136,31 @@ type ValidatorSync struct {
 	Amount     *big.Int
 	TxHash     *common.Hash
 	Balance    *big.Int
+	// functionality activated by ForkSlotValSyncProc
+	ActivationEpoch uint64
+	ExitEpoch       uint64
 }
 
 type validatorSyncMarshaling struct {
-	InitTxHash *common.Hash    `json:"initTxHash"`
-	OpType     *hexutil.Uint64 `json:"opType"`
-	ProcEpoch  *hexutil.Uint64 `json:"procEpoch"`
-	Index      *hexutil.Uint64 `json:"index"`
-	Creator    *common.Address `json:"creator"`
-	Amount     *hexutil.Big    `json:"amount"`
-	TxHash     *common.Hash    `json:"txHash"`
-	Balance    *hexutil.Big    `json:"balance"`
+	InitTxHash      *common.Hash    `json:"initTxHash"`
+	OpType          *hexutil.Uint64 `json:"opType"`
+	ProcEpoch       *hexutil.Uint64 `json:"procEpoch"`
+	Index           *hexutil.Uint64 `json:"index"`
+	Creator         *common.Address `json:"creator"`
+	Amount          *hexutil.Big    `json:"amount"`
+	TxHash          *common.Hash    `json:"txHash"`
+	Balance         *hexutil.Big    `json:"balance"`
+	ActivationEpoch *hexutil.Uint64 `json:"activationEpoch"`
+	ExitEpoch       *hexutil.Uint64 `json:"exitEpoch"`
 }
 
 func (vs *ValidatorSync) Copy() *ValidatorSync {
 	cpy := &ValidatorSync{
-		OpType:    vs.OpType,
-		ProcEpoch: vs.ProcEpoch,
-		Index:     vs.Index,
+		OpType:          vs.OpType,
+		ProcEpoch:       vs.ProcEpoch,
+		Index:           vs.Index,
+		ActivationEpoch: vs.ActivationEpoch,
+		ExitEpoch:       vs.ExitEpoch,
 	}
 	copy(cpy.Creator[:], vs.Creator[:])
 	copy(cpy.InitTxHash[:], vs.InitTxHash[:])
@@ -174,7 +181,7 @@ func (vs *ValidatorSync) Print() string {
 	if vs == nil {
 		return "{nil}"
 	}
-	return fmt.Sprintf("{InitTxHash: %#x, OpType: %d, ProcEpoch: %d, Index: %d, Creator: %#x, Amount: %s, Balance: %s, TxHash: %#x}",
+	return fmt.Sprintf("{InitTxHash: %#x, OpType: %d, ProcEpoch: %d, Index: %d, Creator: %#x, Amount: %s, Balance: %s, TxHash: %#x, ActivationEpoch: %d, ExitEpoch: %d}",
 		vs.InitTxHash,
 		vs.OpType,
 		vs.ProcEpoch,
@@ -183,6 +190,8 @@ func (vs *ValidatorSync) Print() string {
 		vs.Amount.String(),
 		vs.Balance.String(),
 		vs.TxHash,
+		vs.ActivationEpoch,
+		vs.ExitEpoch,
 	)
 }
 
@@ -196,14 +205,16 @@ func (vs *ValidatorSync) Key() common.Hash {
 
 func (vs *ValidatorSync) MarshalJSON() ([]byte, error) {
 	out := validatorSyncMarshaling{
-		OpType:     (*hexutil.Uint64)(&vs.OpType),
-		ProcEpoch:  (*hexutil.Uint64)(&vs.ProcEpoch),
-		Index:      (*hexutil.Uint64)(&vs.Index),
-		Creator:    &vs.Creator,
-		Amount:     nil,
-		TxHash:     vs.TxHash,
-		InitTxHash: &vs.InitTxHash,
-		Balance:    nil,
+		OpType:          (*hexutil.Uint64)(&vs.OpType),
+		ProcEpoch:       (*hexutil.Uint64)(&vs.ProcEpoch),
+		Index:           (*hexutil.Uint64)(&vs.Index),
+		Creator:         &vs.Creator,
+		Amount:          nil,
+		TxHash:          vs.TxHash,
+		InitTxHash:      &vs.InitTxHash,
+		Balance:         nil,
+		ActivationEpoch: (*hexutil.Uint64)(&vs.ActivationEpoch),
+		ExitEpoch:       (*hexutil.Uint64)(&vs.ExitEpoch),
 	}
 	if vs.Amount != nil {
 		out.Amount = (*hexutil.Big)(vs.Amount)
@@ -242,6 +253,12 @@ func (vs *ValidatorSync) UnmarshalJSON(input []byte) error {
 	}
 	if dec.Balance != nil {
 		vs.Balance = (*big.Int)(dec.Balance)
+	}
+	if dec.ActivationEpoch != nil {
+		vs.ActivationEpoch = uint64(*dec.ActivationEpoch)
+	}
+	if dec.ExitEpoch != nil {
+		vs.ExitEpoch = uint64(*dec.ExitEpoch)
 	}
 	return nil
 }

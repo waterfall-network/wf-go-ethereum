@@ -2,12 +2,15 @@ package types
 
 import (
 	"database/sql/driver"
+	"encoding/json"
 	"fmt"
+	"math"
 	"math/big"
 	"reflect"
 	"testing"
 
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/common/hexutil"
 )
 
 func TestValidatorSync_Copy(t *testing.T) {
@@ -21,20 +24,89 @@ func TestValidatorSync_Copy(t *testing.T) {
 	}
 	src_1.Amount.SetString("32789456000000", 10)
 
+	src_2 := &ValidatorSync{
+		OpType:          UpdateBalance,
+		ProcEpoch:       45645,
+		Index:           45645,
+		Creator:         common.Address{0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa},
+		Amount:          new(big.Int),
+		InitTxHash:      common.HexToHash("6bd2dcd23984cfb26a005a677d5d94e6e58467026fdbd40b8b7da891247b799f"),
+		ActivationEpoch: 645,
+		ExitEpoch:       math.MaxUint64,
+	}
+	src_2.Amount.SetString("32999956000000", 10)
+
 	tests := []struct {
 		name string
 		src  *ValidatorSync
 		want driver.Value
 	}{
 		{
-			name: "Copy-1",
+			name: "Copy-v1",
 			src:  src_1,
 			want: src_1,
+		},
+		{
+			name: "Copy-v2",
+			src:  src_2,
+			want: src_2,
 		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got := tt.src.Copy()
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("got:  %v\nwant: %v", got, tt.want)
+			}
+		})
+	}
+}
+func TestValidatorSync_Print(t *testing.T) {
+	src_1 := &ValidatorSync{
+		OpType:     2,
+		ProcEpoch:  45645,
+		Index:      45645,
+		Creator:    common.Address{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+		Amount:     new(big.Int),
+		InitTxHash: common.Hash{1, 2, 3},
+	}
+	src_1.Amount.SetString("32789456000000", 10)
+
+	src_2 := &ValidatorSync{
+		OpType:          UpdateBalance,
+		ProcEpoch:       45645,
+		Index:           45645,
+		Creator:         common.Address{0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa, 0xaa},
+		Amount:          new(big.Int),
+		InitTxHash:      common.HexToHash("6bd2dcd23984cfb26a005a677d5d94e6e58467026fdbd40b8b7da891247b799f"),
+		ActivationEpoch: 645,
+		ExitEpoch:       math.MaxUint64,
+	}
+	src_2.Amount.SetString("32999956000000", 10)
+
+	tests := []struct {
+		name string
+		src  *ValidatorSync
+		want driver.Value
+	}{
+		{
+			name: "Copy-v1",
+			src:  src_1,
+			want: "{InitTxHash: 0x0102030000000000000000000000000000000000000000000000000000000000, OpType: 2, " +
+				"ProcEpoch: 45645, Index: 45645, Creator: 0xffffffffffffffffffffffffffffffffffffffff, " +
+				"Amount: 32789456000000, Balance: <nil>, TxHash: <nil>, ActivationEpoch: 0, ExitEpoch: 0}",
+		},
+		{
+			name: "Copy-v2",
+			src:  src_2,
+			want: "{InitTxHash: 0x6bd2dcd23984cfb26a005a677d5d94e6e58467026fdbd40b8b7da891247b799f, OpType: 2, " +
+				"ProcEpoch: 45645, Index: 45645, Creator: 0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa, " +
+				"Amount: 32999956000000, Balance: <nil>, TxHash: <nil>, ActivationEpoch: 645, ExitEpoch: 18446744073709551615}",
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.src.Print()
 			if !reflect.DeepEqual(got, tt.want) {
 				t.Errorf("got:  %v\nwant: %v", got, tt.want)
 			}
@@ -137,7 +209,92 @@ func TestValidatorSync_UnMarshalJSON(t *testing.T) {
 	src_1.Amount.SetString("32789456000000", 10)
 	src_1.Balance.SetString("1032789456000000", 10)
 
-	input, _ := src_1.MarshalJSON()
+	src_2 := &ValidatorSync{
+		OpType:          2,
+		ProcEpoch:       45645,
+		Index:           45645,
+		Creator:         common.Address{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+		Amount:          new(big.Int),
+		Balance:         new(big.Int),
+		InitTxHash:      common.Hash{1, 2, 3},
+		ActivationEpoch: 789,
+		ExitEpoch:       math.MaxUint64,
+	}
+	src_2.Amount.SetString("32789456000000", 10)
+	src_2.Balance.SetString("1032789456000000", 10)
+
+	input1, _ := src_1.MarshalJSON()
+	input2, _ := src_2.MarshalJSON()
+	tests := []struct {
+		name  string
+		input []byte
+		want  driver.Value
+	}{
+		{
+			name:  "Marshal-1",
+			input: input1,
+			want:  fmt.Sprintf("%#v", src_1),
+		},
+		{
+			name:  "Marshal-2",
+			input: input2,
+			want:  fmt.Sprintf("%#v", src_2),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			res := &ValidatorSync{}
+			res.UnmarshalJSON(tt.input)
+			got := fmt.Sprintf("%#v", res)
+			if !reflect.DeepEqual(got, tt.want) {
+				t.Errorf("got:  %v\nwant: %v", got, tt.want)
+			}
+		})
+	}
+}
+
+func TestValidatorSync_UnMarshalJSON_deprecatedJsonV0(t *testing.T) {
+	//deprecated json data struct
+	type validatorSyncMarshalingV0 struct {
+		InitTxHash *common.Hash    `json:"initTxHash"`
+		OpType     *hexutil.Uint64 `json:"opType"`
+		ProcEpoch  *hexutil.Uint64 `json:"procEpoch"`
+		Index      *hexutil.Uint64 `json:"index"`
+		Creator    *common.Address `json:"creator"`
+		Amount     *hexutil.Big    `json:"amount"`
+		TxHash     *common.Hash    `json:"txHash"`
+		Balance    *hexutil.Big    `json:"balance"`
+	}
+
+	vs := &ValidatorSync{
+		OpType:     2,
+		ProcEpoch:  45645,
+		Index:      45645,
+		Creator:    common.Address{0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
+		Amount:     new(big.Int),
+		Balance:    new(big.Int),
+		InitTxHash: common.Hash{1, 2, 3},
+	}
+	vs.Amount.SetString("32789456000000", 10)
+	vs.Balance.SetString("1032789456000000", 10)
+
+	src_1 := validatorSyncMarshalingV0{
+		OpType:     (*hexutil.Uint64)(&vs.OpType),
+		ProcEpoch:  (*hexutil.Uint64)(&vs.ProcEpoch),
+		Index:      (*hexutil.Uint64)(&vs.Index),
+		Creator:    &vs.Creator,
+		Amount:     nil,
+		TxHash:     vs.TxHash,
+		InitTxHash: &vs.InitTxHash,
+		Balance:    nil,
+	}
+	if vs.Amount != nil {
+		src_1.Amount = (*hexutil.Big)(vs.Amount)
+	}
+	if vs.Balance != nil {
+		src_1.Balance = (*hexutil.Big)(vs.Balance)
+	}
+	input, _ := json.Marshal(src_1)
 	tests := []struct {
 		name  string
 		input []byte
@@ -146,7 +303,7 @@ func TestValidatorSync_UnMarshalJSON(t *testing.T) {
 		{
 			name:  "Marshal-1",
 			input: input,
-			want:  fmt.Sprintf("%#v", src_1),
+			want:  fmt.Sprintf("%#v", vs),
 		},
 	}
 	for _, tt := range tests {
