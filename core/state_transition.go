@@ -383,7 +383,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 			ret, vmerr = st.vp.Call(sender, st.to(), st.value, st.msg)
 		} else {
 			if st.evm.ChainConfig().IsForkSlotValSyncProc(st.evm.Context.Slot) {
-				err = st.checkValidatorTransferTx(msg)
+				err = st.checkTxType(msg.To(), txType)
 				if err != nil {
 					return nil, err
 				}
@@ -421,12 +421,9 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	}, nil
 }
 
-func (st *StateTransition) checkValidatorTransferTx(msg Message) error {
-	if msg.To() != nil && *msg.To() == st.vp.GetValidatorsStateAddress() {
-		if len(msg.Data()) > 0 {
-			return nil
-		}
-
+func (st *StateTransition) checkTxType(to *common.Address, txType TxType) error {
+	if to != nil && bytes.Equal(to.Bytes(), st.vp.GetValidatorsStateAddress().Bytes()) &&
+		txType != ValidatorSyncTxType && txType != ValidatorMethodTxType {
 		return errors.New("invalid validator transaction")
 	}
 
