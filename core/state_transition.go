@@ -18,6 +18,7 @@ package core
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -381,6 +382,13 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		} else if isValidatorOp {
 			ret, vmerr = st.vp.Call(sender, st.to(), st.value, st.msg)
 		} else {
+			if st.evm.ChainConfig().IsForkSlotValSyncProc(st.evm.Context.Slot) {
+				err = st.checkValidatorTransferTx(msg)
+				if err != nil {
+					return nil, err
+				}
+			}
+
 			// Increment the nonce for the next transaction
 			st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
 
@@ -411,6 +419,18 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		Err:        vmerr,
 		ReturnData: ret,
 	}, nil
+}
+
+func (st *StateTransition) checkValidatorTransferTx(msg Message) error {
+	if msg.To() != nil && *msg.To() == st.vp.GetValidatorsStateAddress() {
+		if len(msg.Data()) > 0 {
+			return nil
+		}
+
+		return errors.New("invalid validator transaction")
+	}
+
+	return nil
 }
 
 func (st *StateTransition) refundGas(refundQuotient uint64) {

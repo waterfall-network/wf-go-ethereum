@@ -795,11 +795,7 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	if !isTokenOp {
 		txData := tx.Data()
 		if isValidatorOp {
-			err := pool.handleValidatorTransaction(txData, from, tx.Value())
-			if err != nil {
-				return err
-			}
-			return nil
+			return pool.handleValidatorTransaction(txData, from, tx.Value())
 		}
 	}
 
@@ -838,11 +834,11 @@ func (pool *TxPool) handleValidatorTransaction(txData []byte, from common.Addres
 		case valOperation.Deposit:
 			return pool.checkDepositOperation(v, from, value)
 		}
-		return nil
 	}
 
-	log.Warn("validator transaction has no txData")
-	return nil
+	log.Warn("validator transaction has invalid txData", "txData", string(txData))
+
+	return errors.New("validator transaction has invalid txData")
 }
 func (pool *TxPool) isValidatorTrialPeriod(validator *valStore.Validator) (bool, error) {
 	bc := pool.chain
