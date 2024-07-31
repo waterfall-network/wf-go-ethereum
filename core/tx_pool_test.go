@@ -173,6 +173,11 @@ func (bc *testBlockChain) EpochToEra(u uint64) *era.Era {
 	panic("implement me")
 }
 
+func (bc *testBlockChain) CheckValidatorOp(txData []byte, from common.Address, value *big.Int) error {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (bc *testBlockChain) GetHeaderByHash(hash common.Hash) *types.Header {
 	//TODO implement me
 	panic("implement me")
