@@ -46,7 +46,7 @@ func init() {
 		ValidatorsPerSlot:      2,
 		EpochsPerEra:           22,
 		TransitionPeriod:       2,
-		ValidatorOpExpireSlots: 14400,
+		ValidatorOpExpireSlots: 100,
 		ForkSlotSubNet1:        9999999,
 		ForkSlotDelegate:       10,
 		ForkSlotPrefixFin:      10,
