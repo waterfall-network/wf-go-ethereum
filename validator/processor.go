@@ -53,15 +53,6 @@ var (
 )
 
 const (
-	//	// 1024 bytes
-	//	MetadataMaxSize = 1 << 10
-	//
-	//	// Common fields
-	//	pubkeyLogType    = "pubkey"
-	//	signatureLogType = "signature"
-	//	addressLogType   = "address"
-	//	uint256LogType   = "uint256"
-	//	boolLogType      = "bool"
 	postpone = 2
 )
 
@@ -209,6 +200,7 @@ func (p *Processor) Call(caller Ref, toAddr common.Address, value *big.Int, msg 
 				"procEpoch", v.ProcEpoch(),
 				"blHash", p.ctx.BlockHash.Hex(),
 				"err", err,
+				"tx", msg.TxHash().Hex(),
 			)
 		} else {
 			log.Info("Validator sync: success",
@@ -217,6 +209,7 @@ func (p *Processor) Call(caller Ref, toAddr common.Address, value *big.Int, msg 
 				"creator", v.Creator().Hex(),
 				"procEpoch", v.ProcEpoch(),
 				"blHash", p.ctx.BlockHash.Hex(),
+				"tx", msg.TxHash().Hex(),
 			)
 		}
 	case operation.Exit:
@@ -704,8 +697,12 @@ func (p *Processor) validatorActivate(op operation.ValidatorSync) ([]byte, error
 	validator.ResetDepositTxs()
 
 	opEra := p.blockchain.EpochToEra(op.ProcEpoch())
-
-	validator.SetActivationEra(opEra.Number + postpone)
+	opEraNr := opEra.Number
+	if p.blockchain.Config().IsForkSlotValSyncProc(p.ctx.Slot) {
+		//use current block era
+		opEraNr = p.ctx.Era
+	}
+	validator.SetActivationEra(opEraNr + postpone)
 	validator.SetIndex(op.Index())
 	validator.UnsetStake()
 	err = p.Storage().SetValidator(p.state, validator)
@@ -752,7 +749,7 @@ func (p *Processor) validatorDeactivate(op operation.ValidatorSync) ([]byte, err
 	validator = p.updateValidatorVersionBySlot(validator)
 	validator.SetExitTx(nil)
 
-	exitEra := opEra.Number + postpone
+	exitEra := opEraNr + postpone
 	validator.SetExitEra(exitEra)
 	err = p.Storage().SetValidator(p.state, validator)
 	if err != nil {
@@ -912,6 +909,13 @@ func (p *Processor) validatorUpdateBalance(op operation.ValidatorSync) ([]byte, 
 			}
 		}
 	} else if validator.HasDelegatingStake() {
+		if p.blockchain.Config().IsForkSlotValSyncProc(p.ctx.Slot) {
+			// update validator data
+			err = p.Storage().SetValidator(p.state, validator)
+			if err != nil {
+				return nil, err
+			}
+		}
 		// Handle delegate rules
 		return p.applyDelegatingStakeRules(op, validator)
 	} else {

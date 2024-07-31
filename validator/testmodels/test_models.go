@@ -52,7 +52,7 @@ func init() {
 		ForkSlotPrefixFin:      10,
 		ForkSlotShanghai:       0,
 		ForkSlotValOpTracking:  100,
-		ForkSlotValSyncProc:    100,
+		ForkSlotValSyncProc:    10000,
 		StartEpochsPerEra:      0,
 		EffectiveBalance:       big.NewInt(3200),
 	}
