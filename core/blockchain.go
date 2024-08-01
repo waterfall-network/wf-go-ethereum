@@ -5499,7 +5499,7 @@ func (bc *BlockChain) CheckValidatorOp(txData []byte, from common.Address, value
 		case validatorOp.Deposit:
 			return bc.checkDepositOperation(v, from, value)
 		case validatorOp.WithdrawalFromValState:
-			return bc.checkWithdrawalFormValState(v)
+			return bc.checkWithdrawalFromValState(v)
 		}
 	}
 
@@ -5666,7 +5666,7 @@ func (bc *BlockChain) checkWithdrawalOperation(op validatorOp.Withdrawal, from c
 	return nil
 }
 
-func (bc *BlockChain) checkWithdrawalFormValState(v validatorOp.WithdrawalFromValState) error {
+func (bc *BlockChain) checkWithdrawalFromValState(v validatorOp.WithdrawalFromValState) error {
 	if !bc.Config().IsForkSlotValSyncProc(bc.GetSlotInfo().CurrentSlot()) {
 		return errors.New("current fork does not support withdrawal from validators state address")
 	}
