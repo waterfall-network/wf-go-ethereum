@@ -5498,6 +5498,8 @@ func (bc *BlockChain) CheckValidatorOp(txData []byte, from common.Address, value
 			return bc.checkWithdrawalOperation(v, from)
 		case validatorOp.Deposit:
 			return bc.checkDepositOperation(v, from, value)
+		case validatorOp.WithdrawalFromValState:
+			return bc.checkWithdrawalFormValState(v)
 		}
 	}
 
@@ -5659,6 +5661,29 @@ func (bc *BlockChain) checkWithdrawalOperation(op validatorOp.Withdrawal, from c
 				}
 			}
 		}
+	}
+
+	return nil
+}
+
+func (bc *BlockChain) checkWithdrawalFormValState(v validatorOp.WithdrawalFromValState) error {
+	if !bc.Config().IsForkSlotValSyncProc(bc.GetSlotInfo().CurrentSlot()) {
+		return errors.New("current fork does not support withdrawal from validators state address")
+	}
+
+	valStateAddress := bc.ValidatorStorage().GetValidatorsStateAddress()
+	if valStateAddress == nil {
+		return errors.New("empty validators state address")
+	}
+
+	stateDb, err := bc.State()
+	if err != nil {
+		return err
+	}
+
+	valStateBalance := stateDb.GetBalance(*valStateAddress)
+	if valStateBalance.Cmp(v.Amount()) < 0 {
+		return ErrInsufficientFundsForTransfer
 	}
 
 	return nil
