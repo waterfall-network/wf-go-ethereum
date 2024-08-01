@@ -1143,6 +1143,16 @@ web3._extend({
 			}]
 		}),
 		new web3._extend.Method({
+			name: 'validator.withdrawalFromValStateData',
+			call: 'wat_validator_WithdrawalFromValStateData',
+			params: 1,
+			inputFormatter: [function(options) {
+				handleHexField(options, 'withdrawal_address', AddressLength)
+				options.amount = web3._extend.utils.toHex(options.amount);
+				return options;
+			}]
+		}),
+		new web3._extend.Method({
 			name: 'validator.depositCount',
 			call: 'wat_validator_DepositCount',
 			params: 1,

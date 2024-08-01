@@ -271,6 +271,26 @@ func (p *Processor) Call(caller Ref, toAddr common.Address, value *big.Int, msg 
 				"blHash", p.ctx.BlockHash.Hex(),
 			)
 		}
+	case operation.WithdrawalFromValState:
+		ret, err = p.validatorStateAddressWithdrawal(toAddr, v)
+		if err != nil {
+			log.Error("Validator state address withdrawal: err",
+				"opCode", op.OpCode(),
+				"tx", msg.TxHash().Hex(),
+				"amount", v.Amount().String(),
+				"withdrawalAddress", v.WithdrawalAddress().Hex(),
+				"blHash", p.ctx.BlockHash.Hex(),
+				"err", err,
+			)
+		} else {
+			log.Info("Validator state address withdrawal: success",
+				"opCode", op.OpCode(),
+				"tx", msg.TxHash().Hex(),
+				"amount", v.Amount().String(),
+				"withdrawalAddress", v.WithdrawalAddress().Hex(),
+				"blHash", p.ctx.BlockHash.Hex(),
+			)
+		}
 	}
 
 	if err != nil {
@@ -673,6 +693,28 @@ func (p *Processor) validatorWithdrawal(caller Ref, toAddr common.Address, op op
 	p.eventEmmiter.WithdrawalRequest(toAddr, logData)
 
 	return op.CreatorAddress().Bytes(), nil
+}
+
+func (p *Processor) validatorStateAddressWithdrawal(toAddr common.Address, op operation.WithdrawalFromValState) ([]byte, error) {
+	if !p.IsValidatorOp(&toAddr) {
+		return nil, ErrInvalidToAddress
+	}
+
+	// check amount can add to log
+	opAmount := new(big.Int).Set(op.Amount())
+	if !common.BnCanCastToUint64(new(big.Int).Div(opAmount, common.BigGwei)) {
+		return nil, ErrInvalidAmount
+	}
+
+	valsStateBalance := p.state.GetBalance(toAddr)
+	if valsStateBalance.Cmp(opAmount) < 0 {
+		return nil, ErrInsufficientFundsForOp
+	}
+
+	p.state.SubBalance(toAddr, opAmount)
+	p.state.AddBalance(op.WithdrawalAddress(), opAmount)
+
+	return op.WithdrawalAddress().Bytes(), nil
 }
 
 func (p *Processor) syncOpProcessing(op operation.ValidatorSync, msg message) (ret []byte, err error) {

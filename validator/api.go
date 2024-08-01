@@ -255,6 +255,28 @@ func (s *PublicValidatorAPI) Validator_WithdrawalData(args WithdrawalArgs) (hexu
 	return b, nil
 }
 
+type WithdrawalFromValStateArgs struct {
+	WithdrawalAddress *common.Address `json:"withdrawal_address"`
+	Amount            *hexutil.Big    `json:"amount"`
+}
+
+func (s *PublicValidatorAPI) Validator_WithdrawalFromValStateData(args WithdrawalFromValStateArgs) (hexutil.Bytes, error) {
+	if args.WithdrawalAddress == nil {
+		return nil, operation.ErrNoWithdrawalAddress
+	}
+
+	if args.Amount == nil {
+		return nil, operation.ErrNoAmount
+	}
+
+	op, err := operation.NewWithdrawalFromValStateOperation(*args.WithdrawalAddress, (*big.Int)(args.Amount))
+	if err != nil {
+		return nil, err
+	}
+
+	return operation.EncodeToBytes(op)
+}
+
 func (s *PublicValidatorAPI) Validator_DepositAddress() hexutil.Bytes {
 	return s.b.ChainConfig().ValidatorsStateAddress[:]
 }
