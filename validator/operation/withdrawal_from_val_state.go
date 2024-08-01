@@ -30,11 +30,11 @@ func (op *withdrawalFromValStateOperation) init(
 }
 
 func NewWithdrawalFromValStateOperation(
-	validatorAddress common.Address,
+	withdrawalAddress common.Address,
 	amount *big.Int,
 ) (WithdrawalFromValState, error) {
 	op := &withdrawalFromValStateOperation{}
-	if err := op.init(validatorAddress, amount); err != nil {
+	if err := op.init(withdrawalAddress, amount); err != nil {
 		return nil, err
 	}
 
@@ -52,11 +52,11 @@ func (op *withdrawalFromValStateOperation) MarshalBinary() ([]byte, error) {
 }
 
 func (op *withdrawalFromValStateOperation) UnmarshalBinary(data []byte) error {
-	validatorAddress := common.BytesToAddress(data[:common.AddressLength])
+	withdrawalAddress := common.BytesToAddress(data[:common.AddressLength])
 
 	amount := new(big.Int).SetBytes(data[common.AddressLength:])
 
-	return op.init(validatorAddress, amount)
+	return op.init(withdrawalAddress, amount)
 }
 
 func (op *withdrawalFromValStateOperation) OpCode() Code {
