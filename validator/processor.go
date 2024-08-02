@@ -420,7 +420,7 @@ func (p *Processor) validatorExit(caller Ref, toAddr common.Address, op operatio
 	}
 
 	if op.ExitAfterEpoch() == nil {
-		exitAftEpoch := p.blockchain.GetSlotInfo().SlotToEpoch(p.blockchain.GetSlotInfo().CurrentSlot()) + 1
+		exitAftEpoch := p.blockchain.GetSlotInfo().SlotToEpoch(p.ctx.Slot) + 1
 		op.SetExitAfterEpoch(&exitAftEpoch)
 	}
 

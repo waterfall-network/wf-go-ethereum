@@ -108,4 +108,8 @@ var (
 
 	// ErrCpNotFinalized is returned if the checkpoint is not finalized yet.
 	ErrCpNotFinalized = errors.New("checkpoint is not finalized")
+
+	ErrCpBlockNotNotFound = errors.New("checkpoint block not found")
+
+	ErrCpBadFinalization = errors.New("checkpoint bad finalization")
 )
