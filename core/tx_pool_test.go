@@ -399,23 +399,23 @@ type testChain struct {
 	*BlockChain
 	statedb *state.StateDB
 	address common.Address
-	trigger *bool
+	Trigger bool
 }
 
-// testChain.State() is used multiple times to reset the pending state.
+// testChain.StateAt() is used multiple times to reset the pending state.
 // when simulate is true it will create a state that indicates
 // that tx0 and tx1 are included in the chain.
-func (c *testChain) State() (*state.StateDB, error) {
+func (c *testChain) StateAt(root common.Hash) (*state.StateDB, error) {
 	// delay "state change" by one. The tx pool fetches the
 	// state multiple times and by delaying it a bit we simulate
 	// a state change between those fetches.
 	stdb := c.statedb
-	if *c.trigger {
-		c.statedb, _ = state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
+	if c.Trigger {
+		//c.statedb, _ = state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
 		// simulate that the new head block included tx0 and tx1
 		c.statedb.SetNonce(c.address, 2)
 		c.statedb.SetBalance(c.address, new(big.Int).SetUint64(params.Ether))
-		*c.trigger = false
+		c.Trigger = false
 	}
 	return stdb, nil
 }
@@ -428,7 +428,6 @@ func TestStateChangeDuringTransactionPoolReset(t *testing.T) {
 		key, _     = crypto.GenerateKey()
 		address    = crypto.PubkeyToAddress(key.PublicKey)
 		statedb, _ = state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
-		trigger    = false
 	)
 
 	// setup pool with 2 transaction in it
@@ -437,11 +436,11 @@ func TestStateChangeDuringTransactionPoolReset(t *testing.T) {
 		defaultTestBC(common.Address{}),
 		statedb,
 		address,
-		&trigger,
+		false,
 	}
-	tx0 := types.NewTransaction(uint64(0), common.Address{}, big.NewInt(0), 21000, big.NewInt(0), nil)
+	tx0 := types.NewTransaction(uint64(0), common.Address{}, big.NewInt(0), 21000, big.NewInt(17772), nil)
 	tx0, _ = types.SignTx(tx0, types.HomesteadSigner{}, key)
-	tx1 := types.NewTransaction(uint64(1), common.Address{}, big.NewInt(0), 21000, big.NewInt(0), nil)
+	tx1 := types.NewTransaction(uint64(1), common.Address{}, big.NewInt(0), 21000, big.NewInt(17772), nil)
 	tx1, _ = types.SignTx(tx1, types.HomesteadSigner{}, key)
 
 	pool := NewTxPool(testTxPoolConfig, params.TestChainConfig, blockchain)
@@ -460,7 +459,7 @@ func TestStateChangeDuringTransactionPoolReset(t *testing.T) {
 	}
 
 	// trigger state change in the background
-	trigger = true
+	blockchain.Trigger = true
 	<-pool.requestReset(nil, nil)
 
 	if nonce = pool.Nonce(address); nonce != 2 {
@@ -628,12 +627,12 @@ func TestTransactionChainFork(t *testing.T) {
 		statedb, _ := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
 		statedb.AddBalance(addr, big.NewInt(100000000000000))
 
-		pool.chain = defaultTestBC(common.Address{})
+		pool.chain = defaultTestBC(addr)
 		<-pool.requestReset(nil, nil)
 	}
 	resetState()
 
-	tx := types.NewTransaction(uint64(0), common.Address{}, big.NewInt(0), 21000, big.NewInt(0), nil)
+	tx := types.NewTransaction(uint64(0), addr, big.NewInt(0), 21000, big.NewInt(17772), nil)
 	tx, _ = types.SignTx(tx, types.HomesteadSigner{}, key)
 	if _, err := pool.add(tx, false); err != nil {
 		t.Error("didn't expect error", err)
