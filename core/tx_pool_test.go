@@ -1899,14 +1899,20 @@ func TestTransactionPoolStableUnderpricing(t *testing.T) {
 	keys := make([]*ecdsa.PrivateKey, 2)
 	for i := 0; i < len(keys); i++ {
 		keys[i], _ = crypto.GenerateKey()
-		testAddBalance(pool, crypto.PubkeyToAddress(keys[i].PublicKey), big.NewInt(1000000))
+		testAddBalance(pool, crypto.PubkeyToAddress(keys[i].PublicKey), big.NewInt(1_000_000_000_000))
 	}
 	// Fill up the entire queue with the same transaction price points
 	txs := types.Transactions{}
+	baseFeeX1 := pool.chain.GetLastFinalizedHeader().BaseFee
+	baseFeeX3 := new(big.Int).Mul(baseFeeX1, big.NewInt(3))
+
 	for i := uint64(0); i < config.GlobalSlots; i++ {
-		txs = append(txs, pricedTransaction(i, 21000, big.NewInt(1), keys[0]))
+		txs = append(txs, pricedTransaction(i, 21000, baseFeeX1, keys[0]))
 	}
-	pool.AddRemotesSync(txs)
+	errs := pool.AddRemotesSync(txs)
+	for _, err := range errs {
+		require.NoError(t, err)
+	}
 
 	pending, queued, _ := pool.Stats()
 
@@ -1923,7 +1929,7 @@ func TestTransactionPoolStableUnderpricing(t *testing.T) {
 		t.Fatalf("pool internal state corrupted: %v", err)
 	}
 	// Ensure that adding high priced transactions drops a cheap, but doesn't produce a gap
-	if err := pool.addRemoteSync(pricedTransaction(0, 21000, big.NewInt(3), keys[1])); err != nil {
+	if err := pool.addRemoteSync(pricedTransaction(0, 21000, baseFeeX3, keys[1])); err != nil {
 		t.Fatalf("failed to add well priced transaction: %v", err)
 	}
 	pending, queued, _ = pool.Stats()
@@ -2123,8 +2129,9 @@ func TestTransactionDeduplication(t *testing.T) {
 
 	// Create a batch of transactions and add a few of them
 	txs := make([]*types.Transaction, 16)
+	baseFeeX1 := pool.chain.GetLastFinalizedHeader().BaseFee
 	for i := 0; i < len(txs); i++ {
-		txs[i] = pricedTransaction(uint64(i), 21000, big.NewInt(1), key)
+		txs[i] = pricedTransaction(uint64(i), 21000, baseFeeX1, key)
 	}
 	var firsts []*types.Transaction
 	for i := 0; i < len(txs); i += 2 {
@@ -2189,19 +2196,25 @@ func TestTransactionReplacement(t *testing.T) {
 
 	// Create a test account to add transactions with
 	key, _ := crypto.GenerateKey()
-	testAddBalance(pool, crypto.PubkeyToAddress(key.PublicKey), big.NewInt(1000000000))
+	testAddBalance(pool, crypto.PubkeyToAddress(key.PublicKey), big.NewInt(1000_000_000_000))
+
+	baseFeeX1 := pool.chain.GetLastFinalizedHeader().BaseFee
+	baseFeeX2 := new(big.Int).Mul(baseFeeX1, big.NewInt(2))
+	baseFeeX3 := new(big.Int).Mul(baseFeeX1, big.NewInt(3))
+	//baseFeeX4 := new(big.Int).Mul(baseFeeX1, big.NewInt(4))
+	//baseFeeX5 := new(big.Int).Mul(baseFeeX1, big.NewInt(5))
 
 	// Add pending transactions, ensuring the minimum price bump is enforced for replacement (for ultra low prices too)
-	price := int64(100)
+	price := baseFeeX3.Int64()
 	threshold := (price * (100 + int64(testTxPoolConfig.PriceBump))) / 100
 
-	if err := pool.addRemoteSync(pricedTransaction(0, 21000, big.NewInt(1), key)); err != nil {
+	if err := pool.addRemoteSync(pricedTransaction(0, 21000, baseFeeX1, key)); err != nil {
 		t.Fatalf("failed to add original cheap pending transaction: %v", err)
 	}
-	if err := pool.AddRemote(pricedTransaction(0, 2, big.NewInt(1), key)); err != ErrIntrinsicGas {
+	if err := pool.AddRemote(pricedTransaction(0, 2, baseFeeX1, key)); err != ErrIntrinsicGas {
 		t.Fatalf("original cheap pending transaction replacement error mismatch: have %v, want %v", err, ErrIntrinsicGas)
 	}
-	if err := pool.AddRemote(pricedTransaction(0, 21000, big.NewInt(2), key)); err != nil {
+	if err := pool.AddRemote(pricedTransaction(0, 21000, baseFeeX2, key)); err != nil {
 		t.Fatalf("failed to replace original cheap pending transaction: %v", err)
 	}
 	if err := validateEvents(events, 2); err != nil {
@@ -2222,13 +2235,13 @@ func TestTransactionReplacement(t *testing.T) {
 	}
 
 	// Add queued transactions, ensuring the minimum price bump is enforced for replacement (for ultra low prices too)
-	if err := pool.AddRemote(pricedTransaction(2, 21000, big.NewInt(1), key)); err != nil {
+	if err := pool.AddRemote(pricedTransaction(2, 21000, baseFeeX1, key)); err != nil {
 		t.Fatalf("failed to add original cheap queued transaction: %v", err)
 	}
-	if err := pool.AddRemote(pricedTransaction(2, 21000, big.NewInt(1), key)); err != ErrAlreadyKnown {
+	if err := pool.AddRemote(pricedTransaction(2, 21000, baseFeeX1, key)); err != ErrAlreadyKnown {
 		t.Fatalf("original cheap queued transaction replacement error mismatch: have %v, want %v", err, ErrAlreadyKnown)
 	}
-	if err := pool.AddRemote(pricedTransaction(2, 21000, big.NewInt(2), key)); err != nil {
+	if err := pool.AddRemote(pricedTransaction(2, 21000, baseFeeX2, key)); err != nil {
 		t.Fatalf("failed to replace original cheap queued transaction: %v", err)
 	}
 
