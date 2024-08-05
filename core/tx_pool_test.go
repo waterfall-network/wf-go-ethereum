@@ -28,14 +28,13 @@ import (
 	"testing"
 	"time"
 
-	"gitlab.waterfall.network/waterfall/protocol/gwat/ethdb"
-
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/rawdb"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/state"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/vm"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/crypto"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/ethdb"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/event"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/tests/testutils"
@@ -656,26 +655,26 @@ func TestTransactionDoubleNonce(t *testing.T) {
 		statedb, _ := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
 		statedb.AddBalance(addr, big.NewInt(100000000000000000))
 
-		pool.chain = defaultTestBC(common.Address{})
+		pool.chain = defaultTestBC(addr)
 		<-pool.requestReset(nil, nil)
 	}
 	resetState()
 
 	signer := types.HomesteadSigner{}
 
-	tx1 := types.NewTransaction(uint64(0), common.Address{}, big.NewInt(0), 21000, big.NewInt(0), nil)
-	tx1, _ = types.SignTx(tx1, types.HomesteadSigner{}, key)
-	tx2 := types.NewTransaction(uint64(0), common.Address{}, big.NewInt(0), 21000, big.NewInt(0), nil)
-	tx2, _ = types.SignTx(tx2, types.HomesteadSigner{}, key)
-	tx3 := types.NewTransaction(uint64(0), common.Address{}, big.NewInt(0), 21000, big.NewInt(0), nil)
-	tx3, _ = types.SignTx(tx3, types.HomesteadSigner{}, key)
+	tx1 := types.NewTransaction(uint64(0), common.Address{}, big.NewInt(0), 21000, big.NewInt(17772), nil)
+	tx1, _ = types.SignTx(tx1, signer, key)
+	tx2 := types.NewTransaction(uint64(0), common.Address{}, big.NewInt(0), 21000, big.NewInt(17772+(178*10)), nil)
+	tx2, _ = types.SignTx(tx2, signer, key)
+	tx3 := types.NewTransaction(uint64(0), common.Address{}, big.NewInt(0), 21000, big.NewInt(17772+((178-1)*10)), nil)
+	tx3, _ = types.SignTx(tx3, signer, key)
 
 	// Add the first two transaction, ensure higher priced stays only
 	if replace, err := pool.add(tx1, false); err != nil || replace {
 		t.Errorf("first transaction insert failed (%v) or reported replacement (%v)", err, replace)
 	}
 	if replace, err := pool.add(tx2, false); err != nil || !replace {
-		//t.Errorf("second transaction insert failed (%v) or not reported replacement (%v)", err, replace)
+		t.Errorf("second transaction insert failed (%v) or not reported replacement (%v)", err, replace)
 	}
 	<-pool.requestPromoteExecutables(newAccountSet(signer, addr))
 	if pool.pending[addr].Len() != 1 {
