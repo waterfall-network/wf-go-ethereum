@@ -404,13 +404,42 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		reward = new(big.Int).Add(reward, tips)
 	}
 
-	st.state.AddBalance(st.evm.Context.Coinbase, reward)
+	err = st.processRewards(st.evm.Context.Coinbase, reward)
+	if err != nil {
+		return nil, err
+	}
 
 	return &ExecutionResult{
 		UsedGas:    st.gasUsed(),
 		Err:        vmerr,
 		ReturnData: ret,
 	}, nil
+}
+
+func (st *StateTransition) processRewards(creatorAddress common.Address, reward *big.Int) error {
+	if !st.evm.ChainConfig().IsForkSlotValSyncProc(st.evm.Context.Slot) {
+		st.state.AddBalance(creatorAddress, reward)
+
+		return nil
+	}
+
+	val, err := st.vp.Storage().GetValidator(st.state, creatorAddress)
+	if err != nil {
+		return err
+	}
+	if val.DelegatingStake != nil {
+		for address, percent := range val.DelegatingStake.Rules.ProfitShare() {
+			amount := new(big.Int).Mul(reward, big.NewInt(int64(percent)))
+			amount = new(big.Int).Div(amount, big.NewInt(100))
+			st.state.AddBalance(address, amount)
+		}
+
+		return nil
+	}
+
+	st.state.AddBalance(*val.WithdrawalAddress, reward)
+
+	return nil
 }
 
 func (st *StateTransition) refundGas(refundQuotient uint64) {

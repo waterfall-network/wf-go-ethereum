@@ -20,73 +20,190 @@ import (
 	"math/big"
 	"testing"
 
-	"github.com/stretchr/testify/assert"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/rawdb"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/state"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/vm"
-	"gitlab.waterfall.network/waterfall/protocol/gwat/eth/tracers/logger"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/crypto"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/tests/testutils"
-	"gitlab.waterfall.network/waterfall/protocol/gwat/token"
-	"gitlab.waterfall.network/waterfall/protocol/gwat/token/operation"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/validator"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/operation"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/storage"
 )
 
-var (
-	stateTransition                        *StateTransition
-	tokenProcessor                         *token.Processor
-	stateDB                                vm.StateDB
-	owner, spender, to                     common.Address
-	WRC20Address, WRC721Address            common.Address
-	caller                                 token.Ref
-	value, gasPrice, gasFreeCap, gasTipCap *big.Int
-	gas                                    uint64
-	data                                   []byte
-	name                                   []byte
-	symbol                                 []byte
-	baseURI                                []byte
-	metadata                               []byte
-	totalSupply                            *big.Int
-	decimals                               uint8
-	percentFee                             uint8
-	ID1, ID2, ID3                          *big.Int
-)
+func TestProcessRewards(t *testing.T) {
 
-func init() {
-	owner = common.BytesToAddress(testutils.RandomData(20))
-	spender = common.BytesToAddress(testutils.RandomData(20))
-	caller = vm.AccountRef(owner)
-	to = common.BytesToAddress(testutils.RandomData(20))
-	value = big.NewInt(int64(testutils.RandomInt(10, 30)))
-	totalSupply = big.NewInt(int64(testutils.RandomInt(100, 1000)))
-	decimals = uint8(testutils.RandomInt(0, 255))
-	name = testutils.RandomStringInBytes(testutils.RandomInt(10, 20))
-	symbol = testutils.RandomStringInBytes(testutils.RandomInt(5, 8))
-	baseURI = testutils.RandomStringInBytes(testutils.RandomInt(10, 20))
-	metadata = testutils.RandomData(testutils.RandomInt(20, 50))
-	ID1 = big.NewInt(int64(testutils.RandomInt(1000, 99999999)))
-	ID2 = big.NewInt(int64(testutils.RandomInt(1000, 99999999)))
-	ID3 = big.NewInt(int64(testutils.RandomInt(1000, 99999999)))
-	gasPrice = big.NewInt(100)
-	gasFreeCap = big.NewInt(0)
-	gasTipCap = big.NewInt(0)
-	gas = 25200
-	percentFee = 5
-
-	db, err := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
-	if err != nil {
-		panic("cannot create state DB")
+	chainConfig := &params.ChainConfig{
+		ForkSlotValSyncProc: 100,
 	}
-	db.CreateAccount(owner)
-	db.SetBalance(owner, big.NewInt(10000000000000000))
-	db.CreateAccount(spender)
-	db.SetBalance(spender, big.NewInt(10000000000000000))
-	db.CreateAccount(to)
-	db.SetBalance(to, big.NewInt(10000000000000000))
-	stateDB = db
-	tokenProcessor = token.NewProcessor(vm.BlockContext{}, stateDB)
+
+	bc := &BlockChain{
+		chainConfig: chainConfig,
+	}
+
+	gasPrice := big.NewInt(10 * params.InitialBaseFee)
+	key, err := crypto.GenerateKey()
+	testutils.AssertNoError(t, err)
+
+	tx, _ := types.SignTx(types.NewTransaction(0, common.BytesToAddress(testutils.RandomData(20)), big.NewInt(1000), params.TxGas, gasPrice, nil), types.HomesteadSigner{}, key)
+
+	signer := types.MakeSigner(bc.Config())
+
+	msg, err := tx.AsMessage(signer, big.NewInt(params.InitialBaseFee))
+	testutils.AssertNoError(t, err)
+	valAddress := common.BytesToAddress(testutils.RandomData(20))
+	withdrawalAddress := common.BytesToAddress(testutils.RandomData(20))
+
+	delegateAddress1 := common.BytesToAddress(testutils.RandomData(20))
+	delegateAddress2 := common.BytesToAddress(testutils.RandomData(20))
+	delegateAddress3 := common.BytesToAddress(testutils.RandomData(20))
+
+	profitShare := map[common.Address]uint8{
+		delegateAddress1: 10,
+		delegateAddress2: 20,
+		delegateAddress3: 70,
+	}
+	delegateRules := operation.NewDelegatingStakeRules(profitShare, nil, nil, nil)
+
+	testCases := []struct {
+		name        string
+		currentSlot uint64
+		reward      *big.Int
+		validator   *storage.Validator
+		checkResult func(t *testing.T, stateDb *state.StateDB, val *storage.Validator, reward *big.Int)
+	}{
+		{
+			name:        "Before fork without delegate",
+			currentSlot: 0,
+			reward:      big.NewInt(999),
+			validator:   &storage.Validator{Address: valAddress, WithdrawalAddress: &valAddress},
+			checkResult: func(t *testing.T, stateDb *state.StateDB, val *storage.Validator, reward *big.Int) {
+				balance := stateDb.GetBalance(val.GetAddress())
+				if balance.Cmp(reward) != 0 {
+					t.Fatalf("validator %v has insufficient balance to fork", val.GetAddress())
+				}
+			},
+		},
+		{
+			name:        "Before fork with delegate",
+			currentSlot: 0,
+			reward:      big.NewInt(1000),
+			validator:   &storage.Validator{Address: valAddress, WithdrawalAddress: &valAddress, DelegatingStake: &operation.DelegatingStakeData{Rules: *delegateRules}},
+			checkResult: func(t *testing.T, stateDb *state.StateDB, val *storage.Validator, reward *big.Int) {
+				balance := stateDb.GetBalance(val.GetAddress())
+				if balance.Cmp(reward) != 0 {
+					t.Fatalf("validator %v has insufficient balance to fork", val.GetAddress())
+				}
+			},
+		},
+		{
+			name:        "After fork without delegate",
+			currentSlot: 200,
+			reward:      big.NewInt(999111),
+			validator:   &storage.Validator{Address: valAddress, WithdrawalAddress: &withdrawalAddress},
+			checkResult: func(t *testing.T, stateDb *state.StateDB, val *storage.Validator, reward *big.Int) {
+				balance := stateDb.GetBalance(*val.GetWithdrawalAddress())
+				if balance.Cmp(reward) != 0 {
+					t.Fatalf("validator %v has insufficient balance to fork", *val.GetWithdrawalAddress())
+				}
+			},
+		},
+		{
+			name:        "After fork with delegate",
+			currentSlot: 200,
+			reward:      big.NewInt(1000),
+			validator:   &storage.Validator{Address: valAddress, WithdrawalAddress: &valAddress, DelegatingStake: &operation.DelegatingStakeData{Rules: *delegateRules}},
+			checkResult: func(t *testing.T, stateDb *state.StateDB, val *storage.Validator, reward *big.Int) {
+				for address, percent := range val.DelegatingStake.Rules.ProfitShare() {
+					balance := stateDb.GetBalance(address)
+					amount := new(big.Int).Mul(reward, big.NewInt(int64(percent)))
+					amount = new(big.Int).Div(amount, big.NewInt(100))
+					if balance.Cmp(amount) != 0 {
+						t.Fatalf("validator %v has insufficient balance to fork", val.GetAddress())
+					}
+				}
+
+			},
+		},
+	}
+
+	for _, testCase := range testCases {
+		t.Run(testCase.name, func(t *testing.T) {
+			stateDb, err := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
+			testutils.AssertNoError(t, err)
+
+			evm := vm.NewEVM(vm.BlockContext{Slot: testCase.currentSlot}, vm.TxContext{}, stateDb, chainConfig, vm.Config{})
+
+			vp := validator.NewProcessor(vm.BlockContext{}, stateDb, bc)
+
+			stTransition := NewStateTransition(evm, nil, vp, msg, nil)
+			err = vp.Storage().SetValidator(stateDb, testCase.validator)
+			testutils.AssertNoError(t, err)
+
+			err = stTransition.processRewards(testCase.validator.GetAddress(), testCase.reward)
+			testutils.AssertNoError(t, err)
+
+			testCase.checkResult(t, stateDb, testCase.validator, testCase.reward)
+		})
+	}
 }
+
+//var (
+//	stateTransition                        *StateTransition
+//	tokenProcessor                         *token.Processor
+//	stateDB                                vm.StateDB
+//	owner, spender, to                     common.Address
+//	WRC20Address, WRC721Address            common.Address
+//	caller                                 token.Ref
+//	value, gasPrice, gasFreeCap, gasTipCap *big.Int
+//	gas                                    uint64
+//	data                                   []byte
+//	name                                   []byte
+//	symbol                                 []byte
+//	baseURI                                []byte
+//	metadata                               []byte
+//	totalSupply                            *big.Int
+//	decimals                               uint8
+//	percentFee                             uint8
+//	ID1, ID2, ID3                          *big.Int
+//)
+
+//func init() {
+//	owner = common.BytesToAddress(testutils.RandomData(20))
+//	spender = common.BytesToAddress(testutils.RandomData(20))
+//	caller = vm.AccountRef(owner)
+//	to = common.BytesToAddress(testutils.RandomData(20))
+//	value = big.NewInt(int64(testutils.RandomInt(10, 30)))
+//	totalSupply = big.NewInt(int64(testutils.RandomInt(100, 1000)))
+//	decimals = uint8(testutils.RandomInt(0, 255))
+//	name = testutils.RandomStringInBytes(testutils.RandomInt(10, 20))
+//	symbol = testutils.RandomStringInBytes(testutils.RandomInt(5, 8))
+//	baseURI = testutils.RandomStringInBytes(testutils.RandomInt(10, 20))
+//	metadata = testutils.RandomData(testutils.RandomInt(20, 50))
+//	ID1 = big.NewInt(int64(testutils.RandomInt(1000, 99999999)))
+//	ID2 = big.NewInt(int64(testutils.RandomInt(1000, 99999999)))
+//	ID3 = big.NewInt(int64(testutils.RandomInt(1000, 99999999)))
+//	gasPrice = big.NewInt(100)
+//	gasFreeCap = big.NewInt(0)
+//	gasTipCap = big.NewInt(0)
+//	gas = 25200
+//	percentFee = 5
+//
+//	db, err := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
+//	if err != nil {
+//		panic("cannot create state DB")
+//	}
+//	db.CreateAccount(owner)
+//	db.SetBalance(owner, big.NewInt(10000000000000000))
+//	db.CreateAccount(spender)
+//	db.SetBalance(spender, big.NewInt(10000000000000000))
+//	db.CreateAccount(to)
+//	db.SetBalance(to, big.NewInt(10000000000000000))
+//	stateDB = db
+//	tokenProcessor = token.NewProcessor(vm.BlockContext{}, stateDB)
+//}
 
 //func TestTransitionDb(t *testing.T) {
 //	tests := []testutils.TestCase{
@@ -601,154 +718,154 @@ func init() {
 //	}
 //}
 
-func initStateTransition(m func(token common.Address) Message, init func(tp *token.Processor) common.Address) *StateTransition {
-	t := func(init func(tp *token.Processor) common.Address) common.Address {
-		if init != nil {
-			return init(tokenProcessor)
-		}
-
-		return common.Address{}
-	}(init)
-
-	if stateTransition != nil {
-		stateTransition.msg = m(t)
-		return stateTransition
-	}
-
-	var (
-		tracer = logger.NewStructLogger(&logger.Config{})
-		evm    = vm.NewEVM(vm.BlockContext{
-			CanTransfer: func(db vm.StateDB, addr common.Address, amount *big.Int) bool {
-				return db.GetBalance(addr).Cmp(amount) >= 0
-			},
-			Transfer: func(db vm.StateDB, sender, recipient common.Address, amount *big.Int) {
-				db.SubBalance(sender, amount)
-				db.AddBalance(recipient, amount)
-			},
-			BaseFee: big.NewInt(10),
-		}, vm.TxContext{}, stateDB, params.TestChainConfig, vm.Config{NoBaseFee: true, Debug: true, Tracer: tracer})
-		st = NewStateTransition(evm, tokenProcessor, nil, m(t), new(GasPool).AddGas(50000000))
-	)
-
-	stateTransition = st
-
-	return stateTransition
-}
-
-func newTokenOpData(opCode byte, f func() []byte) []byte {
-	return append([]byte{operation.Prefix, opCode}, f()...)
-}
-
-func callApprove(t *testing.T, tp *token.Processor, std operation.Std, spender, TokenAddress common.Address, Caller token.Ref, value *big.Int, Errs []error) {
-	approveOp, err := operation.NewApproveOperation(std, spender, value)
-	assert.NoError(t, err)
-
-	call(t, tp, Caller, TokenAddress, nil, approveOp, Errs)
-}
-
-func call(t *testing.T, tp *token.Processor, Caller token.Ref, TokenAddress common.Address, value *big.Int, op operation.Operation, Errs []error) []byte {
-	res, err := tp.Call(Caller, TokenAddress, value, op)
-	if !testutils.CheckError(err, Errs) {
-		t.Fatalf("Case failed\nwant errors: %s\nhave errors: %s", Errs, err)
-	}
-
-	return res
-}
-
-func mintNewToken(t *testing.T, tp *token.Processor, owner, TokenAddress common.Address, id *big.Int, data []byte, Caller token.Ref, Errs []error) {
-	mintOp, err := operation.NewMintOperation(owner, id, data)
-	assert.NoError(t, err)
-
-	call(t, tp, Caller, TokenAddress, nil, mintOp, Errs)
-}
-
-func checkCost(tp *token.Processor, tokenAddress common.Address, tokenId *big.Int) (*big.Int, error) {
-	costOp, err := operation.NewCostOperation(tokenAddress, tokenId)
-	if err != nil {
-		return nil, err
-	}
-
-	return tp.Cost(costOp)
-}
-
-func checkBalance(t *testing.T, tp *token.Processor, TokenAddress, owner common.Address) *big.Int {
-	balanceOp, err := operation.NewBalanceOfOperation(TokenAddress, owner)
-	assert.NoError(t, err)
-
-	balance, err := tp.BalanceOf(balanceOp)
-	assert.NoError(t, err)
-
-	return balance
-}
-
-func setPrice(t *testing.T, tp *token.Processor, caller token.Ref, tokenAddress common.Address, tokenId, value *big.Int) {
-	setPriceOp, err := operation.NewSetPriceOperation(tokenId, value)
-	if err != nil {
-		t.Error(err)
-		t.FailNow()
-	}
-
-	call(t, tp, caller, tokenAddress, nil, setPriceOp, nil)
-}
-
-type MockMessage struct {
-	from  common.Address
-	to    *common.Address
-	value *big.Int
-	gas   uint64
-	data  []byte
-}
-
-func (m MockMessage) From() common.Address {
-	return m.from
-}
-
-func (m MockMessage) To() *common.Address {
-	return m.to
-}
-
-func (m MockMessage) GasPrice() *big.Int {
-	return gasPrice
-}
-
-func (m MockMessage) GasFeeCap() *big.Int {
-	return gasFreeCap
-}
-
-func (m MockMessage) GasTipCap() *big.Int {
-	return gasTipCap
-}
-
-func (m MockMessage) Gas() uint64 {
-	return m.gas
-}
-
-func (m MockMessage) Value() *big.Int {
-	return m.value
-}
-
-func (m MockMessage) Nonce() uint64 {
-	panic("Nonce: implement me")
-}
-
-func (m MockMessage) IsFake() bool {
-	return true
-}
-
-func (m MockMessage) Data() []byte {
-	return m.data
-}
-
-func (m MockMessage) AccessList() types.AccessList {
-	return []types.AccessTuple{}
-}
-
-func (m MockMessage) setTo(addr *common.Address) {
-	m.to = addr
-}
-
-func NewMockMessage(from common.Address, to *common.Address, value *big.Int, gas uint64, data []byte) *MockMessage {
-	return &MockMessage{
-		from, to, value, gas, data,
-	}
-}
+//func initStateTransition(m func(token common.Address) Message, init func(tp *token.Processor) common.Address) *StateTransition {
+//	t := func(init func(tp *token.Processor) common.Address) common.Address {
+//		if init != nil {
+//			return init(tokenProcessor)
+//		}
+//
+//		return common.Address{}
+//	}(init)
+//
+//	if stateTransition != nil {
+//		stateTransition.msg = m(t)
+//		return stateTransition
+//	}
+//
+//	var (
+//		tracer = logger.NewStructLogger(&logger.Config{})
+//		evm    = vm.NewEVM(vm.BlockContext{
+//			CanTransfer: func(db vm.StateDB, addr common.Address, amount *big.Int) bool {
+//				return db.GetBalance(addr).Cmp(amount) >= 0
+//			},
+//			Transfer: func(db vm.StateDB, sender, recipient common.Address, amount *big.Int) {
+//				db.SubBalance(sender, amount)
+//				db.AddBalance(recipient, amount)
+//			},
+//			BaseFee: big.NewInt(10),
+//		}, vm.TxContext{}, stateDB, params.TestChainConfig, vm.Config{NoBaseFee: true, Debug: true, Tracer: tracer})
+//		st = NewStateTransition(evm, tokenProcessor, nil, m(t), new(GasPool).AddGas(50000000))
+//	)
+//
+//	stateTransition = st
+//
+//	return stateTransition
+//}
+//
+//func newTokenOpData(opCode byte, f func() []byte) []byte {
+//	return append([]byte{operation.Prefix, opCode}, f()...)
+//}
+//
+//func callApprove(t *testing.T, tp *token.Processor, std operation.Std, spender, TokenAddress common.Address, Caller token.Ref, value *big.Int, Errs []error) {
+//	approveOp, err := operation.NewApproveOperation(std, spender, value)
+//	assert.NoError(t, err)
+//
+//	call(t, tp, Caller, TokenAddress, nil, approveOp, Errs)
+//}
+//
+//func call(t *testing.T, tp *token.Processor, Caller token.Ref, TokenAddress common.Address, value *big.Int, op operation.Operation, Errs []error) []byte {
+//	res, err := tp.Call(Caller, TokenAddress, value, op)
+//	if !testutils.CheckError(err, Errs) {
+//		t.Fatalf("Case failed\nwant errors: %s\nhave errors: %s", Errs, err)
+//	}
+//
+//	return res
+//}
+//
+//func mintNewToken(t *testing.T, tp *token.Processor, owner, TokenAddress common.Address, id *big.Int, data []byte, Caller token.Ref, Errs []error) {
+//	mintOp, err := operation.NewMintOperation(owner, id, data)
+//	assert.NoError(t, err)
+//
+//	call(t, tp, Caller, TokenAddress, nil, mintOp, Errs)
+//}
+//
+//func checkCost(tp *token.Processor, tokenAddress common.Address, tokenId *big.Int) (*big.Int, error) {
+//	costOp, err := operation.NewCostOperation(tokenAddress, tokenId)
+//	if err != nil {
+//		return nil, err
+//	}
+//
+//	return tp.Cost(costOp)
+//}
+//
+//func checkBalance(t *testing.T, tp *token.Processor, TokenAddress, owner common.Address) *big.Int {
+//	balanceOp, err := operation.NewBalanceOfOperation(TokenAddress, owner)
+//	assert.NoError(t, err)
+//
+//	balance, err := tp.BalanceOf(balanceOp)
+//	assert.NoError(t, err)
+//
+//	return balance
+//}
+//
+//func setPrice(t *testing.T, tp *token.Processor, caller token.Ref, tokenAddress common.Address, tokenId, value *big.Int) {
+//	setPriceOp, err := operation.NewSetPriceOperation(tokenId, value)
+//	if err != nil {
+//		t.Error(err)
+//		t.FailNow()
+//	}
+//
+//	call(t, tp, caller, tokenAddress, nil, setPriceOp, nil)
+//}
+//
+//type MockMessage struct {
+//	from  common.Address
+//	to    *common.Address
+//	value *big.Int
+//	gas   uint64
+//	data  []byte
+//}
+//
+//func (m MockMessage) From() common.Address {
+//	return m.from
+//}
+//
+//func (m MockMessage) To() *common.Address {
+//	return m.to
+//}
+//
+//func (m MockMessage) GasPrice() *big.Int {
+//	return gasPrice
+//}
+//
+//func (m MockMessage) GasFeeCap() *big.Int {
+//	return gasFreeCap
+//}
+//
+//func (m MockMessage) GasTipCap() *big.Int {
+//	return gasTipCap
+//}
+//
+//func (m MockMessage) Gas() uint64 {
+//	return m.gas
+//}
+//
+//func (m MockMessage) Value() *big.Int {
+//	return m.value
+//}
+//
+//func (m MockMessage) Nonce() uint64 {
+//	panic("Nonce: implement me")
+//}
+//
+//func (m MockMessage) IsFake() bool {
+//	return true
+//}
+//
+//func (m MockMessage) Data() []byte {
+//	return m.data
+//}
+//
+//func (m MockMessage) AccessList() types.AccessList {
+//	return []types.AccessTuple{}
+//}
+//
+//func (m MockMessage) setTo(addr *common.Address) {
+//	m.to = addr
+//}
+//
+//func NewMockMessage(from common.Address, to *common.Address, value *big.Int, gas uint64, data []byte) *MockMessage {
+//	return &MockMessage{
+//		from, to, value, gas, data,
+//	}
+//}

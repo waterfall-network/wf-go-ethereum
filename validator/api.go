@@ -122,15 +122,9 @@ func (s *PublicValidatorAPI) Validator_DepositData(_ context.Context, args Depos
 			dlgStakeArg.TrialRules = &DelegatingRulesArgs{}
 		}
 		ar := dlgStakeArg.Rules
-		rules, err = operation.NewDelegatingStakeRules(*ar.ProfitShare, *ar.StakeShare, *ar.Exit, *ar.Withdrawal)
-		if err != nil {
-			return nil, err
-		}
+		rules = operation.NewDelegatingStakeRules(*ar.ProfitShare, *ar.StakeShare, *ar.Exit, *ar.Withdrawal)
 		atr := dlgStakeArg.TrialRules
-		trialRules, err = operation.NewDelegatingStakeRules(*atr.ProfitShare, *atr.StakeShare, *atr.Exit, *atr.Withdrawal)
-		if err != nil {
-			return nil, err
-		}
+		trialRules = operation.NewDelegatingStakeRules(*atr.ProfitShare, *atr.StakeShare, *atr.Exit, *atr.Withdrawal)
 
 		if delegatingStake, err = operation.NewDelegatingStakeData(rules, *dlgStakeArg.TrialPeriod, trialRules); err != nil {
 			return nil, err
