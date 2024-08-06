@@ -71,10 +71,9 @@ func TestValidatorDelegatingStake_MarshalingBinary(t *testing.T) {
 	profitShare, stakeShare, exit, withdrawal := operation.TestParamsDelegatingStakeRules()
 	trialPeriod := uint64(321)
 
-	rules, err := operation.NewDelegatingStakeRules(profitShare, stakeShare, exit, withdrawal)
-	testutils.AssertNoError(t, err)
-	trialRules, err := operation.NewDelegatingStakeRules(profitShare, stakeShare, exit, withdrawal)
-	testutils.AssertNoError(t, err)
+	rules := operation.NewDelegatingStakeRules(profitShare, stakeShare, exit, withdrawal)
+
+	trialRules := operation.NewDelegatingStakeRules(profitShare, stakeShare, exit, withdrawal)
 
 	dsr, err := operation.NewDelegatingStakeData(rules, trialPeriod, trialRules)
 	testutils.AssertNoError(t, err)

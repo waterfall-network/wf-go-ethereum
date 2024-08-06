@@ -14,8 +14,7 @@ import (
 func TestDelegatingStakeRules_init(t *testing.T) {
 	profitShare, stakeShare, exit, withdrawal := TestParamsDelegatingStakeRules()
 
-	dsr, err := NewDelegatingStakeRules(profitShare, stakeShare, exit, withdrawal)
-	testutils.AssertNoError(t, err)
+	dsr := NewDelegatingStakeRules(profitShare, stakeShare, exit, withdrawal)
 
 	testutils.AssertEqual(t, profitShare, dsr.ProfitShare())
 	testutils.AssertEqual(t, stakeShare, dsr.StakeShare())
@@ -26,8 +25,7 @@ func TestDelegatingStakeRules_init(t *testing.T) {
 func TestDelegatingStakeRules_Copy(t *testing.T) {
 	profitShare, stakeShare, exit, withdrawal := TestParamsDelegatingStakeRules()
 
-	dsr, err := NewDelegatingStakeRules(profitShare, stakeShare, exit, withdrawal)
-	testutils.AssertNoError(t, err)
+	dsr := NewDelegatingStakeRules(profitShare, stakeShare, exit, withdrawal)
 
 	cpy := dsr.Copy()
 	testutils.AssertEqual(t, dsr.ProfitShare(), cpy.ProfitShare())
@@ -131,15 +129,13 @@ func TestDelegatingStakeRules_validate(t *testing.T) {
 
 	operationEncode := func(b []byte, i interface{}) error {
 		o := i.(decodedOp)
-		createOp, err := NewDelegatingStakeRules(
+		createOp := NewDelegatingStakeRules(
 			o.profitShare,
 			o.stakeShare,
 			o.exit,
 			o.withdrawal,
 		)
-		if err != nil {
-			return err
-		}
+
 		return createOp.Validate()
 	}
 
@@ -166,8 +162,7 @@ func TestDelegatingStakeRules_Marshaling(t *testing.T) {
 		"947777777777777777777777777777777777777777" +
 		"870a1e3c0000000087000000461e000081a081c0")
 
-	dsr, err := NewDelegatingStakeRules(profitShare, stakeShare, exit, withdrawal)
-	testutils.AssertNoError(t, err)
+	dsr := NewDelegatingStakeRules(profitShare, stakeShare, exit, withdrawal)
 
 	bin, err := dsr.MarshalBinary()
 	testutils.AssertNoError(t, err)

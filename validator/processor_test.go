@@ -167,8 +167,8 @@ func TestTestProcessorDeposit_DelegatingStake(t *testing.T) {
 	processor := NewProcessor(ctx, stateDb, bc)
 	to := processor.GetValidatorsStateAddress()
 
-	rules, _ := operation.NewDelegatingStakeRules(dsProfitShare, dsStakeShare, dsExit, dsWithdrawal)
-	trialRules, _ := operation.NewDelegatingStakeRules(dsProfitShare, dsStakeShare, dsExit, dsWithdrawal)
+	rules := operation.NewDelegatingStakeRules(dsProfitShare, dsStakeShare, dsExit, dsWithdrawal)
+	trialRules := operation.NewDelegatingStakeRules(dsProfitShare, dsStakeShare, dsExit, dsWithdrawal)
 
 	pubKey := common.HexToBlsPubKey("931f74533c800ebb6d4b4330a9f7ad609314303c01ca7cd235635fe30fcaa33cdcc2c09e9a07d22d7126e0a078657cbe")
 	creator_address := common.HexToAddress("0x6e9e76fa278190cfb2404e5923d3ccd7e8f6c777")
@@ -492,13 +492,12 @@ func TestTestProcessorDeposit_DelegatingStake(t *testing.T) {
 					processor.ctx.Slot = 0
 				}()
 
-				changedRules, err := operation.NewDelegatingStakeRules(
+				changedRules := operation.NewDelegatingStakeRules(
 					map[common.Address]uint8{common.Address{0x16}: 100},
 					map[common.Address]uint8{},
 					nil,
-					[]common.Address{common.Address{0x16}},
+					[]common.Address{{0x16}},
 				)
-				testutils.AssertNoError(t, err)
 
 				delegateData, err := operation.NewDelegatingStakeData(
 					rules,
@@ -1038,8 +1037,8 @@ func TestProcessorExit_DelegatingStake(t *testing.T) {
 	to := processor.GetValidatorsStateAddress()
 
 	dsProfitShare, dsStakeShare, dsExit, dsWithdrawal := operation.TestParamsDelegatingStakeRules()
-	rules, _ := operation.NewDelegatingStakeRules(dsProfitShare, dsStakeShare, dsExit, dsWithdrawal)
-	trialRules, _ := operation.NewDelegatingStakeRules(dsProfitShare, dsStakeShare, dsExit, dsWithdrawal)
+	rules := operation.NewDelegatingStakeRules(dsProfitShare, dsStakeShare, dsExit, dsWithdrawal)
+	trialRules := operation.NewDelegatingStakeRules(dsProfitShare, dsStakeShare, dsExit, dsWithdrawal)
 
 	exitOperation, err := operation.NewExitOperation(pubKey, testmodels.Addr1, &procEpoch)
 	testutils.AssertNoError(t, err)
@@ -1545,8 +1544,8 @@ func TestProcessorWithdrawal_DelegatingStake(t *testing.T) {
 	to := processor.GetValidatorsStateAddress()
 
 	dsProfitShare, dsStakeShare, dsExit, dsWithdrawal := operation.TestParamsDelegatingStakeRules()
-	rules, _ := operation.NewDelegatingStakeRules(dsProfitShare, dsStakeShare, dsExit, dsWithdrawal)
-	trialRules, _ := operation.NewDelegatingStakeRules(dsProfitShare, dsStakeShare, dsExit, dsWithdrawal)
+	rules := operation.NewDelegatingStakeRules(dsProfitShare, dsStakeShare, dsExit, dsWithdrawal)
+	trialRules := operation.NewDelegatingStakeRules(dsProfitShare, dsStakeShare, dsExit, dsWithdrawal)
 
 	withdrawalOperation, err := operation.NewWithdrawalOperation(testmodels.Addr1, value)
 	testutils.AssertNoError(t, err)
@@ -1882,8 +1881,8 @@ func TestProcessorUpdateBalance_DelegatingStake(t *testing.T) {
 	to := proc.GetValidatorsStateAddress()
 
 	dsProfitShare, dsStakeShare, dsExit, dsWithdrawal := operation.TestParamsDelegatingStakeRules()
-	rules, _ := operation.NewDelegatingStakeRules(dsProfitShare, dsStakeShare, dsExit, dsWithdrawal)
-	trialRules, _ := operation.NewDelegatingStakeRules(dsProfitShare, dsStakeShare, dsExit, dsWithdrawal)
+	rules := operation.NewDelegatingStakeRules(dsProfitShare, dsStakeShare, dsExit, dsWithdrawal)
+	trialRules := operation.NewDelegatingStakeRules(dsProfitShare, dsStakeShare, dsExit, dsWithdrawal)
 	//add delegation data
 	delegateData, err := operation.NewDelegatingStakeData(
 		rules,
@@ -2476,8 +2475,8 @@ func TestValidatePartialDepositOp(t *testing.T) {
 	badWithdrawalAdr := common.BytesToAddress(testutils.RandomData(20))
 
 	dsProfitShare, dsStakeShare, dsExit, dsWithdrawal := operation.TestParamsDelegatingStakeRules()
-	rules, _ := operation.NewDelegatingStakeRules(dsProfitShare, dsStakeShare, dsExit, dsWithdrawal)
-	trialRules, _ := operation.NewDelegatingStakeRules(dsProfitShare, dsStakeShare, dsExit, dsWithdrawal)
+	rules := operation.NewDelegatingStakeRules(dsProfitShare, dsStakeShare, dsExit, dsWithdrawal)
+	trialRules := operation.NewDelegatingStakeRules(dsProfitShare, dsStakeShare, dsExit, dsWithdrawal)
 	cases := []*testmodels.TestCase{
 		{
 			CaseName: "ValidatePartialDepositOp_OK",

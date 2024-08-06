@@ -136,10 +136,8 @@ func TestDelegatingStake_Marshaling(t *testing.T) {
 			"5a42795183ab5aa2f1b2dd1")
 	)
 
-	rules, err := NewDelegatingStakeRules(profitShare, stakeShare, exit, withdrawal)
-	testutils.AssertNoError(t, err)
-	trialRules, err := NewDelegatingStakeRules(profitShare, stakeShare, exit, withdrawal)
-	testutils.AssertNoError(t, err)
+	rules := NewDelegatingStakeRules(profitShare, stakeShare, exit, withdrawal)
+	trialRules := NewDelegatingStakeRules(profitShare, stakeShare, exit, withdrawal)
 	delegate, err := NewDelegatingStakeData(rules, 321, trialRules)
 	testutils.AssertNoError(t, err)
 
@@ -236,10 +234,8 @@ func TestDepositData_withDelegatingStake(t *testing.T) {
 			"7777777777870a1e3c0000000087000000461e000081a081c0")
 	)
 
-	rules, err := NewDelegatingStakeRules(profitShare, stakeShare, exit, withdrawal)
-	testutils.AssertNoError(t, err)
-	trialRules, err := NewDelegatingStakeRules(profitShare, stakeShare, exit, withdrawal)
-	testutils.AssertNoError(t, err)
+	rules := NewDelegatingStakeRules(profitShare, stakeShare, exit, withdrawal)
+	trialRules := NewDelegatingStakeRules(profitShare, stakeShare, exit, withdrawal)
 	delegate, err := NewDelegatingStakeData(rules, 321, trialRules)
 	testutils.AssertNoError(t, err)
 	delegate2, err := NewDelegatingStakeData(rules, 321, nil)
