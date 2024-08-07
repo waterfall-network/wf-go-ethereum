@@ -28,7 +28,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/stretchr/testify/require"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/rawdb"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/state"
@@ -1805,10 +1804,10 @@ func TestTransactionPoolUnderpricing(t *testing.T) {
 	// Import the batch and that both pending and queued transactions match up
 	errs := pool.AddRemotes(txs)
 	for _, err := range errs {
-		require.NoError(t, err)
+		testutils.AssertNoError(t, err)
 	}
 	err := pool.AddLocal(ltx)
-	require.NoError(t, err)
+	testutils.AssertNoError(t, err)
 
 	pending, queued, _ := pool.Stats()
 
@@ -1911,7 +1910,7 @@ func TestTransactionPoolStableUnderpricing(t *testing.T) {
 	}
 	errs := pool.AddRemotesSync(txs)
 	for _, err := range errs {
-		require.NoError(t, err)
+		testutils.AssertNoError(t, err)
 	}
 
 	pending, queued, _ := pool.Stats()
