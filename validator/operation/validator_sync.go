@@ -10,7 +10,7 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/rlp"
 )
 
-const valSyncOpDataMinLen = 8 + 8 + common.AddressLength + common.HashLength
+const valSyncOpDataMinLen = common.Uint64Size + common.Uint64Size + common.AddressLength + common.HashLength
 
 type VersionValSyncOp uint16
 
@@ -215,7 +215,7 @@ func (op *validatorSyncOperation) unmarshalBinaryLegacy(b []byte) error {
 		return ErrBadDataLen
 	}
 	startOffset := 0
-	endOffset := startOffset + 8
+	endOffset := startOffset + common.Uint64Size
 	opType := types.ValidatorSyncOp(binary.BigEndian.Uint64(b[startOffset:endOffset]))
 
 	startOffset = endOffset
@@ -223,11 +223,11 @@ func (op *validatorSyncOperation) unmarshalBinaryLegacy(b []byte) error {
 	initTxHash := common.BytesToHash(b[startOffset:endOffset])
 
 	startOffset = endOffset
-	endOffset = startOffset + 8
+	endOffset = startOffset + common.Uint64Size
 	procEpoch := binary.BigEndian.Uint64(b[startOffset:endOffset])
 
 	startOffset = endOffset
-	endOffset = startOffset + 8
+	endOffset = startOffset + common.Uint64Size
 	index := binary.BigEndian.Uint64(b[startOffset:endOffset])
 
 	startOffset = endOffset
@@ -252,17 +252,17 @@ func (op *validatorSyncOperation) unmarshalBinaryLegacy(b []byte) error {
 func (op *validatorSyncOperation) marshalBinaryLegacy() ([]byte, error) {
 	bin := make([]byte, 0, valSyncOpDataMinLen)
 
-	enc := make([]byte, 8)
+	enc := make([]byte, common.Uint64Size)
 	binary.BigEndian.PutUint64(enc, uint64(op.opType))
 	bin = append(bin, enc...)
 
 	bin = append(bin, op.initTxHash.Bytes()...)
 
-	enc = make([]byte, 8)
+	enc = make([]byte, common.Uint64Size)
 	binary.BigEndian.PutUint64(enc, op.procEpoch)
 	bin = append(bin, enc...)
 
-	enc = make([]byte, 8)
+	enc = make([]byte, common.Uint64Size)
 	binary.BigEndian.PutUint64(enc, op.index)
 	bin = append(bin, enc...)
 
