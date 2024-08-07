@@ -2020,7 +2020,7 @@ func TestProcessorUpdateBalance_DelegatingStake(t *testing.T) {
 
 				var expDlgLogData = make(txlog.DelegatingStakeLogData, 0, len(expectBalances))
 				for acc, expBal := range expectBalances {
-					if expBal.Cmp(common.Big0) == 0 {
+					if testutils.BigIntEquals(expBal, common.Big0) {
 						continue
 					}
 					ruleType := txlog.ProfitShare
@@ -2153,7 +2153,7 @@ func TestProcessorUpdateBalance_DelegatingStake(t *testing.T) {
 
 				var expDlgLogData = make(txlog.DelegatingStakeLogData, 0, len(expectBalances))
 				for acc, expBal := range expectBalances {
-					if expBal.Cmp(common.Big0) == 0 {
+					if testutils.BigIntEquals(expBal, common.Big0) {
 						continue
 					}
 					ruleType := txlog.ProfitShare
@@ -2285,7 +2285,7 @@ func TestProcessorUpdateBalance_DelegatingStake(t *testing.T) {
 
 				var expDlgLogData = make(txlog.DelegatingStakeLogData, 0, len(expectBalances))
 				for acc, expBal := range expectBalances {
-					if expBal.Cmp(common.Big0) == 0 {
+					if testutils.BigIntEquals(expBal, common.Big0) {
 						continue
 					}
 					ruleType := txlog.ProfitShare
@@ -2429,7 +2429,7 @@ func TestProcessorUpdateBalance_DelegatingStake(t *testing.T) {
 
 				var expDlgLogData = make(txlog.DelegatingStakeLogData, 0, len(expectBalances))
 				for acc, expBal := range expectBalances {
-					if expBal.Cmp(common.Big0) == 0 {
+					if testutils.BigIntEquals(expBal, common.Big0) {
 						continue
 					}
 					ruleType := txlog.ProfitShare
@@ -2578,7 +2578,7 @@ func TestProcessorUpdateBalance_DelegatingStake(t *testing.T) {
 
 				var expDlgLogData = make(txlog.DelegatingStakeLogData, 0, len(expectBalances))
 				for acc, expBal := range expectBalances {
-					if expBal.Cmp(common.Big0) == 0 {
+					if testutils.BigIntEquals(expBal, common.Big0) {
 						continue
 					}
 					ruleType := txlog.ProfitShare
