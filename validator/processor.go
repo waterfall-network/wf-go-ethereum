@@ -436,7 +436,7 @@ func (p *Processor) validatorExit(caller Ref, toAddr common.Address, op operatio
 		//check delegating roles
 		//retrieve actual rules
 		var actualRules = &validator.DelegatingStake.Rules
-		isTrial, err := p.isValidatorTrialPeriod(validator)
+		isTrial, err := p.IsValidatorTrialPeriod(validator)
 		if err != nil {
 			return nil, err
 		}
@@ -623,7 +623,7 @@ func (p *Processor) validatorWithdrawal(caller Ref, toAddr common.Address, op op
 		//check delegating roles
 		//retrieve actual rules
 		var actualRules = &validator.DelegatingStake.Rules
-		isTrial, err := p.isValidatorTrialPeriod(validator)
+		isTrial, err := p.IsValidatorTrialPeriod(validator)
 		if err != nil {
 			return nil, err
 		}
@@ -964,7 +964,7 @@ func (p *Processor) applyDelegatingStakeRules(op operation.ValidatorSync, valida
 
 	//retrieve actual rules
 	var actualRules = &validator.DelegatingStake.Rules
-	isTrial, err := p.isValidatorTrialPeriod(validator)
+	isTrial, err := p.IsValidatorTrialPeriod(validator)
 	if err != nil {
 		return nil, err
 	}
@@ -1056,7 +1056,7 @@ func (p *Processor) applyDelegatingStakeRules(op operation.ValidatorSync, valida
 	return op.Creator().Bytes(), nil
 }
 
-func (p *Processor) isValidatorTrialPeriod(validator *valStore.Validator) (bool, error) {
+func (p *Processor) IsValidatorTrialPeriod(validator *valStore.Validator) (bool, error) {
 	// if validator is not activated yet - trial period
 	if validator.GetActivationEra() > p.ctx.Era {
 		return true, nil

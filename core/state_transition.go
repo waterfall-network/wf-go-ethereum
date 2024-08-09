@@ -428,7 +428,16 @@ func (st *StateTransition) processRewards(creatorAddress common.Address, reward 
 		return err
 	}
 	if val.DelegatingStake != nil {
-		for address, percent := range val.DelegatingStake.Rules.ProfitShare() {
+		var delegateRules = &val.DelegatingStake.Rules
+		isTrial, err := st.vp.IsValidatorTrialPeriod(val)
+		if err != nil {
+			return err
+		}
+		if isTrial {
+			delegateRules = &val.DelegatingStake.TrialRules
+		}
+
+		for address, percent := range delegateRules.ProfitShare() {
 			amount := new(big.Int).Mul(reward, big.NewInt(int64(percent)))
 			amount = new(big.Int).Div(amount, big.NewInt(100))
 			st.state.AddBalance(address, amount)

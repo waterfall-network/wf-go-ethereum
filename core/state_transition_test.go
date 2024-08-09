@@ -29,19 +29,33 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/tests/testutils"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/validator"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/era"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/operation"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/storage"
 )
 
 func TestProcessRewards(t *testing.T) {
-
 	chainConfig := &params.ChainConfig{
 		ForkSlotValSyncProc: 100,
 	}
 
 	bc := &BlockChain{
 		chainConfig: chainConfig,
+		db:          rawdb.NewMemoryDatabase(),
+		slotInfo: &types.SlotInfo{
+			GenesisTime:    0,
+			SecondsPerSlot: 4,
+			SlotsPerEpoch:  32,
+		},
 	}
+
+	rawdb.WriteEra(bc.Database(), 0, era.Era{
+		Number: 0,
+		From:   0,
+		To:     20,
+		//Root:      common.Hash{},
+		//BlockHash: common.Hash{},
+	})
 
 	gasPrice := big.NewInt(10 * params.InitialBaseFee)
 	key, err := crypto.GenerateKey()
@@ -65,7 +79,15 @@ func TestProcessRewards(t *testing.T) {
 		delegateAddress2: 20,
 		delegateAddress3: 70,
 	}
+
+	trialProfitShare := map[common.Address]uint8{
+		delegateAddress1: 30,
+		delegateAddress2: 30,
+		delegateAddress3: 40,
+	}
+
 	delegateRules := operation.NewDelegatingStakeRules(profitShare, nil, nil, nil)
+	trialRules := operation.NewDelegatingStakeRules(trialProfitShare, nil, nil, nil)
 
 	testCases := []struct {
 		name        string
@@ -78,7 +100,10 @@ func TestProcessRewards(t *testing.T) {
 			name:        "Before fork without delegate",
 			currentSlot: 0,
 			reward:      big.NewInt(999),
-			validator:   &storage.Validator{Address: valAddress, WithdrawalAddress: &valAddress},
+			validator: &storage.Validator{
+				Address:           valAddress,
+				WithdrawalAddress: &valAddress,
+			},
 			checkResult: func(t *testing.T, stateDb *state.StateDB, val *storage.Validator, reward *big.Int) {
 				balance := stateDb.GetBalance(val.GetAddress())
 				if balance.Cmp(reward) != 0 {
@@ -87,10 +112,16 @@ func TestProcessRewards(t *testing.T) {
 			},
 		},
 		{
-			name:        "Before fork with delegate",
+			name:        "Before fork with delegate without trial rules",
 			currentSlot: 0,
 			reward:      big.NewInt(1000),
-			validator:   &storage.Validator{Address: valAddress, WithdrawalAddress: &valAddress, DelegatingStake: &operation.DelegatingStakeData{Rules: *delegateRules}},
+			validator: &storage.Validator{
+				Address:           valAddress,
+				WithdrawalAddress: &valAddress,
+				DelegatingStake: &operation.DelegatingStakeData{
+					Rules: *delegateRules,
+				},
+			},
 			checkResult: func(t *testing.T, stateDb *state.StateDB, val *storage.Validator, reward *big.Int) {
 				balance := stateDb.GetBalance(val.GetAddress())
 				if balance.Cmp(reward) != 0 {
@@ -98,11 +129,34 @@ func TestProcessRewards(t *testing.T) {
 				}
 			},
 		},
+		{
+			name:        "Before fork with delegate with trial rules",
+			currentSlot: 0,
+			reward:      big.NewInt(1000),
+			validator: &storage.Validator{
+				Address:           valAddress,
+				WithdrawalAddress: &valAddress,
+				DelegatingStake: &operation.DelegatingStakeData{
+					Rules:      *delegateRules,
+					TrialRules: *trialRules,
+				},
+			},
+			checkResult: func(t *testing.T, stateDb *state.StateDB, val *storage.Validator, reward *big.Int) {
+				balance := stateDb.GetBalance(val.GetAddress())
+				if balance.Cmp(reward) != 0 {
+					t.Fatalf("validator %v has insufficient balance to fork", val.GetAddress())
+				}
+			},
+		},
+
 		{
 			name:        "After fork without delegate",
 			currentSlot: 200,
 			reward:      big.NewInt(999111),
-			validator:   &storage.Validator{Address: valAddress, WithdrawalAddress: &withdrawalAddress},
+			validator: &storage.Validator{
+				Address:           valAddress,
+				WithdrawalAddress: &withdrawalAddress,
+			},
 			checkResult: func(t *testing.T, stateDb *state.StateDB, val *storage.Validator, reward *big.Int) {
 				balance := stateDb.GetBalance(*val.GetWithdrawalAddress())
 				if balance.Cmp(reward) != 0 {
@@ -111,15 +165,57 @@ func TestProcessRewards(t *testing.T) {
 			},
 		},
 		{
-			name:        "After fork with delegate",
+			name:        "After fork with delegate without trial rules",
+			currentSlot: 5000,
+			reward:      big.NewInt(1000),
+			validator: &storage.Validator{
+				Address:           valAddress,
+				WithdrawalAddress: &valAddress,
+				ExitEra:           2,
+				DelegatingStake: &operation.DelegatingStakeData{
+					TrialPeriod: 1000,
+					Rules:       *delegateRules,
+				},
+			},
+			checkResult: func(t *testing.T, stateDb *state.StateDB, val *storage.Validator, reward *big.Int) {
+				for address := range val.DelegatingStake.Rules.ProfitShare() {
+					percent, ok := profitShare[address]
+					if !ok {
+						t.Fatalf("unknown address %s", address.Hex())
+					}
+					amount := big.NewInt(reward.Int64() * int64(percent) / 100)
+					balance := stateDb.GetBalance(address)
+
+					if balance.Cmp(amount) != 0 {
+						t.Fatalf("validator %v has insufficient balance to fork", val.GetAddress())
+					}
+				}
+
+			},
+		},
+		{
+			name:        "After fork with delegate with trial rules",
 			currentSlot: 200,
 			reward:      big.NewInt(1000),
-			validator:   &storage.Validator{Address: valAddress, WithdrawalAddress: &valAddress, DelegatingStake: &operation.DelegatingStakeData{Rules: *delegateRules}},
+			validator: &storage.Validator{
+				Address:           valAddress,
+				WithdrawalAddress: &valAddress,
+				ActivationEra:     0,
+				ExitEra:           2,
+				DelegatingStake: &operation.DelegatingStakeData{
+					TrialRules:  *trialRules,
+					Rules:       *delegateRules,
+					TrialPeriod: 1000,
+				},
+			},
 			checkResult: func(t *testing.T, stateDb *state.StateDB, val *storage.Validator, reward *big.Int) {
-				for address, percent := range val.DelegatingStake.Rules.ProfitShare() {
+				for address := range val.DelegatingStake.Rules.ProfitShare() {
+					percent, ok := trialProfitShare[address]
+					if !ok {
+						t.Fatalf("unknown address %s", address.Hex())
+					}
+					amount := big.NewInt(reward.Int64() * int64(percent) / 100)
 					balance := stateDb.GetBalance(address)
-					amount := new(big.Int).Mul(reward, big.NewInt(int64(percent)))
-					amount = new(big.Int).Div(amount, big.NewInt(100))
 					if balance.Cmp(amount) != 0 {
 						t.Fatalf("validator %v has insufficient balance to fork", val.GetAddress())
 					}
@@ -135,8 +231,7 @@ func TestProcessRewards(t *testing.T) {
 			testutils.AssertNoError(t, err)
 
 			evm := vm.NewEVM(vm.BlockContext{Slot: testCase.currentSlot}, vm.TxContext{}, stateDb, chainConfig, vm.Config{})
-
-			vp := validator.NewProcessor(vm.BlockContext{}, stateDb, bc)
+			vp := validator.NewProcessor(vm.BlockContext{Slot: testCase.currentSlot}, stateDb, bc)
 
 			stTransition := NewStateTransition(evm, nil, vp, msg, nil)
 			err = vp.Storage().SetValidator(stateDb, testCase.validator)
