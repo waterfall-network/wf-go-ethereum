@@ -2303,8 +2303,10 @@ func (bc *BlockChain) VerifyBlock(block *types.Block) (bool, error) {
 	)
 	timeTrack = time.Now()
 
-	if !bc.verifyBlockTxsOrderByNonce(block) {
-		return false, nil
+	if bc.Config().IsForkSlotValSyncProc(block.Slot()) {
+		if !bc.verifyBlockTxsOrderByNonce(block) {
+			return false, nil
+		}
 	}
 
 	// Verify body hash and transactions hash
