@@ -67,6 +67,7 @@ var (
 		utils.USBFlag,
 		utils.SmartCardDaemonPathFlag,
 		utils.OverrideDelegatingStakeFlag,
+		utils.OverridePrefixFinFlag,
 		utils.TxPoolLocalsFlag,
 		utils.TxPoolNoLocalsFlag,
 		utils.TxPoolJournalFlag,
@@ -83,16 +84,17 @@ var (
 		utils.GCModeFlag,
 		utils.SnapshotFlag,
 		utils.TxLookupLimitFlag,
-		utils.LightServeFlag,
-		utils.LightIngressFlag,
-		utils.LightEgressFlag,
-		utils.LightMaxPeersFlag,
-		utils.LightNoPruneFlag,
-		utils.LightKDFFlag,
-		utils.UltraLightServersFlag,
-		utils.UltraLightFractionFlag,
-		utils.UltraLightOnlyAnnounceFlag,
-		utils.LightNoSyncServeFlag,
+		// TODO: uncomment when light client is ready
+		//utils.LightServeFlag,
+		//utils.LightIngressFlag,
+		//utils.LightEgressFlag,
+		//utils.LightMaxPeersFlag,
+		//utils.LightNoPruneFlag,
+		//utils.LightKDFFlag,
+		//utils.UltraLightServersFlag,
+		//utils.UltraLightFractionFlag,
+		//utils.UltraLightOnlyAnnounceFlag,
+		//utils.LightNoSyncServeFlag,
 		utils.WhitelistFlag,
 		utils.BloomFilterSizeFlag,
 		utils.CacheFlag,
@@ -125,6 +127,8 @@ var (
 		utils.MainnetFlag,
 		utils.TestNet8Flag,
 		utils.DeveloperFlag,
+		utils.Testnet5Flag,
+		utils.Testnet9Flag,
 		utils.VMEnableDebugFlag,
 		utils.NetworkIdFlag,
 		utils.EthStatsURLFlag,
@@ -256,6 +260,11 @@ func prepare(ctx *cli.Context) {
 
 	case ctx.GlobalIsSet(utils.TestNet8Flag.Name):
 		log.Info("Starting GWAT on testnet8 testnet...")
+
+	case ctx.GlobalIsSet(utils.Testnet5Flag.Name):
+		log.Info("Overriding by testnet5 configuration...")
+	case ctx.GlobalIsSet(utils.Testnet9Flag.Name):
+		log.Info("Overriding by testnet9 configuration...")
 
 	case ctx.GlobalIsSet(utils.DeveloperFlag.Name):
 		log.Info("Starting GWAT in dev mode...")

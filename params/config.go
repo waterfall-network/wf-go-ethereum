@@ -28,7 +28,7 @@ import (
 
 // Genesis hashes to enforce below configs on.
 var (
-	MainnetGenesisHash = common.HexToHash("0xdcafaade5ac90c72bcd8603f3c94764fab5d3218b1afc4923bb3c34f2cd4fe74")
+	MainnetGenesisHash = common.HexToHash("0x5c46071bf3056d26734af3696fb829ba87dbd24502cbfc3a20c5c9285e637ceb")
 	// Testnet8GenesisHash  waterfall test net
 	Testnet8GenesisHash = common.HexToHash("0xa7531d17d43684576b864662852e3cbb2dc20df7cdb9fc5405d5a0a253f623eb")
 )
@@ -37,6 +37,7 @@ var (
 	// testnet8AcceptCpRootOnFinEpoch fix sync finalization by hard define cp.finEpoch/cpRoot combo
 	testnet8AcceptCpRootOnFinEpoch = map[common.Hash][]uint64{
 		common.HexToHash("0xd76dd012c08baefd84750cf9752a6987dbc8ff4451069056cfd110e32250ed4a"): {96176},
+		common.HexToHash("0x771d385d42fa93c0303ea34086f09d8adf99f97813f761aa6a437451959a0841"): {126283},
 	}
 )
 
@@ -55,18 +56,26 @@ var TrustedCheckpoints = map[common.Hash]*TrustedCheckpoint{
 //}
 
 var (
+	validatorsStateAddress = common.HexToAddress("0x329c3A3d65Ab0bE08c6eff6695933391Cfc02cCA")
 	// MainnetChainConfig is the chain parameters to run a node on the main network.
 	MainnetChainConfig = &ChainConfig{
-		ChainID:                big.NewInt(1501865),
-		SecondsPerSlot:         4,
+		ChainID:                big.NewInt(181),
+		SecondsPerSlot:         6,
 		SlotsPerEpoch:          32,
-		EpochsPerEra:           4,
+		EpochsPerEra:           16,
 		TransitionPeriod:       2,
-		ValidatorsStateAddress: nil,
-		ValidatorsPerSlot:      5,
-		EffectiveBalance:       big.NewInt(3200),
+		ValidatorsStateAddress: &validatorsStateAddress,
+		ValidatorsPerSlot:      8,
+		EffectiveBalance:       big.NewInt(32000),
+		ValidatorOpExpireSlots: 14400,
 		ForkSlotSubNet1:        math.MaxUint64,
-		ForkSlotDelegate:       2048,
+		ForkSlotDelegate:       0,
+		ForkSlotPrefixFin:      0,
+		ForkSlotShanghai:       0,
+		ForkSlotValOpTracking:  216000,
+		ForkSlotReduceBaseFee:  216000,
+		ForkSlotValSyncProc:    math.MaxUint64,
+		StartEpochsPerEra:      0,
 	}
 
 	// MainnetTrustedCheckpoint contains the light client trusted checkpoint for the main network.
@@ -100,8 +109,15 @@ var (
 		ValidatorsStateAddress: nil,
 		ValidatorsPerSlot:      5,
 		EffectiveBalance:       big.NewInt(3200),
+		ValidatorOpExpireSlots: 21600,
 		ForkSlotSubNet1:        math.MaxUint64,
 		ForkSlotDelegate:       2729920,
+		ForkSlotPrefixFin:      4058240,
+		ForkSlotShanghai:       math.MaxUint64,
+		ForkSlotValOpTracking:  math.MaxUint64,
+		ForkSlotReduceBaseFee:  math.MaxUint64,
+		ForkSlotValSyncProc:    math.MaxUint64,
+		StartEpochsPerEra:      math.MaxUint64,
 		AcceptCpRootOnFinEpoch: testnet8AcceptCpRootOnFinEpoch,
 	}
 
@@ -140,8 +156,15 @@ var (
 		ValidatorsStateAddress: nil,
 		ValidatorsPerSlot:      6,
 		EffectiveBalance:       big.NewInt(3200),
+		ValidatorOpExpireSlots: 14400,
 		ForkSlotSubNet1:        math.MaxUint64,
-		ForkSlotDelegate:       math.MaxUint64,
+		ForkSlotDelegate:       0,
+		ForkSlotPrefixFin:      0,
+		ForkSlotShanghai:       0,
+		ForkSlotValOpTracking:  0,
+		ForkSlotReduceBaseFee:  0,
+		ForkSlotValSyncProc:    math.MaxUint64,
+		StartEpochsPerEra:      0,
 	}
 
 	TestChainConfig = &ChainConfig{
@@ -153,8 +176,15 @@ var (
 		ValidatorsStateAddress: nil,
 		ValidatorsPerSlot:      6,
 		EffectiveBalance:       big.NewInt(3200),
+		ValidatorOpExpireSlots: 14400,
 		ForkSlotSubNet1:        math.MaxUint64,
-		ForkSlotDelegate:       math.MaxUint64,
+		ForkSlotDelegate:       0,
+		ForkSlotPrefixFin:      0,
+		ForkSlotShanghai:       0,
+		ForkSlotValOpTracking:  0,
+		ForkSlotReduceBaseFee:  0,
+		ForkSlotValSyncProc:    math.MaxUint64,
+		StartEpochsPerEra:      0,
 	}
 )
 
@@ -221,9 +251,17 @@ type ChainConfig struct {
 	ValidatorsStateAddress *common.Address
 	ValidatorsPerSlot      uint64   `json:"validatorsPerSlot"`
 	EffectiveBalance       *big.Int `json:"effectiveBalance"`
+	ValidatorOpExpireSlots uint64   `json:"validatorOpExpireSlots"`
 	// Fork slots
-	ForkSlotSubNet1  uint64 `json:"forkSlotSubNet1,omitempty"`
-	ForkSlotDelegate uint64 `json:"forkSlotDelegate,omitempty"`
+	ForkSlotSubNet1       uint64 `json:"forkSlotSubNet1,omitempty"`
+	ForkSlotDelegate      uint64 `json:"forkSlotDelegate,omitempty"`
+	ForkSlotPrefixFin     uint64 `json:"forkSlotPrefixFin,omitempty"`
+	ForkSlotShanghai      uint64 `json:"forkSlotShanghai,omitempty"`
+	ForkSlotValOpTracking uint64 `json:"forkSlotValOpTracking,omitempty"`
+	ForkSlotReduceBaseFee uint64 `json:"forkSlotReduceBaseFee,omitempty"`
+	ForkSlotValSyncProc   uint64 `json:"forkSlotValSyncProc,omitempty"`
+	// Fork eras
+	StartEpochsPerEra uint64 `json:"startEpochsPerEra"`
 
 	// fix sync finalization by hard define cp.finEpoch/cpRoot combo
 	AcceptCpRootOnFinEpoch map[common.Hash][]uint64 `json:"acceptCpRootOnFinEpoch"`
@@ -250,7 +288,8 @@ func (c *CliqueConfig) String() string {
 // String implements the fmt.Stringer interface.
 func (c *ChainConfig) String() string {
 	return fmt.Sprintf("{ChainID: %v, SecondsPerSlot: %v, SlotsPerEpoch: %v, EpochsPerEra: %v, TransitionPeriod: %v, "+
-		"ValidatorsPerSlot %v, ValidatorsStateAddress %v, EffectiveBalance: %v, ForkSlotSubNet1: %v, ForkSlotDelegate: %v, AcceptCpRootOnFinEpoch: %v}",
+		"ValidatorsPerSlot %v, ValidatorsStateAddress %v, EffectiveBalance: %v, ValidatorOpExpireSlots: %v, ForkSlotSubNet1: %v, ForkSlotDelegate: %v, "+
+		"ForkSlotPrefixFin: %v, ForkSlotShanghai: %v, ForkSlotValOpTracking: %v, ForkSlotReduceBaseFee: %v, ForkSlotValSyncProc: %v, StartEpochsPerEra: %v, AcceptCpRootOnFinEpoch: %v}",
 		c.ChainID,
 		c.SecondsPerSlot,
 		c.SlotsPerEpoch,
@@ -259,8 +298,15 @@ func (c *ChainConfig) String() string {
 		c.ValidatorsPerSlot,
 		c.ValidatorsStateAddress,
 		c.EffectiveBalance,
+		c.ValidatorOpExpireSlots,
 		c.ForkSlotSubNet1,
 		c.ForkSlotDelegate,
+		c.ForkSlotPrefixFin,
+		c.ForkSlotShanghai,
+		c.ForkSlotValOpTracking,
+		c.ForkSlotReduceBaseFee,
+		c.ForkSlotValSyncProc,
+		c.StartEpochsPerEra,
 		c.AcceptCpRootOnFinEpoch,
 	)
 }
@@ -275,6 +321,26 @@ func (c *ChainConfig) IsForkSlotDelegate(slot uint64) bool {
 	return slot >= c.ForkSlotDelegate
 }
 
+// IsForkSlotPrefixFin returns true if provided slot greater or equal of the fork slot ForkSlotPrefixFin.
+func (c *ChainConfig) IsForkSlotPrefixFin(slot uint64) bool {
+	return slot >= c.ForkSlotPrefixFin
+}
+
+// IsForkSlotValOpTracking returns true if provided slot greater or equal of the fork slot ForkSlotValOpTracking.
+func (c *ChainConfig) IsForkSlotValOpTracking(slot uint64) bool {
+	return slot >= c.ForkSlotValOpTracking
+}
+
+// IsForkSlotReduceBaseFee returns true if provided slot greater or equal of the fork slot ForkSlotReduceBaseFee.
+func (c *ChainConfig) IsForkSlotReduceBaseFee(slot uint64) bool {
+	return slot >= c.ForkSlotReduceBaseFee
+}
+
+// IsForkSlotValSyncProc returns true if provided slot greater or equal of the fork slot ForkSlotValSyncProc.
+func (c *ChainConfig) IsForkSlotValSyncProc(slot uint64) bool {
+	return slot >= c.ForkSlotValSyncProc
+}
+
 // CheckConfigForkOrder checks that we don't "skip" any forks, geth isn't pluggable enough
 // to guarantee that forks can be implemented in a different order than on official networks
 func (c *ChainConfig) CheckConfigForkOrder() error {
@@ -285,8 +351,8 @@ func (c *ChainConfig) CheckConfigForkOrder() error {
 	}
 	var lastFork fork
 	for _, cur := range []fork{
-		{name: "forkSlotDelegate", slot: new(big.Int).SetUint64(c.ForkSlotDelegate)},
-		//{name: "londonBlock", block: c.LondonBlock},
+		//{name: "forkSlotDelegate", slot: new(big.Int).SetUint64(c.ForkSlotDelegate)},
+		//{name: "forkSlotPrefixFin", slot: new(big.Int).SetUint64(c.ForkSlotPrefixFin)},
 	} {
 		if lastFork.name != "" {
 			// Next one must be higher number
@@ -358,11 +424,11 @@ type Rules struct {
 	ChainID                                                 *big.Int
 	IsHomestead, IsEIP150, IsEIP155, IsEIP158               bool
 	IsByzantium, IsConstantinople, IsPetersburg, IsIstanbul bool
-	IsBerlin, IsLondon                                      bool
+	IsBerlin, IsLondon, IsShanghai                          bool
 }
 
 // Rules ensures c's ChainID is not nil.
-func (c *ChainConfig) Rules() Rules {
+func (c *ChainConfig) Rules(slot uint64) Rules {
 	chainID := c.ChainID
 	if chainID == nil {
 		chainID = new(big.Int)
@@ -379,5 +445,59 @@ func (c *ChainConfig) Rules() Rules {
 		IsIstanbul:       true,
 		IsBerlin:         true,
 		IsLondon:         true,
+		IsShanghai:       c.ForkSlotShanghai <= slot,
 	}
+}
+
+func (c *ChainConfig) HibernationSpinesThreshold() uint64 {
+	return 128
+}
+
+// OverrideTestnet5 given conf while run a node with --testconf param.
+func OverrideTestnet5(conf *ChainConfig) *ChainConfig {
+	conf.ChainID = new(big.Int).SetInt64(1501865)
+	//conf.SecondsPerSlot = 0
+	//conf.SlotsPerEpoch = 0
+	//conf.EpochsPerEra = 0
+	//conf.TransitionPeriod = 0
+	//conf.ValidatorsStateAddress = nil
+	//conf.ValidatorsPerSlot = 0
+	//conf.EffectiveBalance = nil
+	conf.ValidatorOpExpireSlots = 100
+	conf.ForkSlotSubNet1 = math.MaxUint64
+	//conf.ForkSlotDelegate = 0
+	//conf.ForkSlotPrefixFin = 0
+	//conf.ForkSlotShanghai = 0
+	conf.ForkSlotValOpTracking = 0
+	conf.ForkSlotReduceBaseFee = 0
+	conf.ForkSlotValSyncProc = math.MaxUint64
+	//conf.StartEpochsPerEra = 0
+	//conf.AcceptCpRootOnFinEpoch = nil
+
+	return conf
+}
+
+// OverrideTestnet9 given conf while run a node with --testconf param.
+func OverrideTestnet9(conf *ChainConfig) *ChainConfig {
+	//valsStateAddr := common.HexToAddress("0xc3653bd746859b94839c3ba0a8020febec009714")
+	//conf.ValidatorsStateAddress = &valsStateAddr
+	conf.ChainID = new(big.Int).SetInt64(1501869)
+	conf.SecondsPerSlot = 6
+	conf.SlotsPerEpoch = 32
+	conf.EpochsPerEra = 4
+	conf.TransitionPeriod = 2
+	conf.ValidatorsPerSlot = 5
+	conf.EffectiveBalance = new(big.Int).SetInt64(32000)
+	conf.ForkSlotSubNet1 = math.MaxUint64
+	//conf.ForkSlotDelegate = 0
+	//conf.ForkSlotPrefixFin = 0
+	//conf.ForkSlotShanghai = 0
+	conf.ValidatorOpExpireSlots = 320
+	conf.ForkSlotValOpTracking = 0
+	conf.ForkSlotReduceBaseFee = 0
+	conf.ForkSlotValSyncProc = math.MaxUint64
+	conf.StartEpochsPerEra = 0
+	//conf.AcceptCpRootOnFinEpoch = nil
+
+	return conf
 }

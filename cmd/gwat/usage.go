@@ -54,23 +54,26 @@ var AppHelpFlagGroups = []flags.FlagGroup{
 		},
 	},
 	{
-		Name: "LIGHT CLIENT",
-		Flags: []cli.Flag{
-			utils.LightServeFlag,
-			utils.LightIngressFlag,
-			utils.LightEgressFlag,
-			utils.LightMaxPeersFlag,
-			utils.UltraLightServersFlag,
-			utils.UltraLightFractionFlag,
-			utils.UltraLightOnlyAnnounceFlag,
-			utils.LightNoPruneFlag,
-			utils.LightNoSyncServeFlag,
-		},
+		// TODO: uncomment after light client is implemented
+		//Name: "LIGHT CLIENT",
+		//Flags: []cli.Flag{
+		//	utils.LightServeFlag,
+		//	utils.LightIngressFlag,
+		//	utils.LightEgressFlag,
+		//	utils.LightMaxPeersFlag,
+		//	utils.UltraLightServersFlag,
+		//	utils.UltraLightFractionFlag,
+		//	utils.UltraLightOnlyAnnounceFlag,
+		//	utils.LightNoPruneFlag,
+		//	utils.LightNoSyncServeFlag,
+		//},
 	},
 	{
 		Name: "DEVELOPER CHAIN",
 		Flags: []cli.Flag{
 			utils.DeveloperFlag,
+			utils.Testnet5Flag,
+			utils.Testnet9Flag,
 		},
 	},
 	{

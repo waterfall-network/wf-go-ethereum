@@ -30,6 +30,7 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/accounts/scwallet"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/accounts/usbwallet"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/cmd/utils"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/eth/downloader"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/eth/ethconfig"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/internal/ethapi"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/log"
@@ -143,13 +144,15 @@ func makeConfigNode(ctx *cli.Context) (*node.Node, gethConfig) {
 
 	utils.SetEthConfig(ctx, stack, &cfg.Eth)
 	if ctx.GlobalIsSet(utils.MainnetFlag.Name) {
-		//log.Crit("--mainnet: require implementation")
-		log.Warn("--mainnet: == TEST MODE ==")
+		log.Warn("--mainnet: mode")
 	}
 	if ctx.GlobalIsSet(utils.EthStatsURLFlag.Name) {
 		cfg.Ethstats.URL = ctx.GlobalString(utils.EthStatsURLFlag.Name)
 	}
 	applyMetricConfig(ctx, &cfg)
+
+	// TODO: remove after light client is implemented
+	cfg.Eth.SyncMode = downloader.FullSync
 
 	return stack, cfg
 }
@@ -160,6 +163,10 @@ func makeFullNode(ctx *cli.Context) (*node.Node, ethapi.Backend) {
 	if ctx.GlobalIsSet(utils.OverrideDelegatingStakeFlag.Name) {
 		val := ctx.GlobalUint64(utils.OverrideDelegatingStakeFlag.Name)
 		cfg.Eth.OverrideDelegatingStake = &val
+	}
+	if ctx.GlobalIsSet(utils.OverridePrefixFinFlag.Name) {
+		val := ctx.GlobalUint64(utils.OverridePrefixFinFlag.Name)
+		cfg.Eth.OverridePrefixFin = &val
 	}
 	backend, _ := utils.RegisterEthService(stack, &cfg.Eth)
 

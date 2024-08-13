@@ -1,13 +1,21 @@
 #image: golang:1.17.2-stretch
-image: golang:1.20
+image: golang:1.21
 before_script:
   - echo "machine $CI_SERVER_HOST login gitlab-ci-token password $CI_JOB_TOKEN" >> ~/.netrc
   - export GOPRIVATE=${CI_SERVER_HOST}
+  - echo "Setting GVM_ROOT"
+  - echo "Sourcing GVM scripts"
+  - source ~/.gvm/scripts/gvm || echo "Failed to source GVM"
+  - echo "Using GVM"
+  - gvm use go1.21.12 --default || echo "Failed to use GVM"
+  - go version
+after_script:
+  - rm ~/.netrc
 stages:
+  - lint
   - test
   - build
   - release
-
 
 .job_build:
   script: &job_build |-
@@ -24,30 +32,37 @@ stages:
 
 
 lint:
-  stage: test
-  image: golangci/golangci-lint:v1.55.2
+  stage: lint
+  image: golangci/golangci-lint:v1.52.2
   tags:
     - docker
   rules:
     - if: $CI_COMMIT_TAG == null
       when: on_success
-  script: 
+  script:
+    - echo "SKIPPED"
+    - go version
     - golangci-lint run -v
+  before_script: 
+    - echo "before_script"
+  after_script: 
+    - echo "after_script"
 
 test:
   stage: test
   tags:
-    - docker
+    - go
   rules:
     - if: $CI_COMMIT_TAG == null
       when: on_success
-  script: 
+  script:
+    - echo "SKIPPED"
     - go test ./...
 
 build branch:
   stage: build
   tags:
-    - docker
+    - go
   rules:
     - if: $CI_COMMIT_REF_NAME != "main" && $CI_COMMIT_TAG == null
       when: on_success
@@ -61,7 +76,7 @@ build branch:
 build latest:
   stage: build
   tags:
-    - docker
+    - go
   rules:
     - if: $CI_COMMIT_REF_NAME == "main"
       when: on_success
@@ -75,7 +90,7 @@ build latest:
 release tag:
   stage: build
   tags:
-    - docker
+    - go
   rules:
     - if: $CI_COMMIT_TAG != null
       when: on_success
@@ -85,5 +100,3 @@ release tag:
     paths:
       - dist/gwat-bootnode
       - dist/gwat
-
-

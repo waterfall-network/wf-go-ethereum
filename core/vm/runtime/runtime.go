@@ -55,12 +55,19 @@ type Config struct {
 func setDefaults(cfg *Config) {
 	if cfg.ChainConfig == nil {
 		cfg.ChainConfig = &params.ChainConfig{
-			ChainID:          big.NewInt(1),
-			SecondsPerSlot:   4,
-			SlotsPerEpoch:    32,
-			EffectiveBalance: big.NewInt(3200),
-			ForkSlotSubNet1:  math.MaxUint64,
-			ForkSlotDelegate: math.MaxUint64,
+			ChainID:                big.NewInt(1),
+			SecondsPerSlot:         4,
+			SlotsPerEpoch:          32,
+			EffectiveBalance:       big.NewInt(3200),
+			ValidatorOpExpireSlots: 14400,
+			ForkSlotSubNet1:        math.MaxUint64,
+			ForkSlotDelegate:       0,
+			ForkSlotPrefixFin:      0,
+			ForkSlotShanghai:       0,
+			ForkSlotValOpTracking:  0,
+			ForkSlotReduceBaseFee:  0,
+			ForkSlotValSyncProc:    0,
+			StartEpochsPerEra:      0,
 		}
 	}
 
@@ -111,7 +118,7 @@ func Execute(code, input []byte, cfg *Config) ([]byte, *state.StateDB, error) {
 		vmenv   = NewEnv(cfg)
 		sender  = vm.AccountRef(cfg.Origin)
 	)
-	if rules := cfg.ChainConfig.Rules(); rules.IsBerlin {
+	if rules := cfg.ChainConfig.Rules(cfg.Slot); rules.IsBerlin {
 		cfg.State.PrepareAccessList(cfg.Origin, &address, vm.ActivePrecompiles(rules), nil)
 	}
 	cfg.State.CreateAccount(address)
@@ -143,7 +150,7 @@ func Create(input []byte, cfg *Config) ([]byte, common.Address, uint64, error) {
 		vmenv  = NewEnv(cfg)
 		sender = vm.AccountRef(cfg.Origin)
 	)
-	if rules := cfg.ChainConfig.Rules(); rules.IsBerlin {
+	if rules := cfg.ChainConfig.Rules(cfg.Slot); rules.IsBerlin {
 		cfg.State.PrepareAccessList(cfg.Origin, nil, vm.ActivePrecompiles(rules), nil)
 	}
 	// Call the code with the given configuration.
@@ -169,7 +176,7 @@ func Call(address common.Address, input []byte, cfg *Config) ([]byte, uint64, er
 	sender := cfg.State.GetOrNewStateObject(cfg.Origin)
 	statedb := cfg.State
 
-	if rules := cfg.ChainConfig.Rules(); rules.IsBerlin {
+	if rules := cfg.ChainConfig.Rules(cfg.Slot); rules.IsBerlin {
 		statedb.PrepareAccessList(cfg.Origin, &address, vm.ActivePrecompiles(rules), nil)
 	}
 	// Call the code with the given configuration.

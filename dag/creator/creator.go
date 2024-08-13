@@ -238,6 +238,19 @@ func (c *Creator) RunBlockCreation(slot uint64,
 		return err
 	}
 
+	//check hibernate mode
+	isHibernateMode, err := c.bc.IsHibernateSlot(header)
+	if err != nil {
+		log.Error("Creator failed to check is hibernate mode", "err", err)
+		return err
+	}
+	if isHibernateMode {
+		log.Info("Creator: run in hibernate mode",
+			"isHibernateMode", isHibernateMode,
+			"slot", header.Slot,
+		)
+	}
+
 	wg := new(sync.WaitGroup)
 	for _, account := range assigned.Creators {
 		var needEmptyBlock bool
@@ -252,7 +265,7 @@ func (c *Creator) RunBlockCreation(slot uint64,
 			c.current.txsMu.Lock()
 			c.current.txs[account] = &txsWithCumulativeGas{}
 			c.current.txsMu.Unlock()
-			go c.createNewBlock(account, assigned.Creators, types.CopyHeader(header), wg, needEmptyBlock)
+			go c.createNewBlock(account, assigned.Creators, types.CopyHeader(header), wg, needEmptyBlock, isHibernateMode)
 		}
 	}
 	wg.Wait()
@@ -287,26 +300,71 @@ func (c *Creator) prepareBlockHeader(assigned *Assignment, tipsBlocks types.Bloc
 	// if max slot of parents is less or equal to last finalized block slot
 	// - add last finalized block to parents
 	lastFinBlock := c.bc.GetLastFinalizedBlock()
-	maxParentSlot := uint64(0)
-	for _, blk := range tipsBlocks {
-		if blk.Slot() > maxParentSlot {
-			maxParentSlot = blk.Slot()
+	lfHash := lastFinBlock.Hash()
+
+	var parentTips types.Tips
+	if c.bc.Config().IsForkSlotPrefixFin(assigned.Slot) {
+		parentTips = tips.Copy()
+		isNotLfInPast := true
+		for _, t := range parentTips {
+			if t.OrderedAncestorsHashes.Has(lfHash) || t.CpHash == lfHash {
+				isNotLfInPast = false
+				break
+			}
 		}
-	}
-	if maxParentSlot <= lastFinBlock.Slot() {
-		tipsBlocks[lastFinBlock.Hash()] = lastFinBlock
+		if isNotLfInPast {
+			//add last finalized to parents
+			tipsBlocks[lfHash] = lastFinBlock
+			// check last finalized blockDag exists
+			lfBlDag := c.bc.GetBlockDag(lfHash)
+			if lfBlDag == nil {
+				cpHash := lastFinBlock.CpHash()
+				if lastFinBlock.Height() == 0 {
+					cpHash = lastFinBlock.Hash()
+				}
+				_, anc, _, err := c.bc.CollectAncestorsAftCpByParents(lastFinBlock.ParentHashes(), cpHash)
+				if err != nil {
+					return nil, err
+				}
+				lfBlDag = &types.BlockDAG{
+					Hash:                   lastFinBlock.Hash(),
+					Height:                 lastFinBlock.Height(),
+					Slot:                   lastFinBlock.Slot(),
+					CpHash:                 cpHash,
+					CpHeight:               c.bc.GetHeader(cpHash).Height,
+					OrderedAncestorsHashes: anc.Hashes(),
+				}
+				c.bc.SaveBlockDag(lfBlDag)
+			}
+			parentTips.Add(lfBlDag)
+		}
+	} else {
+		parentTips = tips
+		maxParentSlot := uint64(0)
+		for _, blk := range tipsBlocks {
+			if blk.Slot() > maxParentSlot {
+				maxParentSlot = blk.Slot()
+			}
+		}
+		if maxParentSlot <= lastFinBlock.Slot() {
+			tipsBlocks[lfHash] = lastFinBlock
+		}
 	}
 
 	parentHashes := tipsBlocks.Hashes().Sort()
 
 	cpHeader := c.bc.GetHeader(checkpoint.Spine)
-	newHeight, err := c.bc.CalcBlockHeightByTips(tips, cpHeader.Hash())
+	newHeight, err := c.bc.CalcBlockHeightByTips(parentTips, cpHeader.Hash())
 	if err != nil {
 		log.Error("Creator calculate block height failed", "err", err)
 		return nil, err
 	}
 
-	log.Info("Creator calculate block height", "newHeight", newHeight, "cpHash", checkpoint.Spine.Hex())
+	log.Info("Creator calculate block height",
+		"newHeight", newHeight,
+		"cpHash", checkpoint.Spine.Hex(),
+		"parentHashes", parentHashes,
+	)
 
 	era := c.bc.GetEraInfo().Number()
 	if c.bc.GetSlotInfo().SlotToEpoch(c.bc.GetSlotInfo().CurrentSlot()) >= c.bc.GetEraInfo().NextEraFirstEpoch() {
@@ -336,7 +394,7 @@ func (c *Creator) prepareBlockHeader(assigned *Assignment, tipsBlocks types.Bloc
 		creatorsPerSlotCount = uint64(len(creatorsPerSlot))
 	}
 	validators, _ := c.bc.ValidatorStorage().GetValidators(c.bc, header.Slot, true, false, "RunBlockCreation")
-	header.BaseFee = misc.CalcSlotBaseFee(c.bc.Config(), creatorsPerSlotCount, uint64(len(validators)), c.bc.Genesis().GasLimit())
+	header.BaseFee = misc.CalcSlotBaseFee(c.bc.Config(), creatorsPerSlotCount, uint64(len(validators)), c.bc.Genesis().GasLimit(), header.Slot)
 
 	return header, nil
 }
@@ -435,7 +493,7 @@ func (c *Creator) reorgTips(slot uint64, tips types.Tips) (types.BlockMap, error
 	return tipsBlocks, nil
 }
 
-func (c *Creator) createNewBlock(coinbase common.Address, creators []common.Address, header *types.Header, wg *sync.WaitGroup, needEmptyBlock bool) {
+func (c *Creator) createNewBlock(coinbase common.Address, creators []common.Address, header *types.Header, wg *sync.WaitGroup, needEmptyBlock, isHibernateMode bool) {
 	start := time.Now()
 
 	log.Info("Try to create new block", "slot", header.Slot, "coinbase", coinbase.Hex())
@@ -448,7 +506,11 @@ func (c *Creator) createNewBlock(coinbase common.Address, creators []common.Addr
 	header.Coinbase = coinbase
 
 	// Fill the block with all available pending transactions.
-	pendingTxs := c.getPending(coinbase, creators)
+	pendingTxs := make(map[common.Address]types.Transactions)
+	// Skip while hibernate mode.
+	if !isHibernateMode {
+		pendingTxs = c.getPending(coinbase, creators)
+	}
 
 	syncData := validatorsync.GetPendingValidatorSyncData(c.bc)
 	if len(syncData) > 0 || len(pendingTxs) > 0 || needEmptyBlock {
@@ -511,10 +573,18 @@ func (c *Creator) createNewBlock(coinbase common.Address, creators []common.Addr
 		)
 	}
 
-	log.Info("Block creation: assigned op for", "senders", len(pendingTxs), "validators", len(syncData))
-
 	// Short circuit if no pending transactions
-	if len(pendingTxs) == 0 && len(syncData) == 0 {
+	noAssignedTxs := len(pendingTxs) == 0 && (len(syncData) == 0 || !c.isAddressAssigned(coinbase, *c.bc.Config().ValidatorsStateAddress, creators))
+	log.Info("Block creation: assigned txs",
+		"noAssignedTxs", noAssignedTxs,
+		"senders", len(pendingTxs),
+		"validators", len(syncData),
+		"isValSyncAssigned", c.isAddressAssigned(coinbase, *c.bc.Config().ValidatorsStateAddress, creators),
+		"needEmptyBlock", needEmptyBlock,
+		"coinbase", coinbase.Hex(),
+		"slot", header.Slot,
+	)
+	if noAssignedTxs {
 		if needEmptyBlock {
 			c.create(header, true)
 			log.Info("Create empty block", "creator", header.Coinbase.Hex(), "slot", header.Slot)
@@ -851,7 +921,12 @@ func (c *Creator) processValidatorTxs(syncData map[common.Hash]*types.ValidatorS
 		if validatorSync.ProcEpoch <= c.bc.GetSlotInfo().SlotToEpoch(c.bc.GetSlotInfo().CurrentSlot()) {
 			valSyncTx, err := validatorsync.CreateValidatorSyncTx(c.backend, header.CpHash, header.Coinbase, header.Slot, validatorSync, nonce, c.current.keystore)
 			if err != nil {
-				log.Error("failed to create validator sync tx", "error", err)
+				log.Error("failed to create validator sync tx",
+					"error", err,
+					"slot", header.Slot,
+					"creator", header.Coinbase.Hex(),
+					"syncOp", validatorSync.Print(),
+				)
 				continue
 			}
 			c.current.txsMu.Lock()
@@ -883,7 +958,10 @@ func (c *Creator) SetNodeCreators(accounts []common.Address) {
 
 // unlockAccount unlocks a specified account.
 func (c *Creator) unlockAccount(ks *keystore.KeyStore, targetAddress string) error {
-	passwords := c.getPasswords()
+	passwords, err := c.getPasswords()
+	if err != nil {
+		return err
+	}
 	keystoreAccounts := ks.Accounts()
 
 	// Find the position of the target account.
@@ -894,7 +972,7 @@ func (c *Creator) unlockAccount(ks *keystore.KeyStore, targetAddress string) err
 }
 
 // getPasswords returns a list of passwords from the password directory.
-func (c *Creator) getPasswords() []string {
+func (c *Creator) getPasswords() ([]string, error) {
 	return makePasswordList(c.config.PasswordDir)
 }
 

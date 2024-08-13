@@ -101,8 +101,8 @@ func defaultTestBC(addr common.Address) *BlockChain {
 	rawdb.WriteCoordinatedCheckpoint(database, genesisCp)
 	rawdb.WriteEpoch(database, 0, genesisCp.Spine)
 
-	genesisEraLength := era.EstimateEraLength(genesis.Config, uint64(len(genesis.Validators)))
-	genesisEra := era.Era{0, 0, genesisEraLength - 1, genesisBlock.Root()}
+	genesisEraLength := era.EstimateEraLength(genesis.Config, uint64(len(genesis.Validators)), 0)
+	genesisEra := era.Era{0, 0, genesisEraLength - 1, genesisBlock.Root(), genesisBlock.Hash()}
 	rawdb.WriteEra(database, genesisEra.Number, genesisEra)
 	rawdb.WriteCurrentEra(database, genesisEra.Number)
 	// i.o. ethash.NewFaker()
@@ -150,6 +150,16 @@ type testBlockChain struct {
 	moveToProcessingCh chan *types.Transaction
 	removeTxFromPoolCh chan *types.Transaction
 	genesisBlock       *types.Block
+}
+
+func (bc *testBlockChain) GetHeaderByHash(hash common.Hash) *types.Header {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (bc *testBlockChain) GetTransactionReceipt(txHash common.Hash) (rc *types.Receipt, blHash common.Hash, index uint64) {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (bc *testBlockChain) GetSlotInfo() *types.SlotInfo {

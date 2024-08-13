@@ -1,3 +1,11 @@
+## Go Waterfall
+## Building the source
+**We strongly recommend installing go version 1.21.11 or later**
+
+```shell
+CGO_CFLAGS="-O2 -D__BLST_PORTABLE__" go run build/ci.go install ./cmd/gwat
+```
+
 ## Go Ethereum
 
 Official Golang implementation of the Ethereum protocol.
@@ -359,3 +367,5 @@ also included in our repository in the `COPYING.LESSER` file.
 The go-ethereum binaries (i.e. all code inside of the `cmd` directory) is licensed under the
 [GNU General Public License v3.0](https://www.gnu.org/licenses/gpl-3.0.en.html), also
 included in our repository in the `COPYING` file.
+
+The code written for the Waterfall project is distributed under [APACHE LICENSE, VERSION 2.0](https://www.apache.org/licenses/LICENSE-2.0)
