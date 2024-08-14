@@ -2544,9 +2544,9 @@ func TestAddToProcessing(t *testing.T) {
 
 	tx := transaction(0, 21000, key)
 
-	tb := &types.TransactionBlocks{Transaction: tx, BlocksHashes: common.HashArray{}}
-
-	pool.moveToProcessing(tb)
+	blTxs := types.NewBlockTransactions(common.Hash{})
+	blTxs.Transactions = types.Transactions{tx}
+	pool.moveToProcessingAccelerated(blTxs)
 
 	if pool.Get(tx.Hash()) == nil {
 		t.Fatal("TX wasn't moved to processing")
@@ -2575,8 +2575,9 @@ func TestMoveToProcessing(t *testing.T) {
 	pool.mu.Lock()
 	tx := transaction(0, 21000, key)
 
-	tb := &types.TransactionBlocks{Transaction: tx, BlocksHashes: common.HashArray{}}
-	pool.moveToProcessing(tb)
+	blTxs := types.NewBlockTransactions(common.Hash{})
+	blTxs.Transactions = types.Transactions{tx}
+	pool.moveToProcessingAccelerated(blTxs)
 	pool.mu.Unlock()
 
 	pool.mu.RLock()
@@ -2622,8 +2623,9 @@ func TestMoveToProcessingFromQueue(t *testing.T) {
 	moveIndex := 2
 	pool.mu.Lock()
 	tx := transaction(0, 21000, key)
-	tb := &types.TransactionBlocks{Transaction: tx, BlocksHashes: common.HashArray{}}
-	pool.moveToProcessing(tb)
+	blTxs := types.NewBlockTransactions(common.Hash{})
+	blTxs.Transactions = types.Transactions{tx}
+	pool.moveToProcessingAccelerated(blTxs)
 	pool.mu.Unlock()
 
 	pool.mu.RLock()
@@ -2853,8 +2855,9 @@ func TestRemoveTxFromProcessing(t *testing.T) {
 	addr, _ := types.Sender(pool.signer, tx)
 
 	pool.mu.Lock()
-	tb := &types.TransactionBlocks{Transaction: tx, BlocksHashes: common.HashArray{}}
-	pool.moveToProcessing(tb)
+	blTxs := types.NewBlockTransactions(common.Hash{})
+	blTxs.Transactions = types.Transactions{tx}
+	pool.moveToProcessingAccelerated(blTxs)
 	pool.mu.Unlock()
 
 	pool.mu.RLock()
