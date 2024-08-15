@@ -4664,13 +4664,7 @@ func (bc *BlockChain) MoveTxsToProcessing(block *types.Block) {
 
 	txs := types.NewBlockTransactions(block.Hash())
 	bc.handleBlockValidatorSyncTxs(block)
-	//txs.Transactions = append(txs.Transactions, block.Transactions()...)
 	txs.Transactions = block.Transactions()
-
-	//sort.Slice(txs.Transactions, func(i, j int) bool {
-	//	return txs.Transactions[i].Nonce() < txs.Transactions[j].Nonce()
-	//})
-
 	bc.moveTxsToProcessing(txs)
 }
 

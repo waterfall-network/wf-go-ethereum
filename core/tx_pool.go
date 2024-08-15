@@ -498,7 +498,7 @@ func (pool *TxPool) loop() {
 			}()
 
 		case txs := <-pool.rmTxCh:
-			func() {
+			go func() {
 				defer func(tStart time.Time) {
 					log.Info("^^^^^^^^^^^^ TIME txpool removeProcessedTx block",
 						"elapsed", common.PrettyDuration(time.Since(tStart)),
