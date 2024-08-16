@@ -1567,6 +1567,7 @@ func (pool *TxPool) moveToProcessingAccelerated(txs *types.BlockTransactions) {
 	transactions := txs.Transactions
 	for i := len(transactions) - 1; i >= 0; i-- {
 		btx := transactions[i]
+		pooledTx := pool.all.Get(btx.Hash())
 
 		// retrieving sender addr of tx
 		var addr common.Address
@@ -1599,7 +1600,8 @@ func (pool *TxPool) moveToProcessingAccelerated(txs *types.BlockTransactions) {
 		pool.processing[addr].PutTxBlockHash(btx.Hash(), txs.BlockHash)
 
 		//skip if sender address has not changed
-		if curAdr == addr {
+		//and tx in pool
+		if curAdr == addr && pooledTx != nil {
 			continue
 		}
 		curAdr = addr
@@ -1729,17 +1731,18 @@ func (pool *TxPool) moveToProcessingAccelerated(txs *types.BlockTransactions) {
 func (pool *TxPool) cancelProcessingBlockTxs(txs *types.BlockTransactions) {
 	transactions := txs.Transactions
 	blockHash := txs.BlockHash
+	dirty := newAccountSet(pool.signer)
 	for i := len(transactions) - 1; i >= 0; i-- {
 		btx := transactions[i]
 		txHash := btx.Hash()
+		// get pooled tx
+		poolTx := pool.all.Get(txHash)
+		if poolTx == nil {
+			continue
+		}
 		// retrieving sender addr of tx
 		var addr common.Address
 		if pAddr := types.SenderFromCache(pool.signer, btx); pAddr == nil {
-			// get pooled tx
-			poolTx := pool.all.Get(btx.Hash())
-			if poolTx == nil {
-				continue
-			}
 			sndr, err := types.Sender(pool.signer, poolTx) // already validated during insertion
 			if err != nil {
 				log.Error("TxPool: cancel processing: get sender failed",
@@ -1773,7 +1776,13 @@ func (pool *TxPool) cancelProcessingBlockTxs(txs *types.BlockTransactions) {
 
 		isLocal := pool.locals.containsTx(btx)
 		pool.enqueueTx(txHash, btx, isLocal, false)
+
+		if !dirty.contains(addr) {
+			dirty.add(addr)
+		}
 	}
+	done := pool.requestPromoteExecutables(dirty)
+	<-done
 }
 
 // removeTx removes a single transaction from the queue, moving all subsequent

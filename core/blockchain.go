@@ -955,7 +955,7 @@ func (bc *BlockChain) rmBlockData(hash common.Hash, slot *uint64) {
 		sl := block.Slot()
 		slot = &sl
 		// handle pooled txs
-		go bc.CancelProcessingTxs(block)
+		bc.CancelProcessingTxs(block)
 	}
 
 	if slot == nil {
@@ -4620,17 +4620,13 @@ func (bc *BlockChain) WriteTxLookupEntry(txIndex int, txHash, blockHash common.H
 	return false
 }
 
-func (bc *BlockChain) cancelProcessingTxs(txs *types.BlockTransactions) {
-	bc.cancelProcFeed.Send(txs)
-}
-
 func (bc *BlockChain) CancelProcessingTxs(block *types.Block) {
 	if block == nil {
 		return
 	}
 	txs := types.NewBlockTransactions(block.Hash())
 	txs.Transactions = block.Transactions()
-	bc.cancelProcessingTxs(txs)
+	bc.cancelProcFeed.Send(txs)
 }
 
 func (bc *BlockChain) moveTxsToProcessing(txs *types.BlockTransactions) {
