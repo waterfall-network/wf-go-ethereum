@@ -23,12 +23,12 @@ func (m mockBlockchain) GetHeaderByHash(hash common.Hash) *types.Header {
 	panic("implement me")
 }
 
-func (m mockBlockchain) EnterNextEra(cp uint64, hash common.Hash) *Era {
+func (m mockBlockchain) EnterNextEra(cp uint64, root, hash common.Hash) *Era {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (m mockBlockchain) StartTransitionPeriod(cp *types.Checkpoint, spineRoot common.Hash) {
+func (m mockBlockchain) StartTransitionPeriod(cp *types.Checkpoint, spineRoot, spineHash common.Hash) {
 	//TODO implement me
 	panic("implement me")
 }
@@ -62,7 +62,7 @@ func (m mockBlockchain) GetSlotInfo() *types.SlotInfo {
 
 func TestNextEraFirstEpoch(t *testing.T) {
 	// Create a new EraInfo with number 1, from epoch 10 to epoch 20, and root hash "0x1234"
-	era := NewEra(1, 10, 20, common.HexToHash("0x1234"))
+	era := NewEra(1, 10, 20, common.HexToHash("0x1234"), common.Hash{})
 	ei := NewEraInfo(*era)
 
 	// Ensure that the NextEraFirstEpoch function returns 21
@@ -76,7 +76,7 @@ func TestNextEraFirstSlot(t *testing.T) {
 	bc := mockBlockchain{}
 
 	// Create a new EraInfo with number 1, from epoch 10 to epoch 20, and root hash "0x1234"
-	era := NewEra(1, 10, 20, common.HexToHash("0x1234"))
+	era := NewEra(1, 10, 20, common.HexToHash("0x1234"), common.Hash{})
 	ei := NewEraInfo(*era)
 
 	// Ensure that the NextEraFirstSlot function returns the correct slot number
@@ -87,7 +87,7 @@ func TestNextEraFirstSlot(t *testing.T) {
 
 func TestLenEpochs(t *testing.T) {
 	// Create a new EraInfo with number 1, from epoch 10 to epoch 20, and root hash "0x1234"
-	era := NewEra(1, 10, 20, common.HexToHash("0x1234"))
+	era := NewEra(1, 10, 20, common.HexToHash("0x1234"), common.Hash{})
 	ei := NewEraInfo(*era)
 
 	// Ensure that the LenEpochs function returns 11
@@ -98,7 +98,7 @@ func TestLenEpochs(t *testing.T) {
 
 func TestLenSlots(t *testing.T) {
 	// Create a new EraInfo with number 1, from epoch 10 to epoch 20, and root hash "0x1234"
-	era := NewEra(1, 10, 20, common.HexToHash("0x1234"))
+	era := NewEra(1, 10, 20, common.HexToHash("0x1234"), common.Hash{})
 	ei := NewEraInfo(*era)
 
 	// Ensure that the LenSlots function returns 320
@@ -109,7 +109,7 @@ func TestLenSlots(t *testing.T) {
 
 func TestNumber(t *testing.T) {
 	// Create a new EraInfo with number 1, from epoch 10 to epoch 20, and root hash "0x1234"
-	era := NewEra(1, 10, 20, common.HexToHash("0x1234"))
+	era := NewEra(1, 10, 20, common.HexToHash("0x1234"), common.Hash{})
 	ei := NewEraInfo(*era)
 
 	// Ensure that the Number function returns the correct era number
@@ -120,7 +120,7 @@ func TestNumber(t *testing.T) {
 
 func TestIsContainsEpoch(t *testing.T) {
 	// Create a new EraInfo with number 1, from epoch 10 to epoch 20, and root hash "0x1234"
-	era := NewEra(1, 10, 20, common.HexToHash("0x1234"))
+	era := NewEra(1, 10, 20, common.HexToHash("0x1234"), common.Hash{})
 	ei := NewEraInfo(*era)
 
 	// Ensure that the IsContainsEpoch function returns true for epochs within the era, and false otherwise
@@ -145,6 +145,7 @@ func TestEstimateEraLength(t *testing.T) {
 			EpochsPerEra:      20,
 			SlotsPerEpoch:     32,
 			ValidatorsPerSlot: 4,
+			StartEpochsPerEra: 30,
 		},
 		slotInfo: types.SlotInfo{
 			SlotsPerEpoch: 32,
@@ -152,13 +153,13 @@ func TestEstimateEraLength(t *testing.T) {
 	}
 
 	// Ensure that the EstimateEraLength function returns the correct era length for different numbers of validators
-	if EstimateEraLength(bc.Config(), 1000) != 20 {
-		t.Errorf("Expected EstimateEraLength to return 20, but got %v", EstimateEraLength(bc.Config(), 1000))
+	if EstimateEraLength(bc.Config(), 1000, 0) != 20 {
+		t.Errorf("Expected EstimateEraLength to return 20, but got %v", EstimateEraLength(bc.Config(), 1000, 0))
 	}
-	if EstimateEraLength(bc.Config(), 10000) != 80 {
-		t.Errorf("Expected EstimateEraLength to return 80, but got %v", EstimateEraLength(bc.Config(), 10000))
+	if EstimateEraLength(bc.Config(), 10000, 20) != 80 {
+		t.Errorf("Expected EstimateEraLength to return 80, but got %v", EstimateEraLength(bc.Config(), 10000, 20))
 	}
-	if EstimateEraLength(bc.Config(), 20000) != 160 {
-		t.Errorf("Expected EstimateEraLength to return 160, but got %v", EstimateEraLength(bc.Config(), 20000))
+	if EstimateEraLength(bc.Config(), 20000, 30) != 20 {
+		t.Errorf("Expected EstimateEraLength to return 160, but got %v", EstimateEraLength(bc.Config(), 20000, 30))
 	}
 }

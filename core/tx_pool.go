@@ -156,6 +156,8 @@ type blockChain interface {
 	GetBlockByNumber(number uint64) *types.Block
 	GetDagHashes() *common.HashArray
 	GetBlocksByHashes(hashes common.HashArray) types.BlockMap
+	GetHeaderByHash(common.Hash) *types.Header
+	GetTransactionReceipt(txHash common.Hash) (rc *types.Receipt, blHash common.Hash, index uint64)
 	Genesis() *types.Block
 	SubscribeChainHeadEvent(ch chan<- ChainHeadEvent) event.Subscription
 	SubscribeProcessing(ch chan<- *types.BlockTransactions) event.Subscription
@@ -889,6 +891,9 @@ func (pool *TxPool) checkExitOperation(op valOperation.Exit, from common.Address
 	if validator.GetExitEra() != math.MaxUint64 {
 		return val.ErrValidatorIsOut
 	}
+	if validator.GetActivationEra() == math.MaxUint64 {
+		return val.ErrNotActivatedValidator
+	}
 	if validator.HasDelegatingStake() {
 		//check delegating roles
 		//retrieve actual rules
@@ -917,6 +922,29 @@ func (pool *TxPool) checkExitOperation(op valOperation.Exit, from common.Address
 			return val.ErrInvalidFromAddresses
 		}
 	}
+
+	if validator.Version() >= valStore.Ver1 {
+		//if operation already has been requested, check it expiration
+		prevOpTx := validator.GetExitTx()
+		if prevOpTx != nil {
+			rc, blHash, _ := pool.chain.GetTransactionReceipt(*prevOpTx)
+			//check prev op succes
+			if rc != nil && rc.Status == types.ReceiptStatusSuccessful {
+				//check prev operation expiration
+				prevHeader := pool.chain.GetHeaderByHash(blHash)
+				expiration := pool.chain.Config().ValidatorOpExpireSlots
+
+				var currSlot uint64
+				if pool.chain.GetSlotInfo() != nil {
+					currSlot = pool.chain.GetSlotInfo().CurrentSlot()
+				}
+				if prevHeader != nil && currSlot < prevHeader.Slot+expiration {
+					return val.ErrValOpBlocked
+				}
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -974,6 +1002,29 @@ func (pool *TxPool) checkWithdrawalOperation(op valOperation.Withdrawal, from co
 			return val.ErrInvalidFromAddresses
 		}
 	}
+
+	if validator.Version() >= valStore.Ver1 {
+		//if operation already has been requested, check it expiration
+		prevOpTx := validator.GetWithdrawalTx()
+		if prevOpTx != nil {
+			rc, blHash, _ := pool.chain.GetTransactionReceipt(*prevOpTx)
+			//check prev op succes
+			if rc != nil && rc.Status == types.ReceiptStatusSuccessful {
+				//check prev operation expiration
+				prevHeader := pool.chain.GetHeaderByHash(blHash)
+				expiration := pool.chain.Config().ValidatorOpExpireSlots
+
+				var currSlot uint64
+				if pool.chain.GetSlotInfo() != nil {
+					currSlot = pool.chain.GetSlotInfo().CurrentSlot()
+				}
+				if prevHeader != nil && currSlot < prevHeader.Slot+expiration {
+					return val.ErrValOpBlocked
+				}
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -1022,6 +1073,30 @@ func (pool *TxPool) checkDepositOperation(op valOperation.Deposit, from common.A
 	if err := val.ValidatePartialDepositOp(validator, op); err != nil {
 		return err
 	}
+
+	if validator.Version() >= valStore.Ver1 {
+		//if has active withdrawal operation - deposit is blocked
+		//check it expiration
+		prevOpTx := validator.GetWithdrawalTx()
+		if prevOpTx != nil {
+			rc, blHash, _ := pool.chain.GetTransactionReceipt(*prevOpTx)
+			//check prev op succes
+			if rc != nil && rc.Status == types.ReceiptStatusSuccessful {
+				//check prev operation expiration
+				prevHeader := pool.chain.GetHeaderByHash(blHash)
+				expiration := pool.chain.Config().ValidatorOpExpireSlots
+
+				var currSlot uint64
+				if pool.chain.GetSlotInfo() != nil {
+					currSlot = pool.chain.GetSlotInfo().CurrentSlot()
+				}
+				if prevHeader != nil && currSlot < prevHeader.Slot+expiration {
+					return val.ErrValOpBlocked
+				}
+			}
+		}
+	}
+
 	return nil
 }
 
@@ -1918,7 +1993,13 @@ func (pool *TxPool) runReorg(done chan struct{}, reset *txpoolResetRequest, dirt
 				statedb = pool.currentState
 			}
 			validators := pool.chain.ValidatorStorage().GetValidatorsList(statedb)
-			pendingBaseFee := misc.CalcSlotBaseFee(pool.chainconfig, pool.chainconfig.ValidatorsPerSlot, uint64(len(validators)), pool.chain.Genesis().GasLimit())
+			pendingBaseFee := misc.CalcSlotBaseFee(
+				pool.chainconfig,
+				pool.chainconfig.ValidatorsPerSlot,
+				uint64(len(validators)),
+				pool.chain.Genesis().GasLimit(),
+				reset.newHead.Slot,
+			)
 			pool.priced.SetBaseFee(pendingBaseFee)
 		}
 	}
