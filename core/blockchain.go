@@ -582,6 +582,21 @@ func (bc *BlockChain) SetLastCoordinatedCheckpoint(cp *types.Checkpoint) {
 			}
 		}
 	}()
+
+	// clear finalized tx
+	go func() {
+		if currCp != nil && cp.Root != currCp.Root {
+			prevCpHeader := bc.GetHeader(currCp.Spine)
+			newCpHeader := bc.GetHeader(cp.Spine)
+			if prevCpHeader != nil {
+				for i := prevCpHeader.Nr() + 1; i <= newCpHeader.Nr(); i++ {
+					block := bc.GetBlockByNumber(i)
+					bc.RemoveTxsFromPool(block.Transactions())
+					log.Info("Clear finalized tx", "finSlot", newCpHeader.Slot, "blNr", i, "txs", len(block.Transactions()))
+				}
+			}
+		}
+	}()
 }
 
 func (bc *BlockChain) ClearStaleBlockDags(uptoNr uint64) {
@@ -1205,8 +1220,6 @@ func (bc *BlockChain) writeFinalizedBlock(finNr uint64, block *types.Block, isHe
 
 		bc.chainHeadFeed.Send(ChainHeadEvent{Block: block, Type: ET_NETWORK})
 	}
-
-	bc.RemoveTxsFromPool(block.Transactions())
 
 	return nil
 }
