@@ -2325,6 +2325,12 @@ func (bc *BlockChain) VerifyBlock(block *types.Block) (bool, error) {
 	)
 	timeTrack = time.Now()
 
+	if bc.Config().IsForkSlotValSyncProc(block.Slot()) {
+		if !bc.verifyBlockTxsOrderByNonce(block) {
+			return false, nil
+		}
+	}
+
 	// Verify body hash and transactions hash
 	if !bc.verifyBlockHashes(block) {
 		return false, nil
@@ -2477,6 +2483,42 @@ func (bc *BlockChain) verifyBlockHeight(block *types.Block, ancestorsCount int) 
 			"cpHeight", cpHeader.Height,
 		)
 		return false
+	}
+	return true
+}
+
+// verifyBlockTxsOrderByNonce validate txs order in accordance with nonce asc.
+func (bc *BlockChain) verifyBlockTxsOrderByNonce(block *types.Block) bool {
+	defer func(ts time.Time) {
+		log.Info("^^^^^^^^^^^^ TIME",
+			"elapsed", common.PrettyDuration(time.Since(ts)),
+			"fn:", "verifyBlockTxsOrderByNonce",
+			"txs", len(block.Transactions()),
+			"hash", block.Hash(),
+		)
+	}(time.Now())
+
+	signer := types.MakeSigner(bc.chainConfig)
+
+	var prevTx *types.Transaction
+	for i, tx := range block.Transactions() {
+		if prevTx != nil && tx.Nonce() != prevTx.Nonce()+1 {
+			from, _ := types.Sender(signer, tx)
+			prevFrom, _ := types.Sender(signer, prevTx)
+			if from == prevFrom {
+				log.Warn("Block verification: invalid transactions nonce order",
+					"i", i,
+					"expNonce", prevTx.Nonce(),
+					"txNonce", tx.Nonce(),
+					"txHash", tx.Hash().Hex(),
+					"txFrom", from.Hex(),
+					"hash", block.Hash().Hex(),
+					"creator", block.Coinbase().Hex(),
+				)
+				return false
+			}
+		}
+		prevTx = tx
 	}
 	return true
 }
@@ -4653,13 +4695,7 @@ func (bc *BlockChain) MoveTxsToProcessing(block *types.Block) {
 
 	txs := types.NewBlockTransactions(block.Hash())
 	bc.handleBlockValidatorSyncTxs(block)
-	//txs.Transactions = append(txs.Transactions, block.Transactions()...)
 	txs.Transactions = block.Transactions()
-
-	//sort.Slice(txs.Transactions, func(i, j int) bool {
-	//	return txs.Transactions[i].Nonce() < txs.Transactions[j].Nonce()
-	//})
-
 	bc.moveTxsToProcessing(txs)
 }
 
