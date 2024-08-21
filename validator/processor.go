@@ -273,7 +273,10 @@ func (p *Processor) validatorDeposit(caller Ref, toAddr common.Address, value *b
 
 	// validate deposit signature
 	if err = operation.VerifyDepositSig(op.Signature(), op.PubKey(), op.CreatorAddress(), op.WithdrawalAddress()); err != nil {
-		return nil, err
+		err = operation.VerifyDepositSigWithDelegate(op.Signature(), op.PubKey(), op.CreatorAddress(), op.WithdrawalAddress(), op.DelegatingStake())
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	if value == nil || value.Cmp(MinDepositVal) < 0 {

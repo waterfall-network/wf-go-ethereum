@@ -1009,7 +1009,10 @@ func (pool *TxPool) checkWithdrawalOperation(op valOperation.Withdrawal, from co
 func (pool *TxPool) checkDepositOperation(op valOperation.Deposit, from common.Address, amount *big.Int) error {
 	// validate deposit signature
 	if err := valOperation.VerifyDepositSig(op.Signature(), op.PubKey(), op.CreatorAddress(), op.WithdrawalAddress()); err != nil {
-		return err
+		err = valOperation.VerifyDepositSigWithDelegate(op.Signature(), op.PubKey(), op.CreatorAddress(), op.WithdrawalAddress(), op.DelegatingStake())
+		if err != nil {
+			return err
+		}
 	}
 
 	// check amount can add to log
