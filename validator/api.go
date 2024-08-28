@@ -280,18 +280,24 @@ func (s *PublicValidatorAPI) GetValidators(ctx context.Context, era *uint64) ([]
 		return nil, err
 	}
 
-	_, addresses := s.chain.ValidatorStorage().GetValidators(s.chain, slot, true, true, "GetValidators")
-	return addresses, nil
+	return s.chain.ValidatorStorage().GetValidators(s.chain, slot, "GetValidators")
 }
 
 // Validator_GetInfo retrieves validator info by provided address.
-func (s *PublicValidatorAPI) Validator_GetInfo(ctx context.Context, address common.Address, blockNrOrHash rpc.BlockNumberOrHash) (*valStore.Validator, error) {
+func (s *PublicValidatorAPI) Validator_GetInfo(ctx context.Context, address common.Address, blockNrOrHash *rpc.BlockNumberOrHash) (*valStore.Validator, error) {
 	slotInfo := s.chain.GetSlotInfo()
 	if slotInfo == nil {
 		return nil, errors.New("no slot info")
 	}
 
-	stateDb, _, err := s.b.StateAndHeaderByNumberOrHash(ctx, blockNrOrHash)
+	if blockNrOrHash == nil {
+		cpBlNr := rpc.CheckpointBlockNumber
+		blockNrOrHash = &rpc.BlockNumberOrHash{
+			BlockNumber: &cpBlNr,
+		}
+	}
+
+	stateDb, _, err := s.b.StateAndHeaderByNumberOrHash(ctx, *blockNrOrHash)
 	if stateDb == nil || err != nil {
 		return nil, err
 	}
