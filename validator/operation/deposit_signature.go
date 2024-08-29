@@ -3,7 +3,6 @@ package operation
 import (
 	ssz "github.com/waterfall-network/fastssz"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
-	"gitlab.waterfall.network/waterfall/protocol/gwat/crypto"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/crypto/bls_sig"
 )
 
@@ -197,18 +196,17 @@ func VerifyDepositSigWithDelegate(
 	withdrawalCred common.Address,
 	data *DelegatingStakeData,
 ) error {
-	delegateBytes, err := data.MarshalBinary()
+	delegateHash, err := computeDelegateHash(data)
 	if err != nil {
 		return err
 	}
 
-	delegateHash := crypto.Keccak256Hash(delegateBytes)
 	sigData := &DepositMessageWithDelegate{
 		PublicKey:             pk.Bytes(),
 		CreatorAddress:        creatorAddr.Bytes(),
 		WithdrawalCredentials: withdrawalCred.Bytes(),
 		Amount:                0,
-		DelegateHash:          delegateHash.Bytes(),
+		DelegateHash:          delegateHash,
 	}
 
 	sigDataRoot, err := sigData.HashTreeRoot()

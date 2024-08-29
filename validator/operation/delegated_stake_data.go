@@ -3,10 +3,13 @@ package operation
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
 
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/crypto"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/log"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/rlp"
 )
@@ -20,9 +23,9 @@ var (
 )
 
 type DelegatingStakeData struct {
-	Rules       DelegatingStakeRules `json:"rules"`       // rules after trial period
-	TrialPeriod uint64               `json:"trialPeriod"` // period while trial_rules are active (in slots, starts from activation slot)
-	TrialRules  DelegatingStakeRules `json:"trialRules"`  // rules for trial period
+	Rules       DelegatingStakeRules `json:"rules"`        // rules after trial period
+	TrialPeriod uint64               `json:"trial_period"` // period while trial_rules are active (in slots, starts from activation slot)
+	TrialRules  DelegatingStakeRules `json:"trial_rules"`  // rules for trial period
 }
 
 func (dsd *DelegatingStakeData) init(
@@ -181,4 +184,66 @@ func minDelegatingStakeDataLen() int {
 		log.Crit("Validator: calc min delegate stake binary data length failed")
 	}
 	return len(emptyBin)
+}
+
+func (dsd *DelegatingStakeData) MarshalJSON() ([]byte, error) {
+	normalizeData := normalizeDelegateData(dsd)
+
+	return json.Marshal(normalizeData)
+}
+
+func normalizeDelegateData(data *DelegatingStakeData) map[string]interface{} {
+	normalizedMap := make(map[string]interface{})
+
+	normalizedMap["rules"] = normalizeRules(&data.Rules)
+	normalizedMap["trial_period"] = data.TrialPeriod
+	normalizedMap["trial_rules"] = normalizeRules(&data.TrialRules)
+
+	return normalizedMap
+}
+
+func normalizeRules(rules *DelegatingStakeRules) map[string]interface{} {
+	normalizedRules := make(map[string]interface{})
+
+	normalizedRules["profit_share"] = sortMap(rules.ProfitShare())
+	normalizedRules["stake_share"] = sortMap(rules.StakeShare())
+
+	exit := make([]string, len(rules.Exit()))
+	for i, address := range rules.Exit() {
+		exit[i] = address.Hex()
+	}
+	normalizedRules["exit"] = exit
+
+	withdrawal := make([]string, len(rules.Withdrawal()))
+	for i, address := range rules.Withdrawal() {
+		withdrawal[i] = address.Hex()
+	}
+	normalizedRules["withdrawal"] = withdrawal
+
+	return normalizedRules
+}
+
+func sortMap(data map[common.Address]uint8) map[string]uint8 {
+	keys := make([]string, 0, len(data))
+	for k := range data {
+		keys = append(keys, k.Hex())
+	}
+	sort.Strings(keys)
+
+	sortedMap := make(map[string]uint8)
+	for _, k := range keys {
+		sortedMap[k] = data[common.HexToAddress(k)]
+	}
+
+	return sortedMap
+}
+
+func computeDelegateHash(delegateData *DelegatingStakeData) ([]byte, error) {
+	delegateBytes, err := delegateData.MarshalJSON()
+	if err != nil {
+		return nil, err
+	}
+
+	hash := crypto.Keccak256(delegateBytes)
+	return hash, nil
 }
