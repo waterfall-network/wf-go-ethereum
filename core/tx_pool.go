@@ -1008,7 +1008,15 @@ func (pool *TxPool) checkWithdrawalOperation(op valOperation.Withdrawal, from co
 
 func (pool *TxPool) checkDepositOperation(op valOperation.Deposit, from common.Address, amount *big.Int) error {
 	// validate deposit signature
+	var curSlot uint64
+	if pool.chain.GetSlotInfo() != nil {
+		curSlot = pool.chain.GetSlotInfo().CurrentSlot()
+	}
+
 	if err := valOperation.VerifyDepositSig(op.Signature(), op.PubKey(), op.CreatorAddress(), op.WithdrawalAddress()); err != nil {
+		if !pool.chain.Config().IsForkSlotValSyncProc(curSlot) {
+			return err
+		}
 		err = valOperation.VerifyDepositSigWithDelegate(op.Signature(), op.PubKey(), op.CreatorAddress(), op.WithdrawalAddress(), op.DelegatingStake())
 		if err != nil {
 			return err
@@ -1024,10 +1032,6 @@ func (pool *TxPool) checkDepositOperation(op valOperation.Deposit, from common.A
 		return fmt.Errorf("too low value (min deposit = %s wei)", val.MinDepositVal.String())
 	}
 	//check delegating stake activation fork
-	var curSlot uint64
-	if pool.chain.GetSlotInfo() != nil {
-		curSlot = pool.chain.GetSlotInfo().CurrentSlot()
-	}
 	if op.DelegatingStake() != nil {
 		if !pool.chainconfig.IsForkSlotDelegate(curSlot) {
 			return valOperation.ErrDelegateForkRequire

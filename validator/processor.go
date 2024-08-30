@@ -273,6 +273,9 @@ func (p *Processor) validatorDeposit(caller Ref, toAddr common.Address, value *b
 
 	// validate deposit signature
 	if err = operation.VerifyDepositSig(op.Signature(), op.PubKey(), op.CreatorAddress(), op.WithdrawalAddress()); err != nil {
+		if !p.blockchain.Config().IsForkSlotValSyncProc(p.ctx.Slot) {
+			return nil, err
+		}
 		err = operation.VerifyDepositSigWithDelegate(op.Signature(), op.PubKey(), op.CreatorAddress(), op.WithdrawalAddress(), op.DelegatingStake())
 		if err != nil {
 			return nil, err
