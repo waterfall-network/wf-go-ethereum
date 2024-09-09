@@ -195,40 +195,6 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 	}
 	log.Info("Loaded SlotInfo", "info", eth.blockchain.GetSlotInfo())
 
-	// Rewind the chain in case of an incompatible config upgrade.
-	if compat, ok := genesisErr.(*params.ConfigCompatError); ok {
-		log.Warn("Rewinding chain to upgrade configuration", "err", compat)
-		rawdb.WriteChainConfig(chainDb, genesisHash, chainConfig)
-	}
-	eth.bloomIndexer.Start(eth.blockchain)
-
-	if config.TxPool.Journal != "" {
-		config.TxPool.Journal = stack.ResolvePath(config.TxPool.Journal)
-	}
-	eth.txPool = core.NewTxPool(config.TxPool, chainConfig, eth.blockchain)
-
-	// Permit the downloader to use the trie cache allowance during fast sync
-	cacheLimit := cacheConfig.TrieCleanLimit + cacheConfig.TrieDirtyLimit + cacheConfig.SnapshotLimit
-	checkpoint := config.Checkpoint
-	if checkpoint == nil {
-		checkpoint = params.TrustedCheckpoints[genesisHash]
-	}
-	if eth.handler, err = newHandler(&handlerConfig{
-		Database:   chainDb,
-		Chain:      eth.blockchain,
-		TxPool:     eth.txPool,
-		Network:    config.NetworkId,
-		Sync:       config.SyncMode,
-		BloomCache: uint64(cacheLimit),
-		EventMux:   eth.eventMux,
-		Checkpoint: checkpoint,
-		Whitelist:  config.Whitelist,
-	}); err != nil {
-		return nil, err
-	}
-
-	eth.dag = dag.New(eth, eth.EventMux(), &config.Creator)
-
 	currentEraNumber := rawdb.ReadCurrentEra(chainDb)
 	if eraInfo := rawdb.ReadEra(chainDb, currentEraNumber); eraInfo != nil {
 		eth.blockchain.SetNewEraInfo(*eraInfo)
@@ -269,13 +235,51 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 						log.Crit("Bad data initialized: epoch cp header not fount", "epoch", transEpoch, "cpSpine", cpSpine.Hex())
 						log.Crit("Use backup to restore work")
 					}
-					eth.blockchain.StartTransitionPeriod(cp, header.Root, header.Hash())
+					err = eth.blockchain.StartTransitionPeriod(cp, header.Root, header.Hash())
+					if err != nil {
+						return nil, err
+					}
 				}
 			}
 		}
 	}
+
 	// fixes era for testnet8
 	eth.blockchain.FixEra(nil, true, "eth/backend.New")
+
+	// Rewind the chain in case of an incompatible config upgrade.
+	if compat, ok := genesisErr.(*params.ConfigCompatError); ok {
+		log.Warn("Rewinding chain to upgrade configuration", "err", compat)
+		rawdb.WriteChainConfig(chainDb, genesisHash, chainConfig)
+	}
+	eth.bloomIndexer.Start(eth.blockchain)
+
+	if config.TxPool.Journal != "" {
+		config.TxPool.Journal = stack.ResolvePath(config.TxPool.Journal)
+	}
+	eth.txPool = core.NewTxPool(config.TxPool, chainConfig, eth.blockchain)
+
+	// Permit the downloader to use the trie cache allowance during fast sync
+	cacheLimit := cacheConfig.TrieCleanLimit + cacheConfig.TrieDirtyLimit + cacheConfig.SnapshotLimit
+	checkpoint := config.Checkpoint
+	if checkpoint == nil {
+		checkpoint = params.TrustedCheckpoints[genesisHash]
+	}
+	if eth.handler, err = newHandler(&handlerConfig{
+		Database:   chainDb,
+		Chain:      eth.blockchain,
+		TxPool:     eth.txPool,
+		Network:    config.NetworkId,
+		Sync:       config.SyncMode,
+		BloomCache: uint64(cacheLimit),
+		EventMux:   eth.eventMux,
+		Checkpoint: checkpoint,
+		Whitelist:  config.Whitelist,
+	}); err != nil {
+		return nil, err
+	}
+
+	eth.dag = dag.New(eth, eth.EventMux(), &config.Creator)
 
 	go eth.dag.StartWork()
 
