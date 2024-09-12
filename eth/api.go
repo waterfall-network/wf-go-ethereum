@@ -331,7 +331,6 @@ func (api *PublicDebugAPI) AccountRange(blockNrOrHash rpc.BlockNumberOrHash, sta
 			// the miner and operate on those
 			_, stateDb = api.eth.dag.Creator().Pending()
 		} else if number == rpc.CheckpointBlockNumber || number == rpc.SafeBlockNumber {
-
 			lastCP := api.eth.blockchain.GetLastCoordinatedCheckpoint()
 			stateDb, err = api.eth.BlockChain().StateAt(lastCP.Root)
 			if err != nil {
