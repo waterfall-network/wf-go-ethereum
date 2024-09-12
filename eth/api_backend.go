@@ -103,6 +103,14 @@ func (b *EthAPIBackend) HeaderByNumber(ctx context.Context, number rpc.BlockNumb
 		bl := b.eth.blockchain.GetLastFinalizedBlock()
 		return bl.Header(), nil
 	}
+
+	if number == rpc.CheckpointBlockNumber || number == rpc.SafeBlockNumber {
+		lastCP := b.BlockChain().GetLastCoordinatedCheckpoint()
+		block := b.BlockChain().GetBlockByHash(lastCP.Spine)
+		if block != nil {
+			return block.Header(), nil
+		}
+	}
 	return b.eth.blockchain.GetHeaderByNumber(uint64(number)), nil
 }
 
@@ -141,6 +149,13 @@ func (b *EthAPIBackend) BlockByNumber(ctx context.Context, number rpc.BlockNumbe
 		bl := b.eth.blockchain.GetLastFinalizedBlock()
 		return bl, nil
 	}
+
+	if number == rpc.CheckpointBlockNumber || number == rpc.SafeBlockNumber {
+		lastCP := b.BlockChain().GetLastCoordinatedCheckpoint()
+		block := b.BlockChain().GetBlockByHash(lastCP.Spine)
+		return block, nil
+	}
+
 	return b.eth.blockchain.GetBlockByNumber(uint64(number)), nil
 }
 
@@ -177,7 +192,7 @@ func (b *EthAPIBackend) PendingBlockAndReceipts() (*types.Block, types.Receipts)
 
 func (b *EthAPIBackend) StateAndHeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*state.StateDB, *types.Header, error) {
 	// Pending state is only known by the miner
-	if number == rpc.CheckpointBlockNumber {
+	if number == rpc.CheckpointBlockNumber || number == rpc.SafeBlockNumber {
 		cp := b.eth.blockchain.GetLastCoordinatedCheckpoint()
 		if cp == nil {
 			return nil, nil, errors.New("current cp not found")

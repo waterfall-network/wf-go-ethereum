@@ -1023,10 +1023,10 @@ web3._extend({
 			params: 2,
 			inputFormatter: [web3._extend.formatters.inputAddressFormatter, function(param) {
 				if (param != null) {
-					if (param == "final") {
-						return "final"
-					}
-					return web3._extend.formatters.inputDefaultBlockNumberFormatter(param)
+					var res = web3._extend.formatters.inputDefaultBlockNumberFormatter(param)
+					console.log('wat_validatorGetInfo block number', JSON.stringify({res, param},null,2))
+					return res
+					//return web3._extend.formatters.inputDefaultBlockNumberFormatter(param)
 				}
 			}]
 		}),	
