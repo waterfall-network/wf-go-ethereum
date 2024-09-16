@@ -424,10 +424,8 @@ func (p *Processor) validatorExit(caller Ref, toAddr common.Address, op operatio
 		op.SetExitAfterEpoch(&exitAftEpoch)
 	}
 
-	if p.blockchain.Config().IsForkSlotValSyncProc(p.ctx.Slot) {
-		if validator.GetActivationEra() >= p.blockchain.GetEraInfo().Number() {
-			return nil, ErrNotActivatedValidator
-		}
+	if p.blockchain.Config().IsForkSlotValSyncProc(p.ctx.Slot) && validator.GetActivationEra() >= p.blockchain.GetEraInfo().Number() {
+		return nil, ErrNotActivatedValidator
 	} else if validator.GetActivationEra() > p.blockchain.GetEraInfo().Number() {
 		return nil, ErrNotActivatedValidator
 	}

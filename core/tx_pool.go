@@ -874,6 +874,14 @@ func (pool *TxPool) checkExitOperation(op valOperation.Exit, from common.Address
 	if validator.GetActivationEra() == math.MaxUint64 {
 		return val.ErrNotActivatedValidator
 	}
+
+	if pool.chain.Config().IsForkSlotValSyncProc(pool.chain.GetSlotInfo().CurrentSlot()) {
+		currentEra := pool.chain.GetEraInfo().Number()
+		if validator.GetActivationEra() >= currentEra {
+			return val.ErrNotActivatedValidator
+		}
+	}
+
 	if validator.HasDelegatingStake() {
 		//check delegating roles
 		//retrieve actual rules
