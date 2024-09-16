@@ -424,7 +424,7 @@ func (p *Processor) validatorExit(caller Ref, toAddr common.Address, op operatio
 		op.SetExitAfterEpoch(&exitAftEpoch)
 	}
 
-	if validator.GetActivationEra() > p.blockchain.GetEraInfo().Number() {
+	if validator.GetActivationEra() >= p.blockchain.GetEraInfo().Number() {
 		return nil, ErrNotActivatedValidator
 	}
 
