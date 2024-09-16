@@ -1083,7 +1083,7 @@ func TestProcessorExit_DelegatingStake(t *testing.T) {
 				testutils.AssertNoError(t, err)
 
 				validator := storage.NewValidator(depositOp.PubKey(), depositOp.CreatorAddress(), &withdrawalAddress)
-				validator.ActivationEra = eraInfo.GetEra().Number
+				validator.ActivationEra = eraInfo.GetEra().Number - 1
 				validator.DelegatingStake = depositOp.DelegatingStake()
 				err = processor.Storage().SetValidator(processor.state, validator)
 				testutils.AssertNoError(t, err)
@@ -1113,6 +1113,7 @@ func TestProcessorExit_DelegatingStake(t *testing.T) {
 				bc.EXPECT().GetEraInfo().AnyTimes().Return(&eraInfo)
 
 				db := rawdb.NewMemoryDatabase()
+				rawdb.WriteEra(db, eraInfo.Number()-1, *eraInfo.GetEra())
 				rawdb.WriteEra(db, eraInfo.Number(), *eraInfo.GetEra())
 				bc.EXPECT().Database().AnyTimes().Return(db)
 
@@ -1132,7 +1133,7 @@ func TestProcessorExit_DelegatingStake(t *testing.T) {
 				testutils.AssertNoError(t, err)
 
 				validator := storage.NewValidator(depositOp.PubKey(), depositOp.CreatorAddress(), &withdrawalAddress)
-				validator.ActivationEra = eraInfo.GetEra().Number
+				validator.ActivationEra = eraInfo.GetEra().Number - 1
 				validator.DelegatingStake = depositOp.DelegatingStake()
 				err = processor.Storage().SetValidator(processor.state, validator)
 				testutils.AssertNoError(t, err)
