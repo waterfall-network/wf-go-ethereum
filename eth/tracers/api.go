@@ -96,6 +96,19 @@ type chainContext struct {
 	ctx context.Context
 }
 
+func (context *chainContext) GetHeaderByNumber(number uint64) *types.Header {
+	header, err := context.api.backend.HeaderByNumber(context.ctx, rpc.BlockNumber(number))
+	if err != nil {
+		return nil
+	}
+
+	return header
+}
+
+func (context *chainContext) Config() *params.ChainConfig {
+	return context.api.backend.ChainConfig()
+}
+
 func (context *chainContext) GetHeader(hash common.Hash) *types.Header {
 	header, err := context.api.backend.HeaderByHash(context.ctx, hash)
 	if err != nil {

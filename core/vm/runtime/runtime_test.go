@@ -241,6 +241,23 @@ type dummyChain struct {
 	counter int
 }
 
+func (d *dummyChain) GetHeaderByNumber(number uint64) *types.Header {
+	d.counter++
+	parentHash := common.Hash{}
+	s := common.LeftPadBytes(big.NewInt(int64(number-1)).Bytes(), 32)
+	copy(parentHash[:], s)
+
+	parentHashes := []common.Hash{parentHash}
+
+	//parentHash := common.Hash{byte(n - 1)}
+	//fmt.Printf("GetHeader(%x, %d) => header with parent %x\n", h, n, parentHash)
+	return fakeHeader(number, parentHashes)
+}
+
+func (d *dummyChain) Config() *params.ChainConfig {
+	return params.TestChainConfig
+}
+
 // GetHeader returns the hash corresponding to their hash.
 func (d *dummyChain) GetHeader(h common.Hash) *types.Header {
 	d.counter++

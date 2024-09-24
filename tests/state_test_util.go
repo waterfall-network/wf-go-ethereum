@@ -82,7 +82,8 @@ type stPostState struct {
 
 type stEnv struct {
 	Coinbase   common.Address `json:"currentCoinbase"   gencodec:"required"`
-	Difficulty *big.Int       `json:"currentDifficulty" gencodec:"required"`
+	Difficulty *big.Int       `json:"currentDifficulty" gencodec:"optional"`
+	Random     *big.Int       `json:"currentRandom"     gencodec:"optional"`
 	GasLimit   uint64         `json:"currentGasLimit"   gencodec:"required"`
 	Number     uint64         `json:"currentNumber"     gencodec:"required"`
 	Timestamp  uint64         `json:"currentTimestamp"  gencodec:"required"`
@@ -92,6 +93,7 @@ type stEnv struct {
 type stEnvMarshaling struct {
 	Coinbase   common.UnprefixedAddress
 	Difficulty *math.HexOrDecimal256
+	Random     *math.HexOrDecimal256
 	GasLimit   math.HexOrDecimal64
 	Number     math.HexOrDecimal64
 	Timestamp  math.HexOrDecimal64
@@ -219,6 +221,11 @@ func (t *StateTest) RunNoVerify(subtest StateSubtest, vmconfig vm.Config, snapsh
 	context := core.NewEVMBlockContext(block.Header(), nil, &t.json.Env.Coinbase)
 	context.GetHash = vmTestBlockHash
 	context.BaseFee = baseFee
+	if t.json.Env.Random != nil {
+		rnd := common.BigToHash(t.json.Env.Random)
+		context.Random = &rnd
+		context.Difficulty = big.NewInt(0)
+	}
 	evm := vm.NewEVM(context, txContext, statedb, config, vmconfig)
 	tp := token.NewProcessor(context, statedb)
 	vp := validator.NewProcessor(context, statedb, nil)

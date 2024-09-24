@@ -22,6 +22,7 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/vm"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
 )
 
 // ChainContext supports retrieving headers and consensus parameters from the
@@ -29,6 +30,8 @@ import (
 type ChainContext interface {
 	// GetHeader returns the hash corresponding to their hash.
 	GetHeader(common.Hash) *types.Header
+	GetHeaderByNumber(number uint64) *types.Header
+	Config() *params.ChainConfig
 }
 
 // NewEVMBlockContext creates a new context for use in the EVM.
@@ -36,6 +39,7 @@ func NewEVMBlockContext(header *types.Header, chain ChainContext, author *common
 	var (
 		beneficiary common.Address
 		baseFee     *big.Int
+		random      *common.Hash
 	)
 
 	// If we don't have an explicit author (i.e. not mining), extract from the header
@@ -47,6 +51,12 @@ func NewEVMBlockContext(header *types.Header, chain ChainContext, author *common
 	if header.BaseFee != nil {
 		baseFee = new(big.Int).Set(header.BaseFee)
 	}
+
+	if chain.Config().IsForkSlotValSyncProc(header.Slot) {
+		prevHeader := chain.GetHeaderByNumber(*header.Number - 1)
+		random = &prevHeader.Root
+	}
+
 	return vm.BlockContext{
 		CanTransfer: CanTransfer,
 		Transfer:    Transfer,
@@ -60,6 +70,7 @@ func NewEVMBlockContext(header *types.Header, chain ChainContext, author *common
 		Era:         header.Era,
 		Slot:        header.Slot,
 		BlockHash:   header.Hash(),
+		Random:      random,
 	}
 }
 
