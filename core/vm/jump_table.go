@@ -79,6 +79,19 @@ func validate(jt JumpTable) JumpTable {
 	return jt
 }
 
+func newCancunInstructionSet() JumpTable {
+	instructionSet := newShanghaiInstructionSet()
+	enable5656(&instructionSet) // EIP-5656 (MCOPY opcode)
+	return validate(instructionSet)
+}
+
+func newShanghaiInstructionSet() JumpTable {
+	instructionSet := newLondonInstructionSet()
+	enable3855(&instructionSet) // PUSH0 instruction
+
+	return validate(instructionSet)
+}
+
 func newMergeInstructionSet() JumpTable {
 	instructionSet := newLondonInstructionSet()
 	instructionSet[RANDOM] = &operation{
@@ -87,13 +100,6 @@ func newMergeInstructionSet() JumpTable {
 		minStack:    minStack(0, 1),
 		maxStack:    maxStack(0, 1),
 	}
-	return validate(instructionSet)
-}
-
-func newShanghaiInstructionSet() JumpTable {
-	instructionSet := newLondonInstructionSet()
-	enable3855(&instructionSet) // PUSH0 instruction
-
 	return validate(instructionSet)
 }
 
