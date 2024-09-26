@@ -400,7 +400,13 @@ func (pool *TxPool) validateTx(ctx context.Context, tx *types.Transaction) error
 	isValidatorOp := tx.To() != nil && pool.config.ValidatorsStateAddress != nil && *tx.To() == *pool.config.ValidatorsStateAddress
 
 	// Should supply enough intrinsic gas
-	gas, err := core.IntrinsicGas(tx.Data(), tx.AccessList(), tx.To() == nil, isValidatorOp)
+	gas, err := core.IntrinsicGas(tx.Data(),
+		tx.AccessList(),
+		tx.To() == nil,
+		isValidatorOp,
+		pool.config.Rules(header.Slot).IsHomestead,
+		pool.config.IsForkSlotValSyncProc(header.Slot),
+	)
 	if err != nil {
 		return err
 	}

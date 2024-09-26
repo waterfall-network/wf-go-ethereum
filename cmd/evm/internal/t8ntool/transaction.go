@@ -151,7 +151,13 @@ func Transaction(ctx *cli.Context) error {
 		isContractCreation = tx.To() == nil && !isValidatorOp && !isTokenOp
 
 		// Check intrinsic gas
-		if gas, err := core.IntrinsicGas(tx.Data(), tx.AccessList(), isContractCreation, isValidatorOp); err != nil {
+		if gas, err := core.IntrinsicGas(tx.Data(),
+			tx.AccessList(),
+			isContractCreation,
+			isValidatorOp,
+			chainConfig.Rules(0).IsHomestead,
+			chainConfig.IsForkSlotValSyncProc(0),
+		); err != nil {
 			r.Error = err
 			results = append(results, r)
 			continue
@@ -179,6 +185,10 @@ func Transaction(ctx *cli.Context) error {
 			r.Error = errors.New("gas * gasPrice exceeds 256 bits")
 		case new(big.Int).Mul(tx.GasFeeCap(), new(big.Int).SetUint64(tx.Gas())).BitLen() > 256:
 			r.Error = errors.New("gas * maxFeePerGas exceeds 256 bits")
+		}
+		// Check whether the init code size has been exceeded.
+		if chainConfig.IsForkSlotValSyncProc(0) && tx.To() == nil && len(tx.Data()) > params.MaxInitCodeSize {
+			r.Error = errors.New("max initcode size exceeded")
 		}
 		results = append(results, r)
 	}

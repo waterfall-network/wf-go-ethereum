@@ -56,6 +56,7 @@ var (
 	londonInstructionSet           = newLondonInstructionSet()
 	shanghaiInstructionSet         = newShanghaiInstructionSet()
 	mergeInstructionSet            = newMergeInstructionSet()
+	cancunInstructionSet           = newCancunInstructionSet()
 )
 
 // JumpTable contains the EVM opcodes supported at a given fork.
@@ -82,6 +83,7 @@ func validate(jt JumpTable) JumpTable {
 func newCancunInstructionSet() JumpTable {
 	instructionSet := newShanghaiInstructionSet()
 	enable5656(&instructionSet) // EIP-5656 (MCOPY opcode)
+	enable3860(&instructionSet) // Limit and meter initcode
 	return validate(instructionSet)
 }
 

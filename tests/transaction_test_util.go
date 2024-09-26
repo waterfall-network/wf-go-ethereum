@@ -57,7 +57,13 @@ func (tt *TransactionTest) Run(config *params.ChainConfig) error {
 
 		isValidatorOp := tx.To() != nil && config.ValidatorsStateAddress != nil && *tx.To() == *config.ValidatorsStateAddress
 		// Intrinsic gas
-		requiredGas, err := core.IntrinsicGas(tx.Data(), tx.AccessList(), tx.To() == nil, isValidatorOp)
+		requiredGas, err := core.IntrinsicGas(tx.Data(),
+			tx.AccessList(),
+			tx.To() == nil,
+			isValidatorOp,
+			true,
+			false,
+		)
 		if err != nil {
 			return nil, nil, err
 		}

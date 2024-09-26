@@ -3873,11 +3873,23 @@ func (bc *BlockChain) EstimateGas(msg types.Message, header *types.Header) (uint
 
 	switch txType {
 	case ValidatorMethodTxType, ValidatorSyncTxType:
-		return IntrinsicGas(msg.Data(), msg.AccessList(), false, true)
+		return IntrinsicGas(msg.Data(),
+			msg.AccessList(),
+			false,
+			true,
+			bc.chainConfig.Rules(header.Slot).IsHomestead,
+			bc.chainConfig.IsForkSlotValSyncProc(header.Slot),
+		)
 	case ContractMethodTxType, ContractCreationTxType:
 		return bc.EstimateGasByEvm(msg, header, stateDb, tokenProcessor, validatorProcessor)
 	case TokenCreationTxType, TokenMethodTxType:
-		return IntrinsicGas(msg.Data(), msg.AccessList(), false, false)
+		return IntrinsicGas(msg.Data(),
+			msg.AccessList(),
+			false,
+			false,
+			bc.chainConfig.Rules(header.Slot).IsHomestead,
+			bc.chainConfig.IsForkSlotValSyncProc(header.Slot),
+		)
 	default:
 		return 0, ErrTxTypeNotSupported
 	}
