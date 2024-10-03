@@ -95,6 +95,7 @@ const (
 	NUMBER      OpCode = 0x43
 	DIFFICULTY  OpCode = 0x44
 	RANDOM      OpCode = 0x44 // Same as DIFFICULTY
+	PREVRANDAO  OpCode = 0x44 // Same as DIFFICULTY
 	GASLIMIT    OpCode = 0x45
 	CHAINID     OpCode = 0x46
 	SELFBALANCE OpCode = 0x47
@@ -115,6 +116,8 @@ const (
 	MSIZE    OpCode = 0x59
 	GAS      OpCode = 0x5a
 	JUMPDEST OpCode = 0x5b
+	TLOAD    OpCode = 0x5c
+	TSTORE   OpCode = 0x5d
 	MCOPY    OpCode = 0x5e
 	PUSH0    OpCode = 0x5f
 )
@@ -217,12 +220,6 @@ const (
 	REVERT       OpCode = 0xfd
 	INVALID      OpCode = 0xfe
 	SELFDESTRUCT OpCode = 0xff
-)
-
-// 0xb0 range.
-const (
-	TLOAD  OpCode = 0xb3
-	TSTORE OpCode = 0xb4
 )
 
 var opCodeToString = [256]string{

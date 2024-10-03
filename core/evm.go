@@ -54,7 +54,9 @@ func NewEVMBlockContext(header *types.Header, chain ChainContext, author *common
 
 	if chain.Config().IsForkSlotValSyncProc(header.Slot) {
 		prevHeader := chain.GetHeaderByNumber(*header.Number - 1)
-		random = &prevHeader.Root
+		if prevHeader != nil {
+			random = &prevHeader.Root
+		}
 	}
 
 	return vm.BlockContext{

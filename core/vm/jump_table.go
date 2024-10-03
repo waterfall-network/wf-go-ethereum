@@ -81,10 +81,21 @@ func validate(jt JumpTable) JumpTable {
 }
 
 func newCancunInstructionSet() JumpTable {
-	instructionSet := newShanghaiInstructionSet()
+	instructionSet := newMergeInstructionSet()
 	enable5656(&instructionSet) // EIP-5656 (MCOPY opcode)
 	enable3860(&instructionSet) // Limit and meter initcode
 	enable1153(&instructionSet) // EIP-1153 "Transient Storage"
+	return validate(instructionSet)
+}
+
+func newMergeInstructionSet() JumpTable {
+	instructionSet := newShanghaiInstructionSet()
+	instructionSet[PREVRANDAO] = &operation{
+		execute:     opRandom,
+		constantGas: GasQuickStep,
+		minStack:    minStack(0, 1),
+		maxStack:    maxStack(0, 1),
+	}
 	return validate(instructionSet)
 }
 
@@ -92,17 +103,6 @@ func newShanghaiInstructionSet() JumpTable {
 	instructionSet := newLondonInstructionSet()
 	enable3855(&instructionSet) // PUSH0 instruction
 
-	return validate(instructionSet)
-}
-
-func newMergeInstructionSet() JumpTable {
-	instructionSet := newLondonInstructionSet()
-	instructionSet[RANDOM] = &operation{
-		execute:     opRandom,
-		constantGas: GasQuickStep,
-		minStack:    minStack(0, 1),
-		maxStack:    maxStack(0, 1),
-	}
 	return validate(instructionSet)
 }
 
