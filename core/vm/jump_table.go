@@ -84,6 +84,7 @@ func newCancunInstructionSet() JumpTable {
 	instructionSet := newShanghaiInstructionSet()
 	enable5656(&instructionSet) // EIP-5656 (MCOPY opcode)
 	enable3860(&instructionSet) // Limit and meter initcode
+	enable1153(&instructionSet) // EIP-1153 "Transient Storage"
 	return validate(instructionSet)
 }
 
