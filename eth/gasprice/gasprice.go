@@ -24,12 +24,15 @@ import (
 
 	lru "github.com/hashicorp/golang-lru"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/consensus/misc"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/core/state"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/event"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/log"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/rpc"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/era"
 	valStore "gitlab.waterfall.network/waterfall/protocol/gwat/validator/storage"
 )
 
@@ -61,18 +64,25 @@ type OracleBackend interface {
 	ValidatorsStorage() valStore.Storage
 	Genesis() *types.Block
 	BlockChain() *core.BlockChain
+	StateAt(root common.Hash) (*state.StateDB, error)
+	GetBlock(ctx context.Context, hash common.Hash) *types.Block
+	GetSlotInfo() *types.SlotInfo
+	GetLastCoordinatedCheckpoint() *types.Checkpoint
+	GetEpoch(epoch uint64) common.Hash
+	EpochToEra(uint64) *era.Era
 }
 
 // Oracle recommends gas prices based on the content of recent
 // blocks. Suitable for both light and full clients.
 type Oracle struct {
-	backend     OracleBackend
-	lastHead    common.Hash
-	lastPrice   *big.Int
-	maxPrice    *big.Int
-	ignorePrice *big.Int
-	cacheLock   sync.RWMutex
-	fetchLock   sync.Mutex
+	backend      OracleBackend
+	lastHead     common.Hash
+	lastPrice    *big.Int
+	maxPrice     *big.Int
+	ignorePrice  *big.Int
+	defaultPrice *big.Int
+	cacheLock    sync.RWMutex
+	fetchLock    sync.Mutex
 
 	checkBlocks, percentile           int
 	maxHeaderHistory, maxBlockHistory int
@@ -127,6 +137,7 @@ func NewOracle(backend OracleBackend, params Config) *Oracle {
 		lastPrice:        params.Default,
 		maxPrice:         maxPrice,
 		ignorePrice:      ignorePrice,
+		defaultPrice:     params.Default,
 		checkBlocks:      blocks,
 		percentile:       percent,
 		maxHeaderHistory: params.MaxHeaderHistory,
@@ -163,18 +174,61 @@ func (oracle *Oracle) SuggestTipCap(ctx context.Context) (*big.Int, error) {
 		return new(big.Int).Set(lastPrice), nil
 	}
 	var (
-		sent, exp int
-		number    = head.Nr()
-		result    = make(chan results, oracle.checkBlocks)
-		quit      = make(chan struct{})
-		results   []*big.Int
+		sent, exp                      int
+		cumGas, blocksCount, mediumGas uint64
+		number                         = head.Nr()
+		result                         = make(chan results, oracle.checkBlocks)
+		quit                           = make(chan struct{})
+		results                        []*big.Int
 	)
 	for sent < oracle.checkBlocks && number > 0 {
 		go oracle.getBlockValues(ctx, types.MakeSigner(oracle.backend.ChainConfig()), number, sampleNumber, oracle.ignorePrice, result, quit)
+
+		header, err := oracle.backend.HeaderByNumber(ctx, rpc.BlockNumber(number))
+		if err != nil {
+			return new(big.Int).Set(lastPrice), err
+		}
+
+		cumGas += header.GasUsed
 		sent++
 		exp++
+		blocksCount++
 		number--
 	}
+
+	if cumGas > 0 && blocksCount > 0 {
+		mediumGas = cumGas / blocksCount
+	}
+
+	if mediumGas < oracle.backend.Genesis().GasLimit()/2 {
+		creatorsPerSlotCount := oracle.backend.ChainConfig().ValidatorsPerSlot
+		if creatorsPerSlot, err := oracle.backend.ValidatorsStorage().GetCreatorsBySlot(oracle.backend, head.Slot); err == nil {
+			creatorsPerSlotCount = uint64(len(creatorsPerSlot))
+		}
+
+		validatorsCount, err := oracle.backend.ValidatorsStorage().GetActiveValidatorsCount(oracle.backend, head.Slot)
+		if err != nil {
+			return new(big.Int).Set(lastPrice), err
+		}
+
+		baseFee := misc.CalcSlotBaseFee(
+			oracle.backend.ChainConfig(),
+			creatorsPerSlotCount,
+			validatorsCount,
+			oracle.backend.Genesis().GasLimit(),
+			head.Slot,
+		)
+
+		price := new(big.Int).Add(baseFee, oracle.defaultPrice)
+
+		oracle.cacheLock.Lock()
+		oracle.lastHead = headHash
+		oracle.lastPrice = price
+		oracle.cacheLock.Unlock()
+
+		return price, nil
+	}
+
 	for exp > 0 {
 		res := <-result
 		if res.err != nil {
