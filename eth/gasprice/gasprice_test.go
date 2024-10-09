@@ -26,6 +26,7 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/rawdb"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/core/state"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/vm"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/crypto"
@@ -33,6 +34,7 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/rpc"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/tests/testutils"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/era"
 	valStore "gitlab.waterfall.network/waterfall/protocol/gwat/validator/storage"
 )
 
@@ -43,19 +45,40 @@ type testBackend struct {
 	pending bool // pending block available
 }
 
+func (b *testBackend) StateAt(root common.Hash) (*state.StateDB, error) {
+	return b.chain.StateAt(root)
+}
+
+func (b *testBackend) GetBlock(ctx context.Context, hash common.Hash) *types.Block {
+	return b.chain.GetBlock(ctx, hash)
+}
+
+func (b *testBackend) GetSlotInfo() *types.SlotInfo {
+	return b.chain.GetSlotInfo()
+}
+
+func (b *testBackend) GetLastCoordinatedCheckpoint() *types.Checkpoint {
+	return b.chain.GetLastCoordinatedCheckpoint()
+}
+
+func (b *testBackend) GetEpoch(epoch uint64) common.Hash {
+	return b.chain.GetEpoch(epoch)
+}
+
+func (b *testBackend) EpochToEra(u uint64) *era.Era {
+	return b.chain.EpochToEra(u)
+}
+
 func (b *testBackend) ValidatorsStorage() valStore.Storage {
-	//TODO implement me
-	panic("implement me")
+	return b.chain.ValidatorStorage()
 }
 
 func (b *testBackend) Genesis() *types.Block {
-	//TODO implement me
-	panic("implement me")
+	return b.chain.Genesis()
 }
 
 func (b *testBackend) BlockChain() *core.BlockChain {
-	//TODO implement me
-	panic("implement me")
+	return b.chain
 }
 
 func (b *testBackend) HeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*types.Header, error) {
@@ -157,6 +180,12 @@ func newTestBackend(t *testing.T, londonBlock *big.Int, pending bool) *testBacke
 		t.Fatalf("Failed to create local chain, %v", err)
 	}
 
+	err = bc.SetSlotInfo(&types.SlotInfo{
+		GenesisTime:    11111,
+		SecondsPerSlot: 32,
+		SlotsPerEpoch:  8,
+	})
+
 	blocks, _ := core.GenerateChain(gspec.Config, genesis, db, testHead+1, func(i int, b *core.BlockGen) {
 		b.SetCoinbase(common.Address{1})
 
@@ -221,11 +250,11 @@ func TestSuggestTipCap(t *testing.T) {
 		fork   *big.Int // London fork number
 		expect *big.Int // Expected gasprice suggestion
 	}{
-		{nil, big.NewInt(int64(1000000000))},
-		{big.NewInt(0), big.NewInt(int64(1000000000))},  // Fork point in genesis
-		{big.NewInt(1), big.NewInt(int64(1000000000))},  // Fork point in first block
-		{big.NewInt(32), big.NewInt(int64(1000000000))}, // Fork point in last block
-		{big.NewInt(33), big.NewInt(int64(1000000000))}, // Fork point in the future
+		{nil, big.NewInt(int64(5925277077315))},
+		{big.NewInt(0), big.NewInt(int64(5925277077315))},  // Fork point in genesis
+		{big.NewInt(1), big.NewInt(int64(5925277077315))},  // Fork point in first block
+		{big.NewInt(32), big.NewInt(int64(5925277077315))}, // Fork point in last block
+		{big.NewInt(33), big.NewInt(int64(5925277077315))}, // Fork point in the future
 	}
 	for _, c := range cases {
 		backend := newTestBackend(t, c.fork, false)
