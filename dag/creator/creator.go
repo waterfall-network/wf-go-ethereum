@@ -385,13 +385,19 @@ func (c *Creator) prepareBlockHeader(assigned *Assignment, tipsBlocks types.Bloc
 		era++
 	}
 
+	blockTime, err := c.bc.GetSlotInfo().StartSlotTime(assigned.Slot)
+	if err != nil {
+		log.Error("Creator calculate block time failed", "err", err)
+		return nil, err
+	}
+
 	header := &types.Header{
 		ParentHashes: parentHashes,
 		Slot:         assigned.Slot,
 		Era:          era,
 		Height:       newHeight,
 		GasLimit:     core.CalcGasLimit(tipsBlocks.AvgGasLimit(), c.config.GasCeil),
-		Time:         uint64(time.Now().Unix()),
+		Time:         uint64(blockTime.Unix()),
 		// Checkpoint spine block
 		CpHash:        cpHeader.Hash(),
 		CpNumber:      cpHeader.Nr(),
