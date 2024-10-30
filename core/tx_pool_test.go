@@ -60,6 +60,9 @@ func init() {
 	testTxPoolConfig.AccountSlots = 16
 	testTxPoolConfig.GlobalSlots = (4096 + 1024) * 20
 
+	testTxPoolConfig.AccountQueue = 64
+	testTxPoolConfig.GlobalQueue = 1024
+
 	cpy := *params.TestChainConfig
 	eip1559Config = &cpy
 }
