@@ -91,7 +91,7 @@ func (oracle *Oracle) processBlock(bf *blockFees, percentiles []float64) {
 	// Get active validators number
 	bc := oracle.backend.BlockChain()
 	genesisGasLimit := oracle.backend.Genesis().GasLimit()
-	validatorsCount, err := bc.ValidatorStorage().GetActiveValidatorsCount(bc, bf.block.Slot())
+	validatorsCount, err := bc.ValidatorStorage().GetActiveValidatorsCount(bc, bf.block.Slot(), bf.header)
 	if err != nil {
 		log.Error(
 			"Block processing error, can`t calculate base fee",
@@ -102,7 +102,7 @@ func (oracle *Oracle) processBlock(bf *blockFees, percentiles []float64) {
 		return
 	}
 	creatorsPerSlotCount := oracle.backend.ChainConfig().ValidatorsPerSlot
-	if creatorsPerSlot, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, bf.header.Slot); err == nil {
+	if creatorsPerSlot, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, bf.header, bf.header.Slot); err == nil {
 		creatorsPerSlotCount = uint64(len(creatorsPerSlot))
 	}
 	bf.results.nextBaseFee = misc.CalcSlotBaseFee(chainconfig, creatorsPerSlotCount, validatorsCount, genesisGasLimit, bf.header.Slot)

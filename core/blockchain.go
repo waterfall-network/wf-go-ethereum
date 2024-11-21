@@ -823,7 +823,7 @@ func (bc *BlockChain) setHeadRecursive(head common.Hash) error {
 	}
 
 	// check head era
-	cpEra := bc.EpochToEra(headCp.FinEpoch)
+	cpEra := bc.EpochToEra(headCp.FinEpoch, headBlock.Header())
 	if cpEra == nil {
 		// search valid checkpoint
 		cp := bc.searchValidCheckpoint(headEpoch)
@@ -2235,7 +2235,7 @@ func (bc *BlockChain) VerifyBlock(block *types.Block) (bool, error) {
 	)
 	timeTrack = time.Now()
 
-	slotCreators, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, block.Slot())
+	slotCreators, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, block.Header(), block.Slot())
 	if err != nil {
 		log.Error("VerifyBlock: can`t get shuffled validators", "error", err)
 		return false, err
@@ -2659,7 +2659,7 @@ func (bc *BlockChain) VerifyBlockEra(block *types.Header) bool {
 	// Get the epoch of the block
 	blockEpoch := bc.GetSlotInfo().SlotToEpoch(block.Slot)
 
-	calcEra := bc.EpochToEra(blockEpoch)
+	calcEra := bc.EpochToEra(blockEpoch, block)
 	if calcEra.Number != block.Era {
 		log.Warn("Block verification: invalid era",
 			"hash", block.Hash().Hex(),
@@ -3378,10 +3378,10 @@ func (bc *BlockChain) UpdateFinalizingState(block *types.Block, stateBlock *type
 
 	// Set baseFee and GasLimit
 	creatorsPerSlotCount := bc.Config().ValidatorsPerSlot
-	if creatorsPerSlot, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, header.Slot); err == nil {
+	if creatorsPerSlot, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, header, header.Slot); err == nil {
 		creatorsPerSlotCount = uint64(len(creatorsPerSlot))
 	}
-	validatorsCount, err := bc.ValidatorStorage().GetActiveValidatorsCount(bc, header.Slot)
+	validatorsCount, err := bc.ValidatorStorage().GetActiveValidatorsCount(bc, header.Slot, header)
 	if err != nil {
 		return err
 	}
@@ -4725,7 +4725,7 @@ func (bc *BlockChain) EnterNextEra(nextEraEpochFrom uint64, root, blockHash comm
 		return nil, err
 	}
 
-	validatorsCount, err := bc.ValidatorStorage().GetActiveValidatorsCount(bc, transitionSlot)
+	validatorsCount, err := bc.ValidatorStorage().GetActiveValidatorsCount(bc, transitionSlot, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -4769,7 +4769,7 @@ func (bc *BlockChain) StartTransitionPeriod(cp *types.Checkpoint, spineRoot, spi
 			return err
 		}
 
-		validatorsCount, err := bc.ValidatorStorage().GetActiveValidatorsCount(bc, cpEpochSlot)
+		validatorsCount, err := bc.ValidatorStorage().GetActiveValidatorsCount(bc, cpEpochSlot, nil)
 		if err != nil {
 			return err
 		}
@@ -5075,7 +5075,7 @@ func (bc *BlockChain) GetOptimisticSpines(gtSlot uint64) ([]common.HashArray, er
 	return optimisticSpines, nil
 }
 
-func (bc *BlockChain) EpochToEra(epoch uint64) *era.Era {
+func (bc *BlockChain) EpochToEra(epoch uint64, header *types.Header) *era.Era {
 	curEra := bc.eraInfo.GetEra()
 	if curEra == nil {
 		currentEraNumber := rawdb.ReadCurrentEra(bc.db)
@@ -5109,6 +5109,30 @@ func (bc *BlockChain) EpochToEra(epoch uint64) *era.Era {
 		for !findingEra.IsContainsEpoch(epoch) {
 			eraNumber++
 			findingEra = rawdb.ReadEra(bc.db, eraNumber)
+			if findingEra == nil && eraNumber-1 != curEra.Number {
+				curEra = rawdb.ReadEra(bc.db, eraNumber-1)
+			}
+			if findingEra == nil && eraNumber-1 == curEra.Number && header != nil {
+				slot, err := bc.GetSlotInfo().SlotOfEpochStart(curEra.To)
+				if err != nil {
+					return nil
+				}
+
+				validatorsCount, err := bc.ValidatorStorage().GetActiveValidatorsCount(bc, slot, header)
+				if err != nil {
+					return nil
+				}
+
+				eraLength := era.EstimateEraLength(bc.Config(), validatorsCount, eraNumber)
+				from := curEra.To + 1
+				to := curEra.To + eraLength
+
+				newEra := era.NewEra(eraNumber, from, to, header.CpRoot, header.CpHash)
+				rawdb.WriteEra(bc.db, newEra.Number, *newEra)
+				curEra = newEra
+				findingEra = curEra
+				bc.ValidatorStorage().PrepareNextEraValidators(bc, newEra)
+			}
 		}
 	}
 
@@ -5139,11 +5163,11 @@ func (bc *BlockChain) HaveEpochBlocks(epoch uint64) (bool, error) {
 
 func (bc *BlockChain) verifyBlockBaseFee(block *types.Block) bool {
 	creatorsPerSlotCount := bc.Config().ValidatorsPerSlot
-	if creatorsPerSlot, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, block.Slot()); err == nil {
+	if creatorsPerSlot, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, block.Header(), block.Slot()); err == nil {
 		creatorsPerSlotCount = uint64(len(creatorsPerSlot))
 	}
 
-	validatorsCount, err := bc.ValidatorStorage().GetActiveValidatorsCount(bc, block.Slot())
+	validatorsCount, err := bc.ValidatorStorage().GetActiveValidatorsCount(bc, block.Slot(), block.Header())
 	if err != nil {
 		log.Error("can`t verify block base fee, no validators for slot", "slot", block.Slot())
 		return false

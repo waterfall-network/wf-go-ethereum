@@ -91,7 +91,7 @@ type Ref interface {
 
 type blockchain interface {
 	era.Blockchain
-	EpochToEra(epoch uint64) *era.Era
+	EpochToEra(epoch uint64, header *types.Header) *era.Era
 	GetSlotInfo() *types.SlotInfo
 	GetEraInfo() *era.EraInfo
 	Config() *params.ChainConfig
@@ -717,7 +717,7 @@ func (p *Processor) validatorActivate(op operation.ValidatorSync) ([]byte, error
 	validator = p.updateValidatorVersionBySlot(validator)
 	validator.ResetDepositTxs()
 
-	opEra := p.blockchain.EpochToEra(op.ProcEpoch())
+	opEra := p.blockchain.EpochToEra(op.ProcEpoch(), p.blockchain.GetHeaderByHash(p.ctx.BlockHash))
 
 	validator.SetActivationEra(opEra.Number + postpone)
 	validator.SetIndex(op.Index())
@@ -753,7 +753,7 @@ func (p *Processor) validatorDeactivate(op operation.ValidatorSync) ([]byte, err
 		return nil, ErrValidatorIsOut
 	}
 
-	opEra := p.blockchain.EpochToEra(op.ProcEpoch())
+	opEra := p.blockchain.EpochToEra(op.ProcEpoch(), p.blockchain.GetHeaderByHash(p.ctx.BlockHash))
 	opEraNr := opEra.Number
 	if p.blockchain.Config().IsForkSlotValSyncProc(p.ctx.Slot) {
 		opEraNr = p.ctx.Era

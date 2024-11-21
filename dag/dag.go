@@ -87,7 +87,7 @@ type blockChain interface {
 	SetOptimisticSpinesToCache(slot uint64, spines common.HashArray)
 	GetOptimisticSpinesFromCache(slot uint64) common.HashArray
 	GetOptimisticSpines(gtSlot uint64) ([]common.HashArray, error)
-	EpochToEra(uint64) *era.Era
+	EpochToEra(uint64, *types.Header) *era.Era
 	Genesis() *types.Block
 
 	SetIsSynced(synced bool)
@@ -687,7 +687,7 @@ func (d *Dag) workLoop() {
 				"endTransSlot", endTransitionSlot,
 			)
 
-			slotCreators, err = d.bc.ValidatorStorage().GetCreatorsBySlot(d.bc, slot)
+			slotCreators, err = d.bc.ValidatorStorage().GetCreatorsBySlot(d.bc, d.bc.GetLastFinalizedHeader(), slot)
 			if err != nil {
 				log.Error("Create block: get creators failed", "slot", slot, "error", err)
 				continue

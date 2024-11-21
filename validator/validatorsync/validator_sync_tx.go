@@ -153,11 +153,11 @@ func ValidateCreateTxValidatorSyncOp(bc *core.BlockChain, stateBlockHash common.
 			return false, fmt.Errorf("validator sync operation failed: validator already deactivated")
 		}
 
-		procEra := bc.EpochToEra(valSyncOp.ProcEpoch)
+		procEra := bc.EpochToEra(valSyncOp.ProcEpoch, stateHead)
 		isLowExitEpoch := validator.GetActivationEra() >= procEra.Number
 		if bc.Config().IsForkSlotValSyncProc(slot) {
 			procEpoch := bc.GetSlotInfo().SlotToEpoch(slot)
-			procEra = bc.EpochToEra(procEpoch)
+			procEra = bc.EpochToEra(procEpoch, stateHead)
 			isLowExitEpoch = validator.GetActivationEra() > procEra.Number
 		}
 
