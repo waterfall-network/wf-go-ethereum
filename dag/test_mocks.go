@@ -248,17 +248,17 @@ func (mr *MockblockChainMockRecorder) EnterNextEra(nextEraEpochFrom, root, block
 }
 
 // EpochToEra mocks base method.
-func (m *MockblockChain) EpochToEra(arg0 uint64) *era.Era {
+func (m *MockblockChain) EpochToEra(arg0 uint64, arg1 *types.Header) *era.Era {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "EpochToEra", arg0)
+	ret := m.ctrl.Call(m, "EpochToEra", arg0, arg1)
 	ret0, _ := ret[0].(*era.Era)
 	return ret0
 }
 
 // EpochToEra indicates an expected call of EpochToEra.
-func (mr *MockblockChainMockRecorder) EpochToEra(arg0 interface{}) *gomock.Call {
+func (mr *MockblockChainMockRecorder) EpochToEra(arg0, arg1 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EpochToEra", reflect.TypeOf((*MockblockChain)(nil).EpochToEra), arg0)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EpochToEra", reflect.TypeOf((*MockblockChain)(nil).EpochToEra), arg0, arg1)
 }
 
 // Genesis mocks base method.

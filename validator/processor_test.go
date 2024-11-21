@@ -654,7 +654,10 @@ func TestProcessorActivate(t *testing.T) {
 		Amount:     activateOperation.Amount(),
 		InitTxHash: initTxHash,
 	})
-	bc.EXPECT().EpochToEra(gomock.AssignableToTypeOf(uint64(0))).AnyTimes().Return(&era.Era{Number: 6})
+
+	header := new(types.Header)
+	bc.EXPECT().GetHeaderByHash(gomock.AssignableToTypeOf(common.Hash{})).AnyTimes().Return(&types.Header{})
+	bc.EXPECT().EpochToEra(gomock.AssignableToTypeOf(uint64(0)), gomock.AssignableToTypeOf(header)).AnyTimes().Return(&era.Era{Number: 6})
 
 	processor := NewProcessor(ctx, stateDb, bc)
 	to := processor.GetValidatorsStateAddress()
@@ -1192,7 +1195,10 @@ func TestProcessorDeactivate(t *testing.T) {
 		Amount:     deactivateOp.Amount(),
 		InitTxHash: initTxHash,
 	})
-	bc.EXPECT().EpochToEra(uint64(100)).AnyTimes().Return(&testmodels.TestEra)
+
+	header := new(types.Header)
+	bc.EXPECT().GetHeaderByHash(gomock.AssignableToTypeOf(common.Hash{})).AnyTimes().Return(&types.Header{})
+	bc.EXPECT().EpochToEra(uint64(100), gomock.AssignableToTypeOf(header)).AnyTimes().Return(&testmodels.TestEra)
 
 	processor := NewProcessor(ctx, stateDb, bc)
 	to := processor.GetValidatorsStateAddress()
@@ -1695,7 +1701,7 @@ func TestProcessorUpdateBalance(t *testing.T) {
 		Amount:     updateBalanceOperation.Amount(),
 		InitTxHash: initTxHash,
 	})
-	bc.EXPECT().EpochToEra(uint64(100)).AnyTimes().Return(&testmodels.TestEra)
+	bc.EXPECT().EpochToEra(uint64(100), nil).AnyTimes().Return(&testmodels.TestEra)
 
 	processor := NewProcessor(ctx, stateDb, bc)
 	to := processor.GetValidatorsStateAddress()
@@ -1878,7 +1884,7 @@ func TestProcessorUpdateBalance_DelegatingStake(t *testing.T) {
 			SecondsPerSlot: testmodels.TestChainConfig.SecondsPerSlot,
 			SlotsPerEpoch:  testmodels.TestChainConfig.SlotsPerEpoch,
 		})
-		bc.EXPECT().EpochToEra(uint64(100)).AnyTimes().Return(&testmodels.TestEra)
+		bc.EXPECT().EpochToEra(uint64(100), nil).AnyTimes().Return(&testmodels.TestEra)
 		bc.EXPECT().GetEraInfo().AnyTimes().Return(&eraInfo)
 		bc.EXPECT().Database().AnyTimes().Return(db)
 		bc.EXPECT().GetTransaction(initTxHash).Return(initTx, common.Hash{}, uint64(0)).AnyTimes()
