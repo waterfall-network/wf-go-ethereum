@@ -40,17 +40,17 @@ func (m *Mockblockchain) EXPECT() *MockblockchainMockRecorder {
 }
 
 // EpochToEra mocks base method.
-func (m *Mockblockchain) EpochToEra(arg0 uint64, arg1 *types.Header) *era.Era {
+func (m *Mockblockchain) EpochToEra(arg0 uint64) *era.Era {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "EpochToEra", arg0, arg1)
+	ret := m.ctrl.Call(m, "EpochToEra", arg0)
 	ret0, _ := ret[0].(*era.Era)
 	return ret0
 }
 
 // EpochToEra indicates an expected call of EpochToEra.
-func (mr *MockblockchainMockRecorder) EpochToEra(arg0, arg1 interface{}) *gomock.Call {
+func (mr *MockblockchainMockRecorder) EpochToEra(arg0 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EpochToEra", reflect.TypeOf((*Mockblockchain)(nil).EpochToEra), arg0, arg1)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EpochToEra", reflect.TypeOf((*Mockblockchain)(nil).EpochToEra), arg0)
 }
 
 // GetBlock mocks base method.
@@ -160,24 +160,24 @@ func (mr *MockStorageMockRecorder) AddValidatorToList(stateDB, index, validator 
 }
 
 // GetActiveValidatorsCount mocks base method.
-func (m *MockStorage) GetActiveValidatorsCount(bc blockchain, slot uint64, header *types.Header) (uint64, error) {
+func (m *MockStorage) GetActiveValidatorsCount(bc blockchain, slot uint64) (uint64, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetActiveValidatorsCount", bc, slot, header)
+	ret := m.ctrl.Call(m, "GetActiveValidatorsCount", bc, slot)
 	ret0, _ := ret[0].(uint64)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetActiveValidatorsCount indicates an expected call of GetActiveValidatorsCount.
-func (mr *MockStorageMockRecorder) GetActiveValidatorsCount(bc, slot, header interface{}) *gomock.Call {
+func (mr *MockStorageMockRecorder) GetActiveValidatorsCount(bc, slot interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetActiveValidatorsCount", reflect.TypeOf((*MockStorage)(nil).GetActiveValidatorsCount), bc, slot, header)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetActiveValidatorsCount", reflect.TypeOf((*MockStorage)(nil).GetActiveValidatorsCount), bc, slot)
 }
 
 // GetCreatorsBySlot mocks base method.
-func (m *MockStorage) GetCreatorsBySlot(bc blockchain, header *types.Header, filter ...uint64) ([]common.Address, error) {
+func (m *MockStorage) GetCreatorsBySlot(bc blockchain, filter ...uint64) ([]common.Address, error) {
 	m.ctrl.T.Helper()
-	varargs := []interface{}{bc, header}
+	varargs := []interface{}{bc}
 	for _, a := range filter {
 		varargs = append(varargs, a)
 	}
@@ -188,9 +188,9 @@ func (m *MockStorage) GetCreatorsBySlot(bc blockchain, header *types.Header, fil
 }
 
 // GetCreatorsBySlot indicates an expected call of GetCreatorsBySlot.
-func (mr *MockStorageMockRecorder) GetCreatorsBySlot(bc, header interface{}, filter ...interface{}) *gomock.Call {
+func (mr *MockStorageMockRecorder) GetCreatorsBySlot(bc interface{}, filter ...interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	varargs := append([]interface{}{bc, header}, filter...)
+	varargs := append([]interface{}{bc}, filter...)
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCreatorsBySlot", reflect.TypeOf((*MockStorage)(nil).GetCreatorsBySlot), varargs...)
 }
 
@@ -224,18 +224,18 @@ func (mr *MockStorageMockRecorder) GetValidator(stateDb, address interface{}) *g
 }
 
 // GetValidators mocks base method.
-func (m *MockStorage) GetValidators(bc blockchain, slot uint64, tmpFromWhere string, header *types.Header) ([]common.Address, error) {
+func (m *MockStorage) GetValidators(bc blockchain, slot uint64, tmpFromWhere string) ([]common.Address, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetValidators", bc, slot, tmpFromWhere, header)
+	ret := m.ctrl.Call(m, "GetValidators", bc, slot, tmpFromWhere)
 	ret0, _ := ret[0].([]common.Address)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetValidators indicates an expected call of GetValidators.
-func (mr *MockStorageMockRecorder) GetValidators(bc, slot, tmpFromWhere, header interface{}) *gomock.Call {
+func (mr *MockStorageMockRecorder) GetValidators(bc, slot, tmpFromWhere interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetValidators", reflect.TypeOf((*MockStorage)(nil).GetValidators), bc, slot, tmpFromWhere, header)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetValidators", reflect.TypeOf((*MockStorage)(nil).GetValidators), bc, slot, tmpFromWhere)
 }
 
 // GetValidatorsList mocks base method.

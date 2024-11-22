@@ -38,13 +38,13 @@ type blockchain interface {
 	GetSlotInfo() *types.SlotInfo
 	GetLastCoordinatedCheckpoint() *types.Checkpoint
 	GetEpoch(epoch uint64) common.Hash
-	EpochToEra(uint64, *types.Header) *era.Era
+	EpochToEra(uint64) *era.Era
 }
 
 type Storage interface {
-	GetValidators(bc blockchain, slot uint64, tmpFromWhere string, header *types.Header) ([]common.Address, error)
-	GetCreatorsBySlot(bc blockchain, header *types.Header, filter ...uint64) ([]common.Address, error)
-	GetActiveValidatorsCount(bc blockchain, slot uint64, header *types.Header) (uint64, error)
+	GetValidators(bc blockchain, slot uint64, tmpFromWhere string) ([]common.Address, error)
+	GetCreatorsBySlot(bc blockchain, filter ...uint64) ([]common.Address, error)
+	GetActiveValidatorsCount(bc blockchain, slot uint64) (uint64, error)
 
 	SetValidator(stateDb vm.StateDB, val *Validator) error
 	GetValidator(stateDb vm.StateDB, address common.Address) (*Validator, error)
@@ -152,9 +152,9 @@ func (s *storage) IncrementDepositCount(stateDb vm.StateDB) {
 // GetValidators return two values: array of Validator and array of Validators addresses.
 // If parameter needAddresses is false it return array of Validator and nil value for validators addresses.
 // Use parameter activeOnly true if you need only active validators.
-func (s *storage) GetValidators(bc blockchain, slot uint64, tmpFromWhere string, header *types.Header) ([]common.Address, error) {
+func (s *storage) GetValidators(bc blockchain, slot uint64, tmpFromWhere string) ([]common.Address, error) {
 	slotEpoch := bc.GetSlotInfo().SlotToEpoch(slot)
-	slotEra := bc.EpochToEra(slotEpoch, header)
+	slotEra := bc.EpochToEra(slotEpoch)
 
 	err := s.checkTransitionProcessing(slotEra.Number)
 	if err != nil {
@@ -197,7 +197,7 @@ func (s *storage) GetValidators(bc blockchain, slot uint64, tmpFromWhere string,
 
 // GetCreatorsBySlot return shuffled validators addresses from cache.
 // Input parameters are list of uint64 (slot, subnet). Sequence is required!!!
-func (s *storage) GetCreatorsBySlot(bc blockchain, header *types.Header, filter ...uint64) ([]common.Address, error) {
+func (s *storage) GetCreatorsBySlot(bc blockchain, filter ...uint64) ([]common.Address, error) {
 	// TODO: improve this function for subnet supporting.
 	start := time.Now()
 
@@ -224,7 +224,7 @@ func (s *storage) GetCreatorsBySlot(bc blockchain, header *types.Header, filter 
 		return validators, nil
 	}
 
-	allValidators, err := s.GetValidators(bc, slot, "GetCreatorsBySlot", header)
+	allValidators, err := s.GetValidators(bc, slot, "GetCreatorsBySlot")
 	if err != nil || len(allValidators) == 0 {
 		return nil, err
 	}
@@ -332,9 +332,9 @@ func (s *storage) AddValidatorToList(stateDb vm.StateDB, index uint64, validator
 	s.SetValidatorsList(stateDb, list)
 }
 
-func (s *storage) GetActiveValidatorsCount(bc blockchain, slot uint64, header *types.Header) (uint64, error) {
+func (s *storage) GetActiveValidatorsCount(bc blockchain, slot uint64) (uint64, error) {
 	slotEpoch := bc.GetSlotInfo().SlotToEpoch(slot)
-	slotEra := bc.EpochToEra(slotEpoch, header)
+	slotEra := bc.EpochToEra(slotEpoch)
 
 	err := s.checkTransitionProcessing(slotEra.Number)
 	if err != nil {

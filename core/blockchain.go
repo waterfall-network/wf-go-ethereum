@@ -823,7 +823,7 @@ func (bc *BlockChain) setHeadRecursive(head common.Hash) error {
 	}
 
 	// check head era
-	cpEra := bc.EpochToEra(headCp.FinEpoch, headBlock.Header())
+	cpEra := bc.EpochToEra(headCp.FinEpoch)
 	if cpEra == nil {
 		// search valid checkpoint
 		cp := bc.searchValidCheckpoint(headEpoch)
@@ -2220,22 +2220,10 @@ func (bc *BlockChain) VerifyBlock(block *types.Block) (bool, error) {
 		"txs", len(block.Transactions()),
 		"hash", block.Hash(),
 	)
+
 	timeTrack = time.Now()
 
-	// Verify block era
-	if !bc.VerifyBlockEra(block.Header()) {
-		return false, nil
-	}
-
-	log.Info("VALIDATION TIME",
-		"elapsed", common.PrettyDuration(time.Since(timeTrack)),
-		"fn:", "VerifyBlockEra",
-		"txs", len(block.Transactions()),
-		"hash", block.Hash(),
-	)
-	timeTrack = time.Now()
-
-	slotCreators, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, block.Header(), block.Slot())
+	slotCreators, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, block.Slot())
 	if err != nil {
 		log.Error("VerifyBlock: can`t get shuffled validators", "error", err)
 		return false, err
@@ -2399,6 +2387,21 @@ func (bc *BlockChain) VerifyBlock(block *types.Block) (bool, error) {
 		"txs", len(block.Transactions()),
 		"hash", block.Hash(),
 	)
+
+	timeTrack = time.Now()
+
+	// Verify block era
+	if !bc.VerifyBlockEra(block.Header()) {
+		return false, nil
+	}
+
+	log.Info("VALIDATION TIME",
+		"elapsed", common.PrettyDuration(time.Since(timeTrack)),
+		"fn:", "VerifyBlockEra",
+		"txs", len(block.Transactions()),
+		"hash", block.Hash(),
+	)
+
 	timeTrack = time.Now()
 
 	// Verify block height
@@ -2659,7 +2662,7 @@ func (bc *BlockChain) VerifyBlockEra(block *types.Header) bool {
 	// Get the epoch of the block
 	blockEpoch := bc.GetSlotInfo().SlotToEpoch(block.Slot)
 
-	calcEra := bc.EpochToEra(blockEpoch, block)
+	calcEra := bc.EpochToEra(blockEpoch)
 	if calcEra.Number != block.Era {
 		log.Warn("Block verification: invalid era",
 			"hash", block.Hash().Hex(),
@@ -3378,10 +3381,10 @@ func (bc *BlockChain) UpdateFinalizingState(block *types.Block, stateBlock *type
 
 	// Set baseFee and GasLimit
 	creatorsPerSlotCount := bc.Config().ValidatorsPerSlot
-	if creatorsPerSlot, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, header, header.Slot); err == nil {
+	if creatorsPerSlot, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, header.Slot); err == nil {
 		creatorsPerSlotCount = uint64(len(creatorsPerSlot))
 	}
-	validatorsCount, err := bc.ValidatorStorage().GetActiveValidatorsCount(bc, header.Slot, header)
+	validatorsCount, err := bc.ValidatorStorage().GetActiveValidatorsCount(bc, header.Slot)
 	if err != nil {
 		return err
 	}
@@ -4725,7 +4728,7 @@ func (bc *BlockChain) EnterNextEra(nextEraEpochFrom uint64, root, blockHash comm
 		return nil, err
 	}
 
-	validatorsCount, err := bc.ValidatorStorage().GetActiveValidatorsCount(bc, transitionSlot, nil)
+	validatorsCount, err := bc.ValidatorStorage().GetActiveValidatorsCount(bc, transitionSlot)
 	if err != nil {
 		return nil, err
 	}
@@ -4769,7 +4772,7 @@ func (bc *BlockChain) StartTransitionPeriod(cp *types.Checkpoint, spineRoot, spi
 			return err
 		}
 
-		validatorsCount, err := bc.ValidatorStorage().GetActiveValidatorsCount(bc, cpEpochSlot, nil)
+		validatorsCount, err := bc.ValidatorStorage().GetActiveValidatorsCount(bc, cpEpochSlot)
 		if err != nil {
 			return err
 		}
@@ -5075,7 +5078,7 @@ func (bc *BlockChain) GetOptimisticSpines(gtSlot uint64) ([]common.HashArray, er
 	return optimisticSpines, nil
 }
 
-func (bc *BlockChain) EpochToEra(epoch uint64, header *types.Header) *era.Era {
+func (bc *BlockChain) EpochToEra(epoch uint64) *era.Era {
 	curEra := bc.eraInfo.GetEra()
 	if curEra == nil {
 		currentEraNumber := rawdb.ReadCurrentEra(bc.db)
@@ -5112,13 +5115,13 @@ func (bc *BlockChain) EpochToEra(epoch uint64, header *types.Header) *era.Era {
 			if findingEra == nil && eraNumber-1 != curEra.Number {
 				curEra = rawdb.ReadEra(bc.db, eraNumber-1)
 			}
-			if findingEra == nil && eraNumber-1 == curEra.Number && header != nil {
+			if findingEra == nil {
 				slot, err := bc.GetSlotInfo().SlotOfEpochStart(curEra.To)
 				if err != nil {
 					return nil
 				}
 
-				validatorsCount, err := bc.ValidatorStorage().GetActiveValidatorsCount(bc, slot, header)
+				validatorsCount, err := bc.ValidatorStorage().GetActiveValidatorsCount(bc, slot)
 				if err != nil {
 					return nil
 				}
@@ -5127,7 +5130,9 @@ func (bc *BlockChain) EpochToEra(epoch uint64, header *types.Header) *era.Era {
 				from := curEra.To + 1
 				to := curEra.To + eraLength
 
-				newEra := era.NewEra(eraNumber, from, to, header.CpRoot, header.CpHash)
+				spineHeader := bc.GetBlockByHash(bc.GetLastCoordinatedCheckpoint().Spine)
+
+				newEra := era.NewEra(eraNumber, from, to, spineHeader.Root(), spineHeader.Hash())
 				rawdb.WriteEra(bc.db, newEra.Number, *newEra)
 				curEra = newEra
 				findingEra = curEra
@@ -5163,11 +5168,11 @@ func (bc *BlockChain) HaveEpochBlocks(epoch uint64) (bool, error) {
 
 func (bc *BlockChain) verifyBlockBaseFee(block *types.Block) bool {
 	creatorsPerSlotCount := bc.Config().ValidatorsPerSlot
-	if creatorsPerSlot, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, block.Header(), block.Slot()); err == nil {
+	if creatorsPerSlot, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, block.Slot()); err == nil {
 		creatorsPerSlotCount = uint64(len(creatorsPerSlot))
 	}
 
-	validatorsCount, err := bc.ValidatorStorage().GetActiveValidatorsCount(bc, block.Slot(), block.Header())
+	validatorsCount, err := bc.ValidatorStorage().GetActiveValidatorsCount(bc, block.Slot())
 	if err != nil {
 		log.Error("can`t verify block base fee, no validators for slot", "slot", block.Slot())
 		return false

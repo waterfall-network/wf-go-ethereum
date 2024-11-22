@@ -105,7 +105,7 @@ func TestGetValidators(t *testing.T) {
 		SecondsPerSlot: testmodels.TestChainConfig.SecondsPerSlot,
 		SlotsPerEpoch:  testmodels.TestChainConfig.SlotsPerEpoch,
 	})
-	bc.EXPECT().EpochToEra(gomock.AssignableToTypeOf(uint64(0)), nil).AnyTimes().Return(&era.Era{
+	bc.EXPECT().EpochToEra(gomock.AssignableToTypeOf(uint64(0))).AnyTimes().Return(&era.Era{
 		Number: 0,
 		From:   0,
 		To:     0,
@@ -149,7 +149,7 @@ func TestGetValidators(t *testing.T) {
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			addresses, err := store.GetValidators(bc, test.slot, "Tests", nil)
+			addresses, err := store.GetValidators(bc, test.slot, "Tests")
 			testutils.AssertNoError(t, err)
 			testutils.AssertEqual(t, test.wantAddresses, addresses)
 		})
@@ -180,7 +180,7 @@ func TestGetShuffledValidators(t *testing.T) {
 		Root:  common.HexToHash("0xe46fb9c7774e3189b822353c521183f637560dfa199695ed5157d49f989d0c52"),
 		Spine: common.HexToHash("0x5e44e252e7b239ea389a3cb95b112ffccd349852dcfd5b4c5e8f7857f1e730e5"),
 	})
-	bc.EXPECT().EpochToEra(gomock.AssignableToTypeOf(uint64(0)), nil).AnyTimes().Return(&era.Era{
+	bc.EXPECT().EpochToEra(gomock.AssignableToTypeOf(uint64(0))).AnyTimes().Return(&era.Era{
 		Number: 10,
 		From:   0,
 		To:     0,
@@ -203,12 +203,12 @@ func TestGetShuffledValidators(t *testing.T) {
 	}
 
 	// Test case 1: Invalid filter error
-	result, err := store.GetCreatorsBySlot(bc, nil, slot, epoch, slot)
+	result, err := store.GetCreatorsBySlot(bc, slot, epoch, slot)
 	testutils.AssertError(t, err, ErrInvalidValidatorsFilter)
 	testutils.AssertNil(t, result)
 
 	// Test case 2: Validators available in cache
-	result, err = store.GetCreatorsBySlot(bc, nil, slot)
+	result, err = store.GetCreatorsBySlot(bc, slot)
 	testutils.AssertNoError(t, err)
 	testutils.AssertEqual(t, []common.Address{
 		testmodels.Addr5,
@@ -249,7 +249,7 @@ func BenchmarkPrepareNextEraValidators(b *testing.B) {
 		SecondsPerSlot: testmodels.TestChainConfig.SecondsPerSlot,
 		SlotsPerEpoch:  testmodels.TestChainConfig.SlotsPerEpoch,
 	})
-	bc.EXPECT().EpochToEra(gomock.AssignableToTypeOf(uint64(0)), nil).AnyTimes().Return(&era.Era{
+	bc.EXPECT().EpochToEra(gomock.AssignableToTypeOf(uint64(0))).AnyTimes().Return(&era.Era{
 		Number: 0,
 		From:   0,
 		To:     0,

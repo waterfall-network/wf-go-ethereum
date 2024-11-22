@@ -54,7 +54,7 @@ type Blockchain interface {
 	GetLastCoordinatedCheckpoint() *types.Checkpoint
 	Database() ethdb.Database
 	GetEpoch(epoch uint64) common.Hash
-	EpochToEra(uint64, *types.Header) *era.Era
+	EpochToEra(uint64) *era.Era
 	GetEraInfo() *era.EraInfo
 }
 
@@ -264,7 +264,7 @@ func (s *PublicValidatorAPI) GetValidatorsBySlot(ctx context.Context, slot uint6
 		return nil, errors.New("no slot info")
 	}
 
-	creatorsPerSlot, err := s.chain.ValidatorStorage().GetCreatorsBySlot(s.chain, nil, slot)
+	creatorsPerSlot, err := s.chain.ValidatorStorage().GetCreatorsBySlot(s.chain, slot)
 	if err != nil {
 		return nil, err
 	}
@@ -294,7 +294,7 @@ func (s *PublicValidatorAPI) GetValidators(ctx context.Context, era *uint64) ([]
 		return nil, err
 	}
 
-	return s.chain.ValidatorStorage().GetValidators(s.chain, slot, "GetValidators", nil)
+	return s.chain.ValidatorStorage().GetValidators(s.chain, slot, "GetValidators")
 }
 
 // Validator_GetInfo retrieves validator info by provided address.

@@ -122,17 +122,17 @@ func (mr *MockblockchainMockRecorder) EnterNextEra(fromEpoch, root, hash interfa
 }
 
 // EpochToEra mocks base method.
-func (m *Mockblockchain) EpochToEra(epoch uint64, header *types.Header) *era.Era {
+func (m *Mockblockchain) EpochToEra(epoch uint64) *era.Era {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "EpochToEra", epoch, header)
+	ret := m.ctrl.Call(m, "EpochToEra", epoch)
 	ret0, _ := ret[0].(*era.Era)
 	return ret0
 }
 
 // EpochToEra indicates an expected call of EpochToEra.
-func (mr *MockblockchainMockRecorder) EpochToEra(epoch, header interface{}) *gomock.Call {
+func (mr *MockblockchainMockRecorder) EpochToEra(epoch interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EpochToEra", reflect.TypeOf((*Mockblockchain)(nil).EpochToEra), epoch, header)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EpochToEra", reflect.TypeOf((*Mockblockchain)(nil).EpochToEra), epoch)
 }
 
 // GetBlock mocks base method.

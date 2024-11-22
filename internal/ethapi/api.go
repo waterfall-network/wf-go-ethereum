@@ -166,10 +166,10 @@ func (s *PublicTxPoolAPI) Content() map[string]map[string]map[string]interface{}
 	curHeader := s.b.GetLastFinalizedHeader()
 	bc := s.b.BlockChain()
 	creatorsPerSlotCount := bc.Config().ValidatorsPerSlot
-	if creatorsPerSlot, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, nil, curHeader.Slot); err == nil {
+	if creatorsPerSlot, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, curHeader.Slot); err == nil {
 		creatorsPerSlotCount = uint64(len(creatorsPerSlot))
 	}
-	validatorsCount, err := bc.ValidatorStorage().GetActiveValidatorsCount(bc, curHeader.Slot, nil)
+	validatorsCount, err := bc.ValidatorStorage().GetActiveValidatorsCount(bc, curHeader.Slot)
 	if err != nil {
 		log.Error("can`t prepare content", "error", err)
 		return nil
@@ -208,10 +208,10 @@ func (s *PublicTxPoolAPI) ContentFrom(addr common.Address) map[string]map[string
 	curHeader := s.b.GetLastFinalizedHeader()
 	bc := s.b.BlockChain()
 	creatorsPerSlotCount := bc.Config().ValidatorsPerSlot
-	if creatorsPerSlot, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, nil, curHeader.Slot); err == nil {
+	if creatorsPerSlot, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, curHeader.Slot); err == nil {
 		creatorsPerSlotCount = uint64(len(creatorsPerSlot))
 	}
-	validatorsCount, err := bc.ValidatorStorage().GetActiveValidatorsCount(bc, curHeader.Slot, nil)
+	validatorsCount, err := bc.ValidatorStorage().GetActiveValidatorsCount(bc, curHeader.Slot)
 	if err != nil {
 		log.Error("can`t prepare content from", "error", err)
 		return nil
@@ -1825,10 +1825,10 @@ func (s *PublicTransactionPoolAPI) GetTransactionByHash(ctx context.Context, has
 		curHeader := s.b.GetLastFinalizedHeader()
 		bc := s.b.BlockChain()
 		creatorsPerSlotCount := bc.Config().ValidatorsPerSlot
-		if creatorsPerSlot, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, nil, curHeader.Slot); err == nil {
+		if creatorsPerSlot, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, curHeader.Slot); err == nil {
 			creatorsPerSlotCount = uint64(len(creatorsPerSlot))
 		}
-		validatorsCount, err := bc.ValidatorStorage().GetActiveValidatorsCount(bc, curHeader.Slot, nil)
+		validatorsCount, err := bc.ValidatorStorage().GetActiveValidatorsCount(bc, curHeader.Slot)
 		if err != nil {
 			return nil, err
 		}
@@ -2104,10 +2104,10 @@ func (s *PublicTransactionPoolAPI) PendingTransactions() ([]*RPCTransaction, err
 	transactions := make([]*RPCTransaction, 0, len(pending))
 	bc := s.b.BlockChain()
 	creatorsPerSlotCount := bc.Config().ValidatorsPerSlot
-	if creatorsPerSlot, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, nil, curHeader.Slot); err == nil {
+	if creatorsPerSlot, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, curHeader.Slot); err == nil {
 		creatorsPerSlotCount = uint64(len(creatorsPerSlot))
 	}
-	validatorsCount, err := bc.ValidatorStorage().GetActiveValidatorsCount(bc, curHeader.Slot, nil)
+	validatorsCount, err := bc.ValidatorStorage().GetActiveValidatorsCount(bc, curHeader.Slot)
 	if err != nil {
 		return nil, err
 	}
