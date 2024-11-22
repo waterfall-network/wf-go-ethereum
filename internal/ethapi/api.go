@@ -1365,8 +1365,11 @@ func RPCMarshalHeader(head *types.Header) map[string]interface{} {
 		"logsBloom":        head.Bloom,
 		"size":             hexutil.Uint64(head.Size()),
 		"bodyRoot":         head.BodyHash,
-		"parentHash":       head.ParentHashes[len(head.ParentHashes)-1],
 		"difficulty":       new(big.Int),
+	}
+
+	if len(head.ParentHashes) > 0 {
+		result["parentHash"] = head.ParentHashes[len(head.ParentHashes)-1]
 	}
 
 	if head.V != nil && head.R != nil && head.S != nil {
