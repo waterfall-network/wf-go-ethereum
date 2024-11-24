@@ -654,6 +654,7 @@ func TestProcessorActivate(t *testing.T) {
 		Amount:     activateOperation.Amount(),
 		InitTxHash: initTxHash,
 	})
+
 	bc.EXPECT().EpochToEra(gomock.AssignableToTypeOf(uint64(0))).AnyTimes().Return(&era.Era{Number: 6})
 
 	processor := NewProcessor(ctx, stateDb, bc)
@@ -1192,6 +1193,7 @@ func TestProcessorDeactivate(t *testing.T) {
 		Amount:     deactivateOp.Amount(),
 		InitTxHash: initTxHash,
 	})
+
 	bc.EXPECT().EpochToEra(uint64(100)).AnyTimes().Return(&testmodels.TestEra)
 
 	processor := NewProcessor(ctx, stateDb, bc)

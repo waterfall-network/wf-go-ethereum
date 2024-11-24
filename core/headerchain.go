@@ -997,7 +997,7 @@ func (hc *HeaderChain) collectAncestorsAftCpByParents(headHash common.Hash, cpHe
 		return false, ancestors, common.HashArray{}, nil
 	}
 
-	if headHeader.ParentHashes == nil || len(headHeader.ParentHashes) == 0 {
+	if len(headHeader.ParentHashes) == 0 {
 		if headHeader.Hash() == hc.genesisHeader.Hash() {
 			return false, ancestors, common.HashArray{}, nil
 		}
