@@ -2220,19 +2220,7 @@ func (bc *BlockChain) VerifyBlock(block *types.Block) (bool, error) {
 		"txs", len(block.Transactions()),
 		"hash", block.Hash(),
 	)
-	timeTrack = time.Now()
 
-	// Verify block era
-	if !bc.VerifyBlockEra(block.Header()) {
-		return false, nil
-	}
-
-	log.Info("VALIDATION TIME",
-		"elapsed", common.PrettyDuration(time.Since(timeTrack)),
-		"fn:", "VerifyBlockEra",
-		"txs", len(block.Transactions()),
-		"hash", block.Hash(),
-	)
 	timeTrack = time.Now()
 
 	slotCreators, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, block.Slot())
@@ -2399,6 +2387,21 @@ func (bc *BlockChain) VerifyBlock(block *types.Block) (bool, error) {
 		"txs", len(block.Transactions()),
 		"hash", block.Hash(),
 	)
+
+	timeTrack = time.Now()
+
+	// Verify block era
+	if !bc.VerifyBlockEra(block.Header()) {
+		return false, nil
+	}
+
+	log.Info("VALIDATION TIME",
+		"elapsed", common.PrettyDuration(time.Since(timeTrack)),
+		"fn:", "VerifyBlockEra",
+		"txs", len(block.Transactions()),
+		"hash", block.Hash(),
+	)
+
 	timeTrack = time.Now()
 
 	// Verify block height
@@ -5109,6 +5112,32 @@ func (bc *BlockChain) EpochToEra(epoch uint64) *era.Era {
 		for !findingEra.IsContainsEpoch(epoch) {
 			eraNumber++
 			findingEra = rawdb.ReadEra(bc.db, eraNumber)
+			if findingEra == nil && eraNumber-1 != curEra.Number {
+				curEra = rawdb.ReadEra(bc.db, eraNumber-1)
+			}
+			if findingEra == nil {
+				slot, err := bc.GetSlotInfo().SlotOfEpochStart(curEra.To)
+				if err != nil {
+					return nil
+				}
+
+				validatorsCount, err := bc.ValidatorStorage().GetActiveValidatorsCount(bc, slot)
+				if err != nil {
+					return nil
+				}
+
+				eraLength := era.EstimateEraLength(bc.Config(), validatorsCount, eraNumber)
+				from := curEra.To + 1
+				to := curEra.To + eraLength
+
+				spineHeader := bc.GetBlockByHash(bc.GetLastCoordinatedCheckpoint().Spine)
+
+				newEra := era.NewEra(eraNumber, from, to, spineHeader.Root(), spineHeader.Hash())
+				rawdb.WriteEra(bc.db, newEra.Number, *newEra)
+				curEra = newEra
+				findingEra = curEra
+				bc.ValidatorStorage().PrepareNextEraValidators(bc, newEra)
+			}
 		}
 	}
 

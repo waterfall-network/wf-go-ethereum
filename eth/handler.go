@@ -202,16 +202,6 @@ func newHandler(config *handlerConfig) (*handler, error) {
 			return core.ErrFutureBlock
 		}
 
-		// check era
-		if !bc.VerifyBlockEra(header) {
-			log.Warn("Header verification: invalid era",
-				"headerEra", header.Era,
-				"calcEra", header.Era,
-				"hash", header.Hash().Hex(),
-			)
-			return core.ErrInvalidEra
-		}
-
 		if len(header.ParentHashes) == 0 {
 			err := fmt.Errorf("no parents in propagate block")
 			log.Warn("Header verification: no parents", "err", err, "hash", header.Hash().Hex())
