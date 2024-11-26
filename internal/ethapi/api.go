@@ -830,7 +830,7 @@ func (s *PublicBlockChainAPI) GetCode(ctx context.Context, address common.Addres
 		return nil, err
 	}
 	if address == *s.b.ChainConfig().ValidatorsStateAddress || state.IsValidatorAddress(address) {
-		return nil, nil
+		return nil, errors.New(fmt.Sprintf("address: %s is validator or validator state address", address.Hex()))
 	}
 	code := state.GetCode(address)
 	return code, state.Error()

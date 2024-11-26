@@ -17,6 +17,7 @@ package validator
 import (
 	"context"
 	"errors"
+	"fmt"
 	"math/big"
 	"time"
 
@@ -315,7 +316,13 @@ func (s *PublicValidatorAPI) Validator_GetInfo(ctx context.Context, address comm
 	if stateDb == nil || err != nil {
 		return nil, err
 	}
-	return s.chain.ValidatorStorage().GetValidator(stateDb, address)
+
+	val, err := s.chain.ValidatorStorage().GetValidator(stateDb, address)
+	if err != nil {
+		return nil, errors.New(fmt.Sprintf("validator %s not found", address.Hex()))
+	}
+
+	return val, nil
 }
 
 // Validator_GetTransactionReceipt returns the transaction receipt of the validator op with parsed data.
