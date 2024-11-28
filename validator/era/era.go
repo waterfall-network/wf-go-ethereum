@@ -83,9 +83,9 @@ type EraInfo struct {
 	length     uint64
 }
 
-func NewEraInfo(era Era) EraInfo {
-	return EraInfo{
-		currentEra: &era,
+func NewEraInfo(era *Era) *EraInfo {
+	return &EraInfo{
+		currentEra: era,
 		length:     era.Length(),
 	}
 }

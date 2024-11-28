@@ -43,7 +43,7 @@ var (
 	withdrawalAddress common.Address   // attached withdrawal credentials
 	signature         common.BlsSignature
 	ctrl              *gomock.Controller
-	eraInfo           era.EraInfo
+	eraInfo           *era.EraInfo
 
 	initTxHash = common.HexToHash("0303030303030303030303030303030303030303030303030303030303030303")
 	value      = MinDepositVal
@@ -73,7 +73,7 @@ func init() {
 	withdrawalAddress = common.BytesToAddress(testutils.RandomData(20))
 	signature = common.BytesToBlsSig(testutils.RandomData(96))
 
-	eraInfo = era.NewEraInfo(testmodels.TestEra)
+	eraInfo = era.NewEraInfo(&testmodels.TestEra)
 }
 
 func TestProcessorDeposit(t *testing.T) {
@@ -634,7 +634,7 @@ func TestProcessorActivate(t *testing.T) {
 	msg := NewMockmessage(ctrl)
 
 	db := rawdb.NewMemoryDatabase()
-	rawdb.WriteEra(db, eraInfo.Number(), *eraInfo.GetEra())
+	rawdb.WriteEra(db, eraInfo.Number(), eraInfo.GetEra())
 	bc := NewMockblockchain(ctrl)
 	bc.EXPECT().Config().AnyTimes().Return(testmodels.TestChainConfig)
 	bc.EXPECT().GetSlotInfo().AnyTimes().Return(&types.SlotInfo{
@@ -642,7 +642,7 @@ func TestProcessorActivate(t *testing.T) {
 		SecondsPerSlot: testmodels.TestChainConfig.SecondsPerSlot,
 		SlotsPerEpoch:  testmodels.TestChainConfig.SlotsPerEpoch,
 	})
-	bc.EXPECT().GetEraInfo().AnyTimes().Return(&eraInfo)
+	bc.EXPECT().GetEraInfo().AnyTimes().Return(eraInfo)
 	bc.EXPECT().Database().AnyTimes().Return(db)
 	bc.EXPECT().GetValidatorSyncData(
 		gomock.AssignableToTypeOf(common.Hash{})).
@@ -756,7 +756,7 @@ func TestProcessorActivate(t *testing.T) {
 				}
 
 				processor.ctx.Era = 3
-				rawdb.WriteEra(db, 3, era.Era{
+				rawdb.WriteEra(db, 3, &era.Era{
 					Number: 3,
 					From:   50,
 					To:     80,
@@ -806,13 +806,13 @@ func TestProcessorActivate(t *testing.T) {
 
 				processor.ctx.Slot = 2790
 				processor.ctx.Era = 4
-				rawdb.WriteEra(db, 3, era.Era{
+				rawdb.WriteEra(db, 3, &era.Era{
 					Number: 3,
 					From:   44,
 					To:     66,
 					Root:   common.BytesToHash(testutils.RandomStringInBytes(32)),
 				})
-				rawdb.WriteEra(db, 4, era.Era{
+				rawdb.WriteEra(db, 4, &era.Era{
 					Number: 4,
 					From:   66,
 					To:     88,
@@ -912,10 +912,10 @@ func TestProcessorExit(t *testing.T) {
 
 	msg := NewMockmessage(ctrl)
 
-	eraInfo := era.NewEraInfo(testmodels.TestEra)
+	eraInfo := era.NewEraInfo(&testmodels.TestEra)
 	bc := NewMockblockchain(ctrl)
 	bc.EXPECT().Config().Return(testmodels.TestChainConfig).AnyTimes()
-	bc.EXPECT().GetEraInfo().AnyTimes().Return(&eraInfo)
+	bc.EXPECT().GetEraInfo().AnyTimes().Return(eraInfo)
 
 	processor := NewProcessor(ctx, stateDb, bc)
 	to := processor.GetValidatorsStateAddress()
@@ -1044,10 +1044,10 @@ func TestProcessorExit_DelegatingStake(t *testing.T) {
 
 	msg := NewMockmessage(ctrl)
 
-	eraInfo := era.NewEraInfo(testmodels.TestEra)
+	eraInfo := era.NewEraInfo(&testmodels.TestEra)
 	bc := NewMockblockchain(ctrl)
 	bc.EXPECT().Config().Return(testmodels.TestChainConfig)
-	bc.EXPECT().GetEraInfo().AnyTimes().Return(&eraInfo)
+	bc.EXPECT().GetEraInfo().AnyTimes().Return(eraInfo)
 
 	processor := NewProcessor(ctx, stateDb, bc)
 	to := processor.GetValidatorsStateAddress()
@@ -1083,10 +1083,10 @@ func TestProcessorExit_DelegatingStake(t *testing.T) {
 					SecondsPerSlot: testmodels.TestChainConfig.SecondsPerSlot,
 					SlotsPerEpoch:  testmodels.TestChainConfig.SlotsPerEpoch,
 				})
-				bc.EXPECT().GetEraInfo().AnyTimes().Return(&eraInfo)
+				bc.EXPECT().GetEraInfo().AnyTimes().Return(eraInfo)
 
 				db := rawdb.NewMemoryDatabase()
-				rawdb.WriteEra(db, eraInfo.Number(), *eraInfo.GetEra())
+				rawdb.WriteEra(db, eraInfo.Number(), eraInfo.GetEra())
 				bc.EXPECT().Database().AnyTimes().Return(db)
 
 				processor := NewProcessor(ctx, stateDb, bc)
@@ -1125,10 +1125,10 @@ func TestProcessorExit_DelegatingStake(t *testing.T) {
 					SecondsPerSlot: testmodels.TestChainConfig.SecondsPerSlot,
 					SlotsPerEpoch:  testmodels.TestChainConfig.SlotsPerEpoch,
 				})
-				bc.EXPECT().GetEraInfo().AnyTimes().Return(&eraInfo)
+				bc.EXPECT().GetEraInfo().AnyTimes().Return(eraInfo)
 
 				db := rawdb.NewMemoryDatabase()
-				rawdb.WriteEra(db, eraInfo.Number(), *eraInfo.GetEra())
+				rawdb.WriteEra(db, eraInfo.Number(), eraInfo.GetEra())
 				bc.EXPECT().Database().AnyTimes().Return(db)
 
 				processor := NewProcessor(ctx, stateDb, bc)
@@ -1174,7 +1174,7 @@ func TestProcessorDeactivate(t *testing.T) {
 	msg := NewMockmessage(ctrl)
 
 	db := rawdb.NewMemoryDatabase()
-	rawdb.WriteEra(db, eraInfo.Number(), *eraInfo.GetEra())
+	rawdb.WriteEra(db, eraInfo.Number(), eraInfo.GetEra())
 	bc := NewMockblockchain(ctrl)
 	bc.EXPECT().Config().AnyTimes().Return(testmodels.TestChainConfig)
 	bc.EXPECT().GetSlotInfo().AnyTimes().Return(&types.SlotInfo{
@@ -1182,7 +1182,7 @@ func TestProcessorDeactivate(t *testing.T) {
 		SecondsPerSlot: testmodels.TestChainConfig.SecondsPerSlot,
 		SlotsPerEpoch:  testmodels.TestChainConfig.SlotsPerEpoch,
 	})
-	bc.EXPECT().GetEraInfo().AnyTimes().Return(&eraInfo)
+	bc.EXPECT().GetEraInfo().AnyTimes().Return(eraInfo)
 	bc.EXPECT().Database().AnyTimes().Return(db)
 	bc.EXPECT().GetValidatorSyncData(gomock.AssignableToTypeOf(common.Hash{})).
 		AnyTimes().Return(&types.ValidatorSync{
@@ -1308,7 +1308,7 @@ func TestProcessorDeactivate(t *testing.T) {
 				testutils.AssertNoError(t, err)
 
 				processor.ctx.Era = 3
-				rawdb.WriteEra(db, 3, era.Era{
+				rawdb.WriteEra(db, 3, &era.Era{
 					Number: 3,
 					From:   50,
 					To:     80,
@@ -1344,13 +1344,13 @@ func TestProcessorDeactivate(t *testing.T) {
 
 				processor.ctx.Slot = 2790
 				processor.ctx.Era = 3
-				rawdb.WriteEra(db, 3, era.Era{
+				rawdb.WriteEra(db, 3, &era.Era{
 					Number: 3,
 					From:   44,
 					To:     66,
 					Root:   common.BytesToHash(testutils.RandomStringInBytes(32)),
 				})
-				rawdb.WriteEra(db, 4, era.Era{
+				rawdb.WriteEra(db, 4, &era.Era{
 					Number: 4,
 					From:   66,
 					To:     88,
@@ -1593,7 +1593,7 @@ func TestProcessorWithdrawal_DelegatingStake(t *testing.T) {
 				})
 
 				db := rawdb.NewMemoryDatabase()
-				rawdb.WriteEra(db, eraInfo.Number(), *eraInfo.GetEra())
+				rawdb.WriteEra(db, eraInfo.Number(), eraInfo.GetEra())
 				bc.EXPECT().Database().AnyTimes().Return(db)
 
 				processor := NewProcessor(ctx, stateDb, bc)
@@ -1634,7 +1634,7 @@ func TestProcessorWithdrawal_DelegatingStake(t *testing.T) {
 				})
 
 				db := rawdb.NewMemoryDatabase()
-				rawdb.WriteEra(db, eraInfo.Number(), *eraInfo.GetEra())
+				rawdb.WriteEra(db, eraInfo.Number(), eraInfo.GetEra())
 				bc.EXPECT().Database().AnyTimes().Return(db)
 
 				processor := NewProcessor(ctx, stateDb, bc)
@@ -1865,13 +1865,13 @@ func TestProcessorUpdateBalance_DelegatingStake(t *testing.T) {
 		msg.EXPECT().TxHash().AnyTimes().Return(common.Hash{})
 
 		db := rawdb.NewMemoryDatabase()
-		eraInfo_0 := era.NewEraInfo(era.Era{
+		eraInfo0 := era.NewEraInfo(&era.Era{
 			Number: 0,
 			From:   0,
 			To:     500,
 			Root:   common.BytesToHash(testutils.RandomData(32)),
 		})
-		rawdb.WriteEra(db, eraInfo_0.Number(), *eraInfo_0.GetEra())
+		rawdb.WriteEra(db, eraInfo0.Number(), eraInfo0.GetEra())
 
 		bc = NewMockblockchain(ctrl)
 		bc.EXPECT().Config().Return(testmodels.TestChainConfig).AnyTimes()
@@ -1881,7 +1881,7 @@ func TestProcessorUpdateBalance_DelegatingStake(t *testing.T) {
 			SlotsPerEpoch:  testmodels.TestChainConfig.SlotsPerEpoch,
 		})
 		bc.EXPECT().EpochToEra(uint64(100)).AnyTimes().Return(&testmodels.TestEra)
-		bc.EXPECT().GetEraInfo().AnyTimes().Return(&eraInfo)
+		bc.EXPECT().GetEraInfo().AnyTimes().Return(eraInfo)
 		bc.EXPECT().Database().AnyTimes().Return(db)
 		bc.EXPECT().GetTransaction(initTxHash).Return(initTx, common.Hash{}, uint64(0)).AnyTimes()
 		initTxRcp := &types.Receipt{Status: types.ReceiptStatusSuccessful}
