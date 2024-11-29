@@ -210,7 +210,7 @@ type BlockChain struct {
 
 	lastFinalizedBlock     atomic.Value // Current last finalized block of the blockchain
 	lastFinalizedFastBlock atomic.Value // Current last finalized block of the fast-sync chain (may be above the blockchain!)
-	eraInfo                era.EraInfo  // Current Era
+	eraInfo                *era.EraInfo // Current Era
 	lastCoordinatedCp      atomic.Value // Current last coordinated checkpoint
 	notProcValSyncOps      map[common.Hash]*types.ValidatorSync
 	valSyncCache           *lru.Cache
@@ -838,7 +838,7 @@ func (bc *BlockChain) setHeadRecursive(head common.Hash) error {
 		//recursive call
 		return bc.setHeadRecursive(cp.Spine)
 	}
-	cpEraInfo := era.NewEraInfo(*cpEra)
+	cpEraInfo := era.NewEraInfo(cpEra)
 
 	// clean chain
 	// clean eras
@@ -4676,11 +4676,11 @@ func (bc *BlockChain) ValidatorStorage() valStore.Storage {
 }
 
 func (bc *BlockChain) GetEraInfo() *era.EraInfo {
-	return &bc.eraInfo
+	return bc.eraInfo
 }
 
 // SetNewEraInfo sets new era info.
-func (bc *BlockChain) SetNewEraInfo(newEra era.Era) {
+func (bc *BlockChain) SetNewEraInfo(newEra *era.Era) {
 	log.Info("New era",
 		"num", newEra.Number,
 		"begin", newEra.From,
@@ -4718,7 +4718,7 @@ func (bc *BlockChain) EnterNextEra(nextEraEpochFrom uint64, root, blockHash comm
 			"currSlot", bc.GetSlotInfo().CurrentSlot(),
 			"currEpoch", bc.GetSlotInfo().SlotToEpoch(bc.GetSlotInfo().CurrentSlot()),
 		)
-		bc.SetNewEraInfo(*nextEra)
+		bc.SetNewEraInfo(nextEra)
 		return nextEra, nil
 	}
 
@@ -4733,7 +4733,7 @@ func (bc *BlockChain) EnterNextEra(nextEraEpochFrom uint64, root, blockHash comm
 		return nil, err
 	}
 	nextEra = era.NextEra(bc, root, blockHash, validatorsCount)
-	rawdb.WriteEra(bc.db, nextEra.Number, *nextEra)
+	rawdb.WriteEra(bc.db, nextEra.Number, nextEra)
 	rawdb.WriteCurrentEra(bc.db, nextEra.Number)
 	log.Info("######### if nextEra == nil EnterNextEra",
 		"num", nextEra.Number,
@@ -4744,7 +4744,7 @@ func (bc *BlockChain) EnterNextEra(nextEraEpochFrom uint64, root, blockHash comm
 		"currEpoch", bc.GetSlotInfo().SlotToEpoch(bc.GetSlotInfo().CurrentSlot()),
 		"validators", validatorsCount,
 	)
-	bc.SetNewEraInfo(*nextEra)
+	bc.SetNewEraInfo(nextEra)
 	return nextEra, nil
 }
 
@@ -4777,7 +4777,7 @@ func (bc *BlockChain) StartTransitionPeriod(cp *types.Checkpoint, spineRoot, spi
 			return err
 		}
 		nextEra := era.NextEra(bc, spineRoot, spineHash, validatorsCount)
-		rawdb.WriteEra(bc.db, nextEra.Number, *nextEra)
+		rawdb.WriteEra(bc.db, nextEra.Number, nextEra)
 
 		go bc.ValidatorStorage().PrepareNextEraValidators(bc, nextEra)
 
@@ -5083,7 +5083,7 @@ func (bc *BlockChain) EpochToEra(epoch uint64) *era.Era {
 	if curEra == nil {
 		currentEraNumber := rawdb.ReadCurrentEra(bc.db)
 		if eraInfo := rawdb.ReadEra(bc.db, currentEraNumber); eraInfo != nil {
-			bc.SetNewEraInfo(*eraInfo)
+			bc.SetNewEraInfo(eraInfo)
 			curEra = eraInfo
 		} else {
 			return nil
@@ -5133,7 +5133,7 @@ func (bc *BlockChain) EpochToEra(epoch uint64) *era.Era {
 				spineHeader := bc.GetBlockByHash(bc.GetLastCoordinatedCheckpoint().Spine)
 
 				newEra := era.NewEra(eraNumber, from, to, spineHeader.Root(), spineHeader.Hash())
-				rawdb.WriteEra(bc.db, newEra.Number, *newEra)
+				rawdb.WriteEra(bc.db, newEra.Number, newEra)
 				curEra = newEra
 				findingEra = curEra
 				bc.ValidatorStorage().PrepareNextEraValidators(bc, newEra)
@@ -5197,15 +5197,15 @@ func (bc *BlockChain) GetEVM(msg Message, state *state.StateDB, header *types.He
 		vmConfig = bc.GetVMConfig()
 	}
 	txContext := NewEVMTxContext(msg)
-	context := NewEVMBlockContext(header, bc, nil)
-	return vm.NewEVM(context, txContext, state, bc.Config(), *vmConfig), vmError, nil
+	ctx := NewEVMBlockContext(header, bc, nil)
+	return vm.NewEVM(ctx, txContext, state, bc.Config(), *vmConfig), vmError, nil
 }
 
 // GetTP retrieves the token processor.
 func (bc *BlockChain) GetTP(state *state.StateDB, header *types.Header) (*token.Processor, func() error, error) {
 	tpError := func() error { return nil }
-	context := NewEVMBlockContext(header, bc, nil)
-	return token.NewProcessor(context, state), tpError, nil
+	ctx := NewEVMBlockContext(header, bc, nil)
+	return token.NewProcessor(ctx, state), tpError, nil
 }
 
 // GetVP retrieves the validator processor.
