@@ -1,3 +1,17 @@
+// Copyright 2024   Blue Wave Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package creator
 
 import (
@@ -371,13 +385,19 @@ func (c *Creator) prepareBlockHeader(assigned *Assignment, tipsBlocks types.Bloc
 		era++
 	}
 
+	blockTime, err := c.bc.GetSlotInfo().StartSlotTime(assigned.Slot)
+	if err != nil {
+		log.Error("Creator calculate block time failed", "err", err)
+		return nil, err
+	}
+
 	header := &types.Header{
 		ParentHashes: parentHashes,
 		Slot:         assigned.Slot,
 		Era:          era,
 		Height:       newHeight,
 		GasLimit:     core.CalcGasLimit(tipsBlocks.AvgGasLimit(), c.config.GasCeil),
-		Time:         uint64(time.Now().Unix()),
+		Time:         uint64(blockTime.Unix()),
 		// Checkpoint spine block
 		CpHash:        cpHeader.Hash(),
 		CpNumber:      cpHeader.Nr(),
