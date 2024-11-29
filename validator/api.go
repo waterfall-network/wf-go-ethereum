@@ -319,7 +319,7 @@ func (s *PublicValidatorAPI) Validator_GetInfo(ctx context.Context, address comm
 
 	val, err := s.chain.ValidatorStorage().GetValidator(stateDb, address)
 	if err != nil {
-		return nil, fmt.Errorf("validator %s not found", address.Hex())
+		return nil, fmt.Errorf("failed: %s", err.Error())
 	}
 
 	return val, nil
