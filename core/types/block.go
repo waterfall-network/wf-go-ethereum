@@ -40,6 +40,8 @@ var (
 	EmptyRootHash = common.HexToHash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
 )
 
+const uint32Length = 4
+
 // A BlockNonce is a 64-bit hash which proves (combined with the
 // mix-hash) that a sufficient amount of computation has been carried
 // out on a block.
@@ -48,6 +50,18 @@ type SlotBlocksMap map[uint64]Blocks // slot: blocks
 type SlotSpineMap map[uint64]*Block  // slot: block
 
 type SlotHeadersMap map[uint64]Headers // slot: blocks
+
+type BlockVersion uint16
+
+const (
+	NoVer BlockVersion = iota
+	Ver1
+)
+
+type rlpExtraData struct {
+	Version BlockVersion
+	Data    []byte
+}
 
 // Uint64 returns the integer value of a block nonce.
 func (n BlockNonce) Uint64() uint64 {
@@ -222,7 +236,11 @@ func (h *Header) Size() common.StorageSize {
 // that the unbounded fields are stuffed with junk data to add processing
 // overhead
 func (h *Header) SanityCheck() error {
-	if eLen := len(h.Extra); eLen > 0 {
+	maxLen, err := h.maxExraLen()
+	if err != nil {
+		return err
+	}
+	if eLen := len(h.Extra); eLen > maxLen {
 		return fmt.Errorf("too large block extradata: size %d", eLen)
 	}
 	if h.BaseFee != nil {
@@ -253,7 +271,56 @@ func (h *Header) setSignature(sig []byte) {
 	h.V, h.R, h.S = v, r, s
 }
 
-const uint32Length = 4
+func wrapExtraData(ver BlockVersion, bin []byte) ([]byte, error) {
+	return rlp.EncodeToBytes(rlpExtraData{
+		Version: ver,
+		Data:    bin,
+	})
+}
+
+func unwrapExtraData(bin []byte) (ver BlockVersion, data []byte, err error) {
+	verWrap := &rlpExtraData{}
+	err = rlp.DecodeBytes(bin, verWrap)
+	if err != nil {
+		return
+	}
+	return verWrap.Version, verWrap.Data, nil
+}
+
+func (h *Header) Version() (BlockVersion, error) {
+	if len(h.Extra) == 0 {
+		return NoVer, nil
+	}
+	ver, _, err := unwrapExtraData(h.Extra)
+	return ver, err
+}
+
+func MakeExtraData(ver BlockVersion, data []byte) ([]byte, error) {
+	switch ver {
+	case NoVer:
+		return nil, nil
+	case Ver1:
+		return wrapExtraData(ver, []byte{})
+	default:
+
+		return wrapExtraData(ver, data)
+	}
+}
+
+func (h *Header) maxExraLen() (int, error) {
+	ver, err := h.Version()
+	if err != nil {
+		return 0, err
+	}
+	switch ver {
+	case NoVer:
+		return 0, nil
+	case Ver1:
+		return 3, nil
+	default:
+		return 0, fmt.Errorf("unknown extra version: %d", ver)
+	}
+}
 
 // Body is a simple (mutable, non-safe) data container for storing and moving
 // a block's data contents (transactions and uncles) together.
