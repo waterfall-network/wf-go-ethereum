@@ -48,25 +48,29 @@ func NewEventEmmiter(state vm.StateDB) *EventEmmiter {
 	return &EventEmmiter{state: state}
 }
 
-func (e *EventEmmiter) Deposit(evtAddr common.Address, data []byte) {
-	e.addLog(
-		evtAddr,
-		EvtDepositLogSignature,
-		data,
-	)
+func (e *EventEmmiter) Deposit(evtAddr common.Address, creatorAddr *common.Address, data []byte) {
+	e.addLog(evtAddr, creatorAddr, nil, EvtDepositLogSignature, data)
 }
 
-func (e *EventEmmiter) ExitRequest(evtAddr common.Address, data []byte) {
-	e.addLog(evtAddr, EvtExitReqLogSignature, data)
+func (e *EventEmmiter) ExitRequest(evtAddr common.Address, creatorAddr *common.Address, data []byte) {
+	e.addLog(evtAddr, creatorAddr, nil, EvtExitReqLogSignature, data)
 }
 
-func (e *EventEmmiter) WithdrawalRequest(evtAddr common.Address, data []byte) {
-	e.addLog(evtAddr, EvtWithdrawalLogSignature, data)
+func (e *EventEmmiter) WithdrawalRequest(evtAddr common.Address, creatorAddr, withdrawalAddr *common.Address, data []byte) {
+	e.addLog(evtAddr, creatorAddr, withdrawalAddr, EvtWithdrawalLogSignature, data)
 }
 
-func (e *EventEmmiter) addLog(targetAddr common.Address, signature common.Hash, data []byte, logsEntries ...logEntry) {
+func (e *EventEmmiter) addLog(targetAddr common.Address, creatorAddress, withdrawalAddr *common.Address, signature common.Hash, data []byte, logsEntries ...logEntry) {
 	//var data []byte
 	topics := []common.Hash{signature}
+
+	if creatorAddress != nil {
+		topics = append(topics, creatorAddress.Hash())
+	}
+
+	if withdrawalAddr != nil {
+		topics = append(topics, withdrawalAddr.Hash())
+	}
 
 	for _, entry := range logsEntries {
 		if entry.indexed {
