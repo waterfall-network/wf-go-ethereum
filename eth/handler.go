@@ -201,6 +201,16 @@ func newHandler(config *handlerConfig) (*handler, error) {
 			)
 			return core.ErrFutureBlock
 		}
+		// validate block version
+		if err := bc.VerifyBlockVersion(header); err != nil {
+			log.Warn("Header verification: invalid version",
+				"headerVer", header.Version(),
+				"headerSlot", header.Slot,
+				"headerHash", header.Hash().Hex(),
+				"err", err.Error(),
+			)
+			return err
+		}
 
 		if len(header.ParentHashes) == 0 {
 			err := fmt.Errorf("no parents in propagate block")

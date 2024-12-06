@@ -227,6 +227,7 @@ type BlockChain interface {
 	IsSynced() bool
 
 	VerifyBlockBaseFee(header *types.Header) bool
+	VerifyBlockVersion(header *types.Header) error
 }
 
 // New creates a new downloader to fetch hashes and blocks from remote peers.
@@ -1207,8 +1208,11 @@ func (d *Downloader) fetchDagHeaders(p *peerConnection, hashes common.HashArray)
 					)
 					return nil, errBadPeer
 				}
-				//todo fork depending
-				if !d.blockchain.VerifyBlockBaseFee(hdr) {
+				err = d.blockchain.VerifyBlockVersion(hdr)
+				if err != nil {
+					return nil, err
+				}
+				if !d.blockchain.Config().IsForkSlotValSyncProc(hdr.Slot) && !d.blockchain.VerifyBlockBaseFee(hdr) {
 					log.Error("Sync: headers by hashes: bad baseFee:",
 						"i", i,
 						"hash", fmt.Sprintf("%#x", hashes[i]),
@@ -1609,7 +1613,11 @@ func (d *Downloader) fetchHeaderByNr(p *peerConnection, nr uint64) (header *type
 				)
 				return header, nil
 			}
-			if !d.blockchain.VerifyBlockBaseFee(header) {
+			err = d.blockchain.VerifyBlockVersion(header)
+			if err != nil {
+				return nil, err
+			}
+			if !d.blockchain.Config().IsForkSlotValSyncProc(header.Slot) && !d.blockchain.VerifyBlockBaseFee(header) {
 				log.Error("Sync: header by nr: bad baseFee:",
 					"nr", nr,
 					"hNr", header.Nr(),
@@ -1695,8 +1703,11 @@ func (d *Downloader) fetchHeaderByHash(p *peerConnection, hash common.Hash) (hea
 				)
 				return nil, errBadPeer
 			}
-			//todo fork depending
-			if !d.blockchain.VerifyBlockBaseFee(header) {
+			err = d.blockchain.VerifyBlockVersion(header)
+			if err != nil {
+				return nil, err
+			}
+			if !d.blockchain.Config().IsForkSlotValSyncProc(header.Slot) && !d.blockchain.VerifyBlockBaseFee(header) {
 				log.Error("Sync: header by hash: bad baseFee:",
 					"hash", hash.Hex(),
 					"hNr", header.Nr(),

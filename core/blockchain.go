@@ -5191,6 +5191,30 @@ func (bc *BlockChain) VerifyBlockBaseFee(header *types.Header) bool {
 	return true
 }
 
+func (bc *BlockChain) VerifyBlockVersion(header *types.Header) error {
+	ver := header.Version()
+	bcConf := bc.Config()
+	if !bcConf.IsForkSlotValSyncProc(header.Slot) && ver != types.NoVer {
+		log.Warn("Block verification: invalid version (NoVer)",
+			"version", ver,
+			"slot", header.Slot,
+			"IsForkSlotValSyncProc", bcConf.IsForkSlotValSyncProc(header.Slot),
+			"blockHash", header.Hash().Hex(),
+		)
+		return ErrInvalidBlockVersion
+	}
+	if bcConf.IsForkSlotValSyncProc(header.Slot) && ver < types.Ver1 {
+		log.Warn("Block verification: invalid version (Ver1)",
+			"version", ver,
+			"slot", header.Slot,
+			"IsForkSlotValSyncProc", bcConf.IsForkSlotValSyncProc(header.Slot),
+			"blockHash", header.Hash().Hex(),
+		)
+		return ErrInvalidBlockVersion
+	}
+	return nil
+}
+
 func (bc *BlockChain) GetEVM(msg Message, state *state.StateDB, header *types.Header, vmConfig *vm.Config) (*vm.EVM, func() error, error) {
 	vmError := func() error { return nil }
 	if vmConfig == nil {

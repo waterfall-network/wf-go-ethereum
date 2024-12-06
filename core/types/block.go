@@ -137,11 +137,13 @@ func (h *Header) Hash() common.Hash {
 	cpy := h.Copy()
 	if cpy != nil {
 		cpy.Number = nil
-		cpy.BaseFee = nil
 		cpy.GasUsed = 0
 		cpy.Bloom = Bloom{}
 		cpy.ReceiptHash = common.Hash{}
 		cpy.Root = common.Hash{}
+		if h.Version() == NoVer {
+			cpy.BaseFee = nil
+		}
 	}
 	return rlpHash(cpy)
 }
@@ -236,12 +238,9 @@ func (h *Header) Size() common.StorageSize {
 // that the unbounded fields are stuffed with junk data to add processing
 // overhead
 func (h *Header) SanityCheck() error {
-	maxLen, err := h.maxExraLen()
-	if err != nil {
-		return err
-	}
+	maxLen := h.maxExraLen()
 	if eLen := len(h.Extra); eLen > maxLen {
-		return fmt.Errorf("too large block extradata: size %d", eLen)
+		return fmt.Errorf("too large block extradata: version=%d maxSize=%d size=%d", h.Version(), maxLen, eLen)
 	}
 	if h.BaseFee != nil {
 		if bfLen := h.BaseFee.BitLen(); bfLen > 256 {
@@ -287,12 +286,15 @@ func unwrapExtraData(bin []byte) (ver BlockVersion, data []byte, err error) {
 	return verWrap.Version, verWrap.Data, nil
 }
 
-func (h *Header) Version() (BlockVersion, error) {
+func (h *Header) Version() BlockVersion {
 	if len(h.Extra) == 0 {
-		return NoVer, nil
+		return NoVer
 	}
 	ver, _, err := unwrapExtraData(h.Extra)
-	return ver, err
+	if err != nil {
+		return NoVer
+	}
+	return ver
 }
 
 func MakeExtraData(ver BlockVersion, data []byte) ([]byte, error) {
@@ -307,18 +309,15 @@ func MakeExtraData(ver BlockVersion, data []byte) ([]byte, error) {
 	}
 }
 
-func (h *Header) maxExraLen() (int, error) {
-	ver, err := h.Version()
-	if err != nil {
-		return 0, err
-	}
+func (h *Header) maxExraLen() int {
+	ver := h.Version()
 	switch ver {
 	case NoVer:
-		return 0, nil
+		return 0
 	case Ver1:
-		return 3, nil
+		return 3
 	default:
-		return 0, fmt.Errorf("unknown extra version: %d", ver)
+		return 0
 	}
 }
 
@@ -500,6 +499,7 @@ func (b *Block) CpBloom() Bloom                 { return b.header.CpBloom }
 func (b *Block) CpRoot() common.Hash            { return b.header.CpRoot }
 func (b *Block) CpReceiptHash() common.Hash     { return b.header.CpReceiptHash }
 func (b *Block) CpGasUsed() uint64              { return b.header.CpGasUsed }
+func (b *Block) Version() BlockVersion          { return b.header.Version() }
 
 func (b *Block) BaseFee() *big.Int {
 	if b.header.BaseFee == nil {
