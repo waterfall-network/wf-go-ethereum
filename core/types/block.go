@@ -238,7 +238,10 @@ func (h *Header) Size() common.StorageSize {
 // that the unbounded fields are stuffed with junk data to add processing
 // overhead
 func (h *Header) SanityCheck() error {
-	maxLen := h.maxExraLen()
+	maxLen, err := h.maxExraLen()
+	if err != nil {
+		return err
+	}
 	if eLen := len(h.Extra); eLen > maxLen {
 		return fmt.Errorf("too large block extradata: version=%d maxSize=%d size=%d", h.Version(), maxLen, eLen)
 	}
@@ -309,15 +312,18 @@ func MakeExtraData(ver BlockVersion, data []byte) ([]byte, error) {
 	}
 }
 
-func (h *Header) maxExraLen() int {
+func (h *Header) maxExraLen() (int, error) {
 	ver := h.Version()
 	switch ver {
 	case NoVer:
-		return 0
+		if len(h.Extra) > 0 {
+			return 0, fmt.Errorf("bad headers extra data: %d", ver)
+		}
+		return 0, nil
 	case Ver1:
-		return 3
+		return 3, nil
 	default:
-		return 0
+		return 0, fmt.Errorf("unknown header's version: %d", ver)
 	}
 }
 
