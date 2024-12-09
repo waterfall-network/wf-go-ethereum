@@ -1035,7 +1035,6 @@ func (s *StateDB) Commit(deleteEmptyObjects bool) (common.Hash, error) {
 // Potential EIPs:
 // - Reset transient storage(1153)
 func (s *StateDB) Prepare(sender common.Address, dst *common.Address, precompiles []common.Address, list types.AccessList) {
-
 	// Clear out any leftover from previous executions
 	s.accessList = newAccessList()
 
