@@ -3880,7 +3880,6 @@ func (bc *BlockChain) EstimateGas(msg types.Message, header *types.Header) (uint
 			msg.AccessList(),
 			false,
 			true,
-			bc.chainConfig.Rules(header.Slot).IsHomestead,
 			bc.chainConfig.IsForkSlotValSyncProc(header.Slot),
 		)
 	case ContractMethodTxType, ContractCreationTxType:
@@ -3890,7 +3889,6 @@ func (bc *BlockChain) EstimateGas(msg types.Message, header *types.Header) (uint
 			msg.AccessList(),
 			false,
 			false,
-			bc.chainConfig.Rules(header.Slot).IsHomestead,
 			bc.chainConfig.IsForkSlotValSyncProc(header.Slot),
 		)
 	default:

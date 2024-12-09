@@ -155,7 +155,6 @@ func Transaction(ctx *cli.Context) error {
 			tx.AccessList(),
 			isContractCreation,
 			isValidatorOp,
-			chainConfig.Rules(0).IsHomestead,
 			chainConfig.IsForkSlotValSyncProc(0),
 		); err != nil {
 			r.Error = err

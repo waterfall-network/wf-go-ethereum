@@ -127,10 +127,10 @@ func (result *ExecutionResult) Revert() []byte {
 }
 
 // IntrinsicGas computes the 'intrinsic gas' for a message with the given data.
-func IntrinsicGas(data []byte, accessList types.AccessList, isContractCreation, isValidatorOp, isHomestead, isCancun bool) (uint64, error) {
+func IntrinsicGas(data []byte, accessList types.AccessList, isContractCreation, isValidatorOp, isCancun bool) (uint64, error) {
 	// Set the starting gas for the raw transaction
 	var gas uint64
-	if isContractCreation && isHomestead {
+	if isContractCreation {
 		gas = params.TxGasContractCreation
 	} else if isValidatorOp {
 		valOp, err := operation.DecodeBytes(data)
@@ -366,7 +366,6 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		st.msg.AccessList(),
 		isContractCreation,
 		isValidatorOp,
-		st.evm.ChainConfig().Rules(st.evm.Context.Slot).IsHomestead,
 		st.evm.ChainConfig().IsForkSlotValSyncProc(st.evm.Context.Slot),
 	)
 	if err != nil {
@@ -389,7 +388,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	// - prepare accessList(post-berlin)
 	// - reset transient storage(eip 1153)
 	rules := st.evm.ChainConfig().Rules(st.evm.Context.Slot)
-	st.state.Prepare(rules, msg.From(), msg.To(), vm.ActivePrecompiles(rules), msg.AccessList())
+	st.state.Prepare(msg.From(), msg.To(), vm.ActivePrecompiles(rules), msg.AccessList())
 
 	// Check whether the init code size has been exceeded.
 	if st.evm.ChainConfig().IsForkSlotValSyncProc(st.evm.Context.Slot) && isContractCreation && len(st.data) > params.MaxInitCodeSize {

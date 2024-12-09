@@ -21,7 +21,6 @@ import (
 
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
-	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
 )
 
 // StateDB is an EVM database for full state querying.
@@ -61,7 +60,7 @@ type StateDB interface {
 	// is defined according to EIP161 (balance = nonce = code = 0).
 	Empty(common.Address) bool
 
-	Prepare(rules params.Rules, sender common.Address, dst *common.Address, precompiles []common.Address, list types.AccessList)
+	Prepare(sender common.Address, dst *common.Address, precompiles []common.Address, list types.AccessList)
 	AddressInAccessList(addr common.Address) bool
 	SlotInAccessList(addr common.Address, slot common.Hash) (addressOk bool, slotOk bool)
 	// AddAddressToAccessList adds the given address to the access list. This operation is safe to perform

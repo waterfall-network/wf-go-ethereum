@@ -61,7 +61,6 @@ func (tt *TransactionTest) Run(config *params.ChainConfig) error {
 			tx.AccessList(),
 			tx.To() == nil,
 			isValidatorOp,
-			true,
 			false,
 		)
 		if err != nil {

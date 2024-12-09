@@ -404,7 +404,6 @@ func (pool *TxPool) validateTx(ctx context.Context, tx *types.Transaction) error
 		tx.AccessList(),
 		tx.To() == nil,
 		isValidatorOp,
-		pool.config.Rules(header.Slot).IsHomestead,
 		pool.config.IsForkSlotValSyncProc(header.Slot),
 	)
 	if err != nil {
