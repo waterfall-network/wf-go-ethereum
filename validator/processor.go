@@ -408,10 +408,9 @@ func (p *Processor) validatorDeposit(caller Ref, toAddr common.Address, value *b
 	logData := txlog.PackDepositLogData(op.PubKey(), op.CreatorAddress(), op.WithdrawalAddress(), value, op.Signature(), p.getDepositCount())
 
 	if p.blockchain.Config().IsForkSlotValSyncProc(p.ctx.Slot) {
-		creatorAddress := op.CreatorAddress()
-		p.eventEmmiter.Deposit(toAddr, &creatorAddress, logData)
+		p.eventEmmiter.Deposit(toAddr, logData, p.eventEmmiter.NewIndexedAddressLogEntry(op.CreatorAddress()))
 	} else {
-		p.eventEmmiter.Deposit(toAddr, nil, logData)
+		p.eventEmmiter.Deposit(toAddr, logData)
 	}
 
 	p.incrDepositCount()
@@ -529,10 +528,9 @@ func (p *Processor) validatorExit(caller Ref, toAddr common.Address, op operatio
 	logData := txlog.PackExitRequestLogData(op.PubKey(), op.CreatorAddress(), validator.GetIndex(), op.ExitAfterEpoch())
 
 	if p.blockchain.Config().IsForkSlotValSyncProc(p.ctx.Slot) {
-		creatorAddress := op.CreatorAddress()
-		p.eventEmmiter.ExitRequest(toAddr, &creatorAddress, logData)
+		p.eventEmmiter.ExitRequest(toAddr, logData, p.eventEmmiter.NewIndexedAddressLogEntry(op.CreatorAddress()))
 	} else {
-		p.eventEmmiter.ExitRequest(toAddr, nil, logData)
+		p.eventEmmiter.ExitRequest(toAddr, logData)
 	}
 
 	return op.CreatorAddress().Bytes(), nil
@@ -685,10 +683,14 @@ func (p *Processor) validatorWithdrawal(caller Ref, toAddr common.Address, op op
 	logData := txlog.PackWithdrawalLogData(validator.GetPubKey(), op.CreatorAddress(), validator.GetIndex(), amtGwei)
 
 	if p.blockchain.Config().IsForkSlotValSyncProc(p.ctx.Slot) {
-		creatorAddress := op.CreatorAddress()
-		p.eventEmmiter.WithdrawalRequest(toAddr, &creatorAddress, validator.GetWithdrawalAddress(), logData)
+		p.eventEmmiter.WithdrawalRequest(
+			toAddr,
+			logData,
+			p.eventEmmiter.NewIndexedAddressLogEntry(op.CreatorAddress()),
+			p.eventEmmiter.NewIndexedAddressLogEntry(*validator.WithdrawalAddress),
+		)
 	} else {
-		p.eventEmmiter.WithdrawalRequest(toAddr, nil, nil, logData)
+		p.eventEmmiter.WithdrawalRequest(toAddr, logData)
 	}
 
 	return op.CreatorAddress().Bytes(), nil
