@@ -152,7 +152,6 @@ func generateSignerTestChain() (*core.Genesis, []*types.Block) {
 	}
 	generate := func(i int, g *core.BlockGen) {
 		g.OffsetTime(5)
-		g.SetExtra([]byte("test"))
 		if i == 1 {
 			// Test transactions are included in block #2.
 			g.AddTx(testTx1)
