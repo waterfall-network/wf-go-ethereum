@@ -534,14 +534,7 @@ func (lc *LightChain) HasHeader(hash common.Hash) bool {
 
 // GetCanonicalHash returns the canonical hash for a given block number
 func (bc *LightChain) GetCanonicalHash(ctx context.Context) common.Hash {
-	bc.GetLastCoordinatedCheckpoint()
-	lastCp := bc.GetLastCoordinatedCheckpoint()
-	cpSpine, err := bc.GetBlockByHash(ctx, lastCp.Spine)
-	if err != nil {
-		return common.Hash{}
-	}
-
-	return cpSpine.Hash()
+	return bc.GetLastCoordinatedCheckpoint().Spine
 }
 
 // GetBlockHashesFromHash retrieves a number of block hashes starting at a given

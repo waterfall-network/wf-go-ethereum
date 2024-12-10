@@ -105,10 +105,9 @@ func (b *EthAPIBackend) HeaderByNumber(ctx context.Context, number rpc.BlockNumb
 	}
 
 	if number == rpc.CheckpointBlockNumber || number == rpc.SafeBlockNumber {
-		lastCP := b.BlockChain().GetLastCoordinatedCheckpoint()
-		block := b.BlockChain().GetBlockByHash(lastCP.Spine)
-		if block != nil {
-			return block.Header(), nil
+		header := b.Blockchain().GetHeader(b.BlockChain().GetLastCoordinatedCheckpoint().Spine)
+		if header != nil {
+			return header, nil
 		}
 	}
 	return b.eth.blockchain.GetHeaderByNumber(uint64(number)), nil
