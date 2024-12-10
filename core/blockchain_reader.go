@@ -253,7 +253,7 @@ func (bc *BlockChain) GetHeadersByHashes(hashes common.HashArray) types.HeaderMa
 }
 
 // GetCanonicalHash returns the canonical hash for a given block number
-func (bc *BlockChain) GetCanonicalHash(number uint64) common.Hash {
+func (bc *BlockChain) GetCanonicalHash() common.Hash {
 	return bc.GetLastCoordinatedCheckpoint().Spine
 }
 
