@@ -1,3 +1,17 @@
+// Copyright 2024   Blue Wave Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package era
 
 import (
@@ -23,12 +37,12 @@ func (m mockBlockchain) GetHeaderByHash(hash common.Hash) *types.Header {
 	panic("implement me")
 }
 
-func (m mockBlockchain) EnterNextEra(cp uint64, root, hash common.Hash) *Era {
+func (m mockBlockchain) EnterNextEra(cp uint64, root, hash common.Hash) (*Era, error) {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (m mockBlockchain) StartTransitionPeriod(cp *types.Checkpoint, spineRoot, spineHash common.Hash) {
+func (m mockBlockchain) StartTransitionPeriod(cp *types.Checkpoint, spineRoot, spineHash common.Hash) error {
 	//TODO implement me
 	panic("implement me")
 }
@@ -63,7 +77,7 @@ func (m mockBlockchain) GetSlotInfo() *types.SlotInfo {
 func TestNextEraFirstEpoch(t *testing.T) {
 	// Create a new EraInfo with number 1, from epoch 10 to epoch 20, and root hash "0x1234"
 	era := NewEra(1, 10, 20, common.HexToHash("0x1234"), common.Hash{})
-	ei := NewEraInfo(*era)
+	ei := NewEraInfo(era)
 
 	// Ensure that the NextEraFirstEpoch function returns 21
 	if ei.NextEraFirstEpoch() != 21 {
@@ -77,7 +91,7 @@ func TestNextEraFirstSlot(t *testing.T) {
 
 	// Create a new EraInfo with number 1, from epoch 10 to epoch 20, and root hash "0x1234"
 	era := NewEra(1, 10, 20, common.HexToHash("0x1234"), common.Hash{})
-	ei := NewEraInfo(*era)
+	ei := NewEraInfo(era)
 
 	// Ensure that the NextEraFirstSlot function returns the correct slot number
 	if ei.NextEraFirstSlot(bc) != 42 {
@@ -88,7 +102,7 @@ func TestNextEraFirstSlot(t *testing.T) {
 func TestLenEpochs(t *testing.T) {
 	// Create a new EraInfo with number 1, from epoch 10 to epoch 20, and root hash "0x1234"
 	era := NewEra(1, 10, 20, common.HexToHash("0x1234"), common.Hash{})
-	ei := NewEraInfo(*era)
+	ei := NewEraInfo(era)
 
 	// Ensure that the LenEpochs function returns 11
 	if ei.LenEpochs() != 10 {
@@ -99,7 +113,7 @@ func TestLenEpochs(t *testing.T) {
 func TestLenSlots(t *testing.T) {
 	// Create a new EraInfo with number 1, from epoch 10 to epoch 20, and root hash "0x1234"
 	era := NewEra(1, 10, 20, common.HexToHash("0x1234"), common.Hash{})
-	ei := NewEraInfo(*era)
+	ei := NewEraInfo(era)
 
 	// Ensure that the LenSlots function returns 320
 	if ei.LenSlots() != 320 {
@@ -110,7 +124,7 @@ func TestLenSlots(t *testing.T) {
 func TestNumber(t *testing.T) {
 	// Create a new EraInfo with number 1, from epoch 10 to epoch 20, and root hash "0x1234"
 	era := NewEra(1, 10, 20, common.HexToHash("0x1234"), common.Hash{})
-	ei := NewEraInfo(*era)
+	ei := NewEraInfo(era)
 
 	// Ensure that the Number function returns the correct era number
 	if ei.Number() != 1 {
@@ -121,7 +135,7 @@ func TestNumber(t *testing.T) {
 func TestIsContainsEpoch(t *testing.T) {
 	// Create a new EraInfo with number 1, from epoch 10 to epoch 20, and root hash "0x1234"
 	era := NewEra(1, 10, 20, common.HexToHash("0x1234"), common.Hash{})
-	ei := NewEraInfo(*era)
+	ei := NewEraInfo(era)
 
 	// Ensure that the IsContainsEpoch function returns true for epochs within the era, and false otherwise
 	if !ei.GetEra().IsContainsEpoch(10) {

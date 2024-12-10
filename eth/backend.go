@@ -231,7 +231,7 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 
 	currentEraNumber := rawdb.ReadCurrentEra(chainDb)
 	if eraInfo := rawdb.ReadEra(chainDb, currentEraNumber); eraInfo != nil {
-		eth.blockchain.SetNewEraInfo(*eraInfo)
+		eth.blockchain.SetNewEraInfo(eraInfo)
 
 		//check transition period and next era
 		si := eth.blockchain.GetSlotInfo()
@@ -274,8 +274,6 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 			}
 		}
 	}
-	// fixes era for testnet8
-	eth.blockchain.FixEra(nil, true, "eth/backend.New")
 
 	go eth.dag.StartWork()
 

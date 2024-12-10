@@ -173,7 +173,7 @@ var (
 		SlotsPerEpoch:          32,
 		EpochsPerEra:           8,
 		TransitionPeriod:       2,
-		ValidatorsStateAddress: nil,
+		ValidatorsStateAddress: &common.Address{'1', '2', '3', '4'},
 		ValidatorsPerSlot:      6,
 		EffectiveBalance:       big.NewInt(3200),
 		ValidatorOpExpireSlots: 14400,
