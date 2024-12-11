@@ -180,6 +180,10 @@ func newTestBackend(t *testing.T, londonBlock *big.Int, pending bool) *testBacke
 		t.Fatalf("Failed to create local chain, %v", err)
 	}
 
+	eraNum := rawdb.ReadCurrentEra(db)
+	currentEra := rawdb.ReadEra(db, eraNum)
+	bc.SetNewEraInfo(currentEra)
+
 	err = bc.SetSlotInfo(&types.SlotInfo{
 		GenesisTime:    11111,
 		SecondsPerSlot: 32,
