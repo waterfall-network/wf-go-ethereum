@@ -3399,22 +3399,6 @@ func (bc *BlockChain) UpdateFinalizingState(block *types.Block, stateBlock *type
 
 	header := block.Header()
 
-	// todo: after ForkSlotValSyncProc activated,
-	// check mainnet synchronization (already checked up to slot 500_000),
-	// if success - remove the code bellow
-	if !bc.Config().IsForkSlotValSyncProc(header.Slot) {
-		// Set baseFee
-		creatorsPerSlotCount := bc.Config().ValidatorsPerSlot
-		if creatorsPerSlot, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, header.Slot); err == nil {
-			creatorsPerSlotCount = uint64(len(creatorsPerSlot))
-		}
-		validatorsCount, err := bc.ValidatorStorage().GetActiveValidatorsCount(bc, header.Slot)
-		if err != nil {
-			return err
-		}
-		header.BaseFee = misc.CalcSlotBaseFee(bc.Config(), creatorsPerSlotCount, validatorsCount, bc.Genesis().GasLimit(), header.Slot)
-	}
-
 	// Process block using the parent state as reference point
 	subStart := time.Now()
 	statedb, receipts, logs, usedGas := bc.CommitBlockTransactions(block, statedb)

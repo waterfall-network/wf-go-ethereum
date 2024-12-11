@@ -152,7 +152,6 @@ func (h *Header) UnsignedHash() common.Hash {
 	cpy := h.Copy()
 	if cpy != nil {
 		cpy.Number = nil
-		cpy.BaseFee = nil
 		cpy.GasUsed = 0
 		cpy.Bloom = Bloom{}
 		cpy.ReceiptHash = common.Hash{}
@@ -160,6 +159,9 @@ func (h *Header) UnsignedHash() common.Hash {
 		cpy.V = nil
 		cpy.R = nil
 		cpy.S = nil
+		if h.Version() == NoVer {
+			cpy.BaseFee = nil
+		}
 	}
 	return rlpHash(cpy)
 }
