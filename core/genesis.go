@@ -420,7 +420,7 @@ func (g *Genesis) ToBlock(db ethdb.Database) *types.Block {
 	rawdb.WriteEpoch(db, 0, genesisCp.Spine)
 
 	genesisEraLength := era.EstimateEraLength(g.Config, uint64(len(g.Validators)), 0)
-	genesisEra := era.Era{
+	genesisEra := &era.Era{
 		Number:    0,
 		From:      0,
 		To:        genesisEraLength - 1,

@@ -210,7 +210,7 @@ type BlockChain struct {
 
 	lastFinalizedBlock     atomic.Value // Current last finalized block of the blockchain
 	lastFinalizedFastBlock atomic.Value // Current last finalized block of the fast-sync chain (may be above the blockchain!)
-	eraInfo                era.EraInfo  // Current Era
+	eraInfo                *era.EraInfo // Current Era
 	lastCoordinatedCp      atomic.Value // Current last coordinated checkpoint
 	notProcValSyncOps      map[common.Hash]*types.ValidatorSync
 	valSyncCache           *lru.Cache
@@ -838,7 +838,7 @@ func (bc *BlockChain) setHeadRecursive(head common.Hash) error {
 		//recursive call
 		return bc.setHeadRecursive(cp.Spine)
 	}
-	cpEraInfo := era.NewEraInfo(*cpEra)
+	cpEraInfo := era.NewEraInfo(cpEra)
 
 	// clean chain
 	// clean eras
@@ -1785,9 +1785,9 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 	bc.AppendToChildren(block.Hash(), block.ParentHashes())
 	// Commit all cached state changes into underlying memory database.
 	root, err := state.Commit(true)
-	log.Info("Block parent hashes", "hash", block.Hash().Hex(), "ParentHashes", block.ParentHashes())
-	log.Info("Block received root", "root", block.Root().Hex(), "hash", block.Hash().Hex())
-	log.Info("Block committed root", "root", root.Hex(), "height", block.Height(), "Nr", block.Nr(), "kind", kind)
+	log.Info("Block parent hashes", "nr", block.Nr(), "hash", block.Hash().Hex(), "ParentHashes", block.ParentHashes())
+	log.Info("Block received root", "nr", block.Nr(), "root", block.Root().Hex(), "hash", block.Hash().Hex())
+	log.Info("Block committed root", "nr", block.Nr(), "root", root.Hex(), "height", block.Height(), "Nr", block.Nr(), "kind", kind)
 
 	if err != nil {
 		log.Error("Block committed root error", "height", block.Height(), "Nr", block.Nr(), "kind", kind, "err", err)
@@ -2220,19 +2220,7 @@ func (bc *BlockChain) VerifyBlock(block *types.Block) (bool, error) {
 		"txs", len(block.Transactions()),
 		"hash", block.Hash(),
 	)
-	timeTrack = time.Now()
 
-	// Verify block era
-	if !bc.VerifyBlockEra(block.Header()) {
-		return false, nil
-	}
-
-	log.Info("VALIDATION TIME",
-		"elapsed", common.PrettyDuration(time.Since(timeTrack)),
-		"fn:", "VerifyBlockEra",
-		"txs", len(block.Transactions()),
-		"hash", block.Hash(),
-	)
 	timeTrack = time.Now()
 
 	slotCreators, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, block.Slot())
@@ -2291,13 +2279,13 @@ func (bc *BlockChain) VerifyBlock(block *types.Block) (bool, error) {
 	timeTrack = time.Now()
 
 	// Verify baseFee
-	if !bc.verifyBlockBaseFee(block) {
+	if !bc.VerifyBlockBaseFee(block.Header()) {
 		return false, nil
 	}
 
 	log.Info("VALIDATION TIME",
 		"elapsed", common.PrettyDuration(time.Since(timeTrack)),
-		"fn:", "verifyBlockBaseFee",
+		"fn:", "VerifyBlockBaseFee",
 		"txs", len(block.Transactions()),
 		"hash", block.Hash(),
 	)
@@ -2399,6 +2387,21 @@ func (bc *BlockChain) VerifyBlock(block *types.Block) (bool, error) {
 		"txs", len(block.Transactions()),
 		"hash", block.Hash(),
 	)
+
+	timeTrack = time.Now()
+
+	// Verify block era
+	if !bc.VerifyBlockEra(block.Header()) {
+		return false, nil
+	}
+
+	log.Info("VALIDATION TIME",
+		"elapsed", common.PrettyDuration(time.Since(timeTrack)),
+		"fn:", "VerifyBlockEra",
+		"txs", len(block.Transactions()),
+		"hash", block.Hash(),
+	)
+
 	timeTrack = time.Now()
 
 	// Verify block height
@@ -4698,11 +4701,11 @@ func (bc *BlockChain) ValidatorStorage() valStore.Storage {
 }
 
 func (bc *BlockChain) GetEraInfo() *era.EraInfo {
-	return &bc.eraInfo
+	return bc.eraInfo
 }
 
 // SetNewEraInfo sets new era info.
-func (bc *BlockChain) SetNewEraInfo(newEra era.Era) {
+func (bc *BlockChain) SetNewEraInfo(newEra *era.Era) {
 	log.Info("New era",
 		"num", newEra.Number,
 		"begin", newEra.From,
@@ -4731,7 +4734,6 @@ func (bc *BlockChain) EnterNextEra(nextEraEpochFrom uint64, root, blockHash comm
 
 	// todo check nextEra.Root != root (in fork)
 	if nextEra != nil {
-		bc.FixEra(nextEra, true, "EnterNextEra_0")
 		rawdb.WriteCurrentEra(bc.db, nextEra.Number)
 		log.Info("######### if nextEra != nil EnterNextEra",
 			"num", nextEra.Number,
@@ -4741,7 +4743,7 @@ func (bc *BlockChain) EnterNextEra(nextEraEpochFrom uint64, root, blockHash comm
 			"currSlot", bc.GetSlotInfo().CurrentSlot(),
 			"currEpoch", bc.GetSlotInfo().SlotToEpoch(bc.GetSlotInfo().CurrentSlot()),
 		)
-		bc.SetNewEraInfo(*nextEra)
+		bc.SetNewEraInfo(nextEra)
 		return nextEra, nil
 	}
 
@@ -4756,8 +4758,7 @@ func (bc *BlockChain) EnterNextEra(nextEraEpochFrom uint64, root, blockHash comm
 		return nil, err
 	}
 	nextEra = era.NextEra(bc, root, blockHash, validatorsCount)
-	bc.FixEra(nextEra, false, "EnterNextEra_1")
-	rawdb.WriteEra(bc.db, nextEra.Number, *nextEra)
+	rawdb.WriteEra(bc.db, nextEra.Number, nextEra)
 	rawdb.WriteCurrentEra(bc.db, nextEra.Number)
 	log.Info("######### if nextEra == nil EnterNextEra",
 		"num", nextEra.Number,
@@ -4768,7 +4769,7 @@ func (bc *BlockChain) EnterNextEra(nextEraEpochFrom uint64, root, blockHash comm
 		"currEpoch", bc.GetSlotInfo().SlotToEpoch(bc.GetSlotInfo().CurrentSlot()),
 		"validators", validatorsCount,
 	)
-	bc.SetNewEraInfo(*nextEra)
+	bc.SetNewEraInfo(nextEra)
 	return nextEra, nil
 }
 
@@ -4801,15 +4802,12 @@ func (bc *BlockChain) StartTransitionPeriod(cp *types.Checkpoint, spineRoot, spi
 			return err
 		}
 		nextEra := era.NextEra(bc, spineRoot, spineHash, validatorsCount)
-		bc.FixEra(nextEra, false, "StartTransitionPeriod_0")
+		rawdb.WriteEra(bc.db, nextEra.Number, nextEra)
 
-		rawdb.WriteEra(bc.db, nextEra.Number, *nextEra)
-
-		go bc.ValidatorStorage().PrepareNextEraValidators(bc, cpEpochSlot)
+		go bc.ValidatorStorage().PrepareNextEraValidators(bc, nextEra)
 
 		log.Info("Era transition period", "from", bc.GetEraInfo().Number(), "num", nextEra.Number, "begin", nextEra.From, "end", nextEra.To, "length", nextEra.Length())
 	} else {
-		bc.FixEra(nextEra, true, "StartTransitionPeriod_1")
 		log.Info("######## HandleEra transitionPeriod skipped already done", "cpEpoch", cp.Epoch,
 			"cpFinEpoch", cp.FinEpoch,
 			"curEpoch", bc.GetSlotInfo().SlotInEpoch(bc.GetSlotInfo().CurrentSlot()),
@@ -5110,7 +5108,7 @@ func (bc *BlockChain) EpochToEra(epoch uint64) *era.Era {
 	if curEra == nil {
 		currentEraNumber := rawdb.ReadCurrentEra(bc.db)
 		if eraInfo := rawdb.ReadEra(bc.db, currentEraNumber); eraInfo != nil {
-			bc.SetNewEraInfo(*eraInfo)
+			bc.SetNewEraInfo(eraInfo)
 			curEra = eraInfo
 		} else {
 			return nil
@@ -5139,6 +5137,32 @@ func (bc *BlockChain) EpochToEra(epoch uint64) *era.Era {
 		for !findingEra.IsContainsEpoch(epoch) {
 			eraNumber++
 			findingEra = rawdb.ReadEra(bc.db, eraNumber)
+			if findingEra == nil && eraNumber-1 != curEra.Number {
+				curEra = rawdb.ReadEra(bc.db, eraNumber-1)
+			}
+			if findingEra == nil {
+				slot, err := bc.GetSlotInfo().SlotOfEpochStart(curEra.To)
+				if err != nil {
+					return nil
+				}
+
+				validatorsCount, err := bc.ValidatorStorage().GetActiveValidatorsCount(bc, slot)
+				if err != nil {
+					return nil
+				}
+
+				eraLength := era.EstimateEraLength(bc.Config(), validatorsCount, eraNumber)
+				from := curEra.To + 1
+				to := curEra.To + eraLength
+
+				spineHeader := bc.GetBlockByHash(bc.GetLastCoordinatedCheckpoint().Spine)
+
+				newEra := era.NewEra(eraNumber, from, to, spineHeader.Root(), spineHeader.Hash())
+				rawdb.WriteEra(bc.db, newEra.Number, newEra)
+				curEra = newEra
+				findingEra = curEra
+				bc.ValidatorStorage().PrepareNextEraValidators(bc, newEra)
+			}
 		}
 	}
 
@@ -5167,29 +5191,53 @@ func (bc *BlockChain) HaveEpochBlocks(epoch uint64) (bool, error) {
 	return false, nil
 }
 
-func (bc *BlockChain) verifyBlockBaseFee(block *types.Block) bool {
+func (bc *BlockChain) VerifyBlockBaseFee(header *types.Header) bool {
 	creatorsPerSlotCount := bc.Config().ValidatorsPerSlot
-	if creatorsPerSlot, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, block.Slot()); err == nil {
+	if creatorsPerSlot, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, header.Slot); err == nil {
 		creatorsPerSlotCount = uint64(len(creatorsPerSlot))
 	}
 
-	validatorsCount, err := bc.ValidatorStorage().GetActiveValidatorsCount(bc, block.Slot())
+	validatorsCount, err := bc.ValidatorStorage().GetActiveValidatorsCount(bc, header.Slot)
 	if err != nil {
-		log.Error("can`t verify block base fee, no validators for slot", "slot", block.Slot())
+		log.Error("can`t verify block base fee, no validators for slot", "slot", header.Slot)
 		return false
 	}
-	expectedBaseFee := misc.CalcSlotBaseFee(bc.Config(), creatorsPerSlotCount, validatorsCount, bc.Genesis().GasLimit(), block.Slot())
+	expectedBaseFee := misc.CalcSlotBaseFee(bc.Config(), creatorsPerSlotCount, validatorsCount, bc.Genesis().GasLimit(), header.Slot)
 
-	if expectedBaseFee.Cmp(block.BaseFee()) != 0 {
+	if expectedBaseFee.Cmp(header.BaseFee) != 0 {
 		log.Warn("Block verification: invalid base fee",
 			"calcBaseFee", expectedBaseFee.String(),
-			"blockBaseFee", block.BaseFee().String(),
-			"blockHash", block.Hash().Hex(),
+			"blockBaseFee", header.BaseFee.String(),
+			"blockHash", header.Hash().Hex(),
 		)
 		return false
 	}
 
 	return true
+}
+
+func (bc *BlockChain) VerifyBlockVersion(header *types.Header) error {
+	ver := header.Version()
+	bcConf := bc.Config()
+	if !bcConf.IsForkSlotValSyncProc(header.Slot) && ver != types.NoVer {
+		log.Warn("Block verification: invalid version (NoVer)",
+			"version", ver,
+			"slot", header.Slot,
+			"IsForkSlotValSyncProc", bcConf.IsForkSlotValSyncProc(header.Slot),
+			"blockHash", header.Hash().Hex(),
+		)
+		return ErrInvalidBlockVersion
+	}
+	if bcConf.IsForkSlotValSyncProc(header.Slot) && ver < types.Ver1 {
+		log.Warn("Block verification: invalid version (Ver1)",
+			"version", ver,
+			"slot", header.Slot,
+			"IsForkSlotValSyncProc", bcConf.IsForkSlotValSyncProc(header.Slot),
+			"blockHash", header.Hash().Hex(),
+		)
+		return ErrInvalidBlockVersion
+	}
+	return nil
 }
 
 func (bc *BlockChain) GetEVM(msg Message, state *state.StateDB, header *types.Header, vmConfig *vm.Config) (*vm.EVM, func() error, error) {
@@ -5198,15 +5246,15 @@ func (bc *BlockChain) GetEVM(msg Message, state *state.StateDB, header *types.He
 		vmConfig = bc.GetVMConfig()
 	}
 	txContext := NewEVMTxContext(msg)
-	context := NewEVMBlockContext(header, bc, nil)
-	return vm.NewEVM(context, txContext, state, bc.Config(), *vmConfig), vmError, nil
+	ctx := NewEVMBlockContext(header, bc, nil)
+	return vm.NewEVM(ctx, txContext, state, bc.Config(), *vmConfig), vmError, nil
 }
 
 // GetTP retrieves the token processor.
 func (bc *BlockChain) GetTP(state *state.StateDB, header *types.Header) (*token.Processor, func() error, error) {
 	tpError := func() error { return nil }
-	context := NewEVMBlockContext(header, bc, nil)
-	return token.NewProcessor(context, state), tpError, nil
+	ctx := NewEVMBlockContext(header, bc, nil)
+	return token.NewProcessor(ctx, state), tpError, nil
 }
 
 // GetVP retrieves the validator processor.
@@ -5441,92 +5489,4 @@ func (bc *BlockChain) verifyHibernateModeBlock(block *types.Block) (bool, error)
 
 func (bc *BlockChain) SetLastFinalisedHeader(head *types.Header, lastFinNr uint64) {
 	bc.hc.SetLastFinalisedHeader(head, lastFinNr)
-}
-
-// FixEra fixes era data.
-func (bc *BlockChain) FixEra(ptrEra *era.Era, save bool, byFn string) {
-	//testnet8
-	if bc.Genesis().Hash() == params.Testnet8GenesisHash {
-		if byFn == "eth/backend.New" {
-			bc.TestNet8FixEraOnInit()
-			return
-		}
-		bc.TestNet8FixEra(ptrEra, save, byFn)
-	}
-}
-
-// TestNet8FixEraOnInit fixes era data for testnet8.
-func (bc *BlockChain) TestNet8FixEraOnInit() {
-	if bc.Genesis().Hash() != params.Testnet8GenesisHash {
-		return
-	}
-	eraInfo := bc.GetEraInfo()
-	if eraInfo == nil && eraInfo.GetEra() == nil {
-		return
-	}
-	correctRoot := common.HexToHash("0x6a2119729696ae56975a8490e6e8a4a2ca12c7a15b6c0d3055d402fc47c756f1")
-	if eraInfo.Number() == 7800 || eraInfo.Number() == 7801 {
-		log.Info("Testnet8 fix era: update era info")
-		fixEra := eraInfo.GetEra()
-		fixEra.Root = correctRoot
-		bc.SetNewEraInfo(*fixEra)
-		if eraInfo.Number() == 7799 {
-			log.Info("Testnet8 fix era: save correct era 7800")
-			era7800 := era.NewEra(7800, 126288, 126319, correctRoot, common.Hash{})
-			rawdb.WriteEra(bc.db, era7800.Number, *era7800)
-		}
-		if eraInfo.Number() == 7800 {
-			log.Info("Testnet8 fix era: save correct era 7801")
-			era7801 := era.NewEra(7801, 126320, 126351, correctRoot, common.Hash{})
-			rawdb.WriteEra(bc.db, era7801.Number, *era7801)
-		}
-	}
-	upEra := rawdb.ReadEra(bc.db, 7800)
-	if upEra != nil && upEra.Root != correctRoot {
-		upEra.Root = correctRoot
-		rawdb.WriteEra(bc.db, upEra.Number, *upEra)
-		log.Info("Testnet8 fix era: correct root of era 7800",
-			"num", upEra.Number,
-			"begin", upEra.From,
-			"end", upEra.To,
-			"root", upEra.Root,
-			"blockHash", upEra.BlockHash,
-		)
-	}
-	upEra = rawdb.ReadEra(bc.db, 7801)
-	if upEra != nil && upEra.Root != correctRoot {
-		upEra.Root = correctRoot
-		rawdb.WriteEra(bc.db, upEra.Number, *upEra)
-		log.Info("Testnet8 fix era: correct root of era 7801",
-			"num", upEra.Number,
-			"begin", upEra.From,
-			"end", upEra.To,
-			"root", upEra.Root,
-			"blockHash", upEra.BlockHash,
-		)
-	}
-}
-
-// TestNet8FixEra fixes era data for testnet8.
-func (bc *BlockChain) TestNet8FixEra(ptrEra *era.Era, save bool, byFn string) {
-	if bc.Genesis().Hash() != params.Testnet8GenesisHash {
-		return
-	}
-	correctRoot := common.HexToHash("0x6a2119729696ae56975a8490e6e8a4a2ca12c7a15b6c0d3055d402fc47c756f1")
-	if ptrEra.Number == 7800 || ptrEra.Number == 7801 {
-		if ptrEra.Root != correctRoot {
-			ptrEra.Root = correctRoot
-			if save {
-				rawdb.WriteEra(bc.db, ptrEra.Number, *ptrEra)
-			}
-			log.Info("Testnet8 fix era: correct root of era",
-				"num", ptrEra.Number,
-				"begin", ptrEra.From,
-				"end", ptrEra.To,
-				"root", ptrEra.Root.Hex(),
-				"blockHash", ptrEra.BlockHash.Hex(),
-				"fn", byFn,
-			)
-		}
-	}
 }
