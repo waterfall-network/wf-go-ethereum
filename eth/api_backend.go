@@ -39,6 +39,7 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/rpc"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/token"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/validator"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/era"
 	valStore "gitlab.waterfall.network/waterfall/protocol/gwat/validator/storage"
 )
 
@@ -48,6 +49,30 @@ type EthAPIBackend struct {
 	allowUnprotectedTxs bool
 	eth                 *Ethereum
 	gpo                 *gasprice.Oracle
+}
+
+func (b *EthAPIBackend) StateAt(root common.Hash) (*state.StateDB, error) {
+	return b.eth.blockchain.StateAt(root)
+}
+
+func (b *EthAPIBackend) GetBlock(ctx context.Context, hash common.Hash) *types.Block {
+	return b.eth.blockchain.GetBlock(ctx, hash)
+}
+
+func (b *EthAPIBackend) GetSlotInfo() *types.SlotInfo {
+	return b.eth.blockchain.GetSlotInfo()
+}
+
+func (b *EthAPIBackend) GetLastCoordinatedCheckpoint() *types.Checkpoint {
+	return b.eth.blockchain.GetLastCoordinatedCheckpoint()
+}
+
+func (b *EthAPIBackend) GetEpoch(epoch uint64) common.Hash {
+	return b.eth.blockchain.GetEpoch(epoch)
+}
+
+func (b *EthAPIBackend) EpochToEra(u uint64) *era.Era {
+	return b.eth.blockchain.EpochToEra(u)
 }
 
 // Dag retrieves current instance of Dag.
