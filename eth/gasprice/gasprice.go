@@ -174,12 +174,12 @@ func (oracle *Oracle) SuggestTipCap(ctx context.Context) (*big.Int, error) {
 		return new(big.Int).Set(lastPrice), nil
 	}
 	var (
-		sent, exp                            int
-		cumGasUsed, cumGasLimit, blocksCount uint64
-		number                               = head.Nr()
-		result                               = make(chan results, oracle.checkBlocks)
-		quit                                 = make(chan struct{})
-		results                              []*big.Int
+		sent, exp               int
+		cumGasUsed, cumGasLimit uint64
+		number                  = head.Nr()
+		result                  = make(chan results, oracle.checkBlocks)
+		quit                    = make(chan struct{})
+		results                 []*big.Int
 	)
 	for sent < oracle.checkBlocks && number > 0 {
 		go oracle.getBlockValues(ctx, types.MakeSigner(oracle.backend.ChainConfig()), number, sampleNumber, oracle.ignorePrice, result, quit)
@@ -193,11 +193,10 @@ func (oracle *Oracle) SuggestTipCap(ctx context.Context) (*big.Int, error) {
 		cumGasLimit += header.GasLimit
 		sent++
 		exp++
-		blocksCount++
 		number--
 	}
 
-	if cumGasUsed < cumGasLimit/2 {
+	if cumGasUsed > 0 && cumGasLimit > 0 && cumGasUsed < cumGasLimit/2 {
 		creatorsPerSlotCount := oracle.backend.ChainConfig().ValidatorsPerSlot
 		if creatorsPerSlot, err := oracle.backend.ValidatorsStorage().GetCreatorsBySlot(oracle.backend, head.Slot); err == nil {
 			creatorsPerSlotCount = uint64(len(creatorsPerSlot))
