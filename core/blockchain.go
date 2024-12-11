@@ -1785,9 +1785,9 @@ func (bc *BlockChain) writeBlockWithState(block *types.Block, receipts []*types.
 	bc.AppendToChildren(block.Hash(), block.ParentHashes())
 	// Commit all cached state changes into underlying memory database.
 	root, err := state.Commit(true)
-	log.Info("Block parent hashes", "hash", block.Hash().Hex(), "ParentHashes", block.ParentHashes())
-	log.Info("Block received root", "root", block.Root().Hex(), "hash", block.Hash().Hex())
-	log.Info("Block committed root", "root", root.Hex(), "height", block.Height(), "Nr", block.Nr(), "kind", kind)
+	log.Info("Block parent hashes", "nr", block.Nr(), "hash", block.Hash().Hex(), "ParentHashes", block.ParentHashes())
+	log.Info("Block received root", "nr", block.Nr(), "root", block.Root().Hex(), "hash", block.Hash().Hex())
+	log.Info("Block committed root", "nr", block.Nr(), "root", root.Hex(), "height", block.Height(), "Nr", block.Nr(), "kind", kind)
 
 	if err != nil {
 		log.Error("Block committed root error", "height", block.Height(), "Nr", block.Nr(), "kind", kind, "err", err)
@@ -2279,13 +2279,13 @@ func (bc *BlockChain) VerifyBlock(block *types.Block) (bool, error) {
 	timeTrack = time.Now()
 
 	// Verify baseFee
-	if !bc.verifyBlockBaseFee(block) {
+	if !bc.VerifyBlockBaseFee(block.Header()) {
 		return false, nil
 	}
 
 	log.Info("VALIDATION TIME",
 		"elapsed", common.PrettyDuration(time.Since(timeTrack)),
-		"fn:", "verifyBlockBaseFee",
+		"fn:", "VerifyBlockBaseFee",
 		"txs", len(block.Transactions()),
 		"hash", block.Hash(),
 	)
@@ -5166,29 +5166,53 @@ func (bc *BlockChain) HaveEpochBlocks(epoch uint64) (bool, error) {
 	return false, nil
 }
 
-func (bc *BlockChain) verifyBlockBaseFee(block *types.Block) bool {
+func (bc *BlockChain) VerifyBlockBaseFee(header *types.Header) bool {
 	creatorsPerSlotCount := bc.Config().ValidatorsPerSlot
-	if creatorsPerSlot, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, block.Slot()); err == nil {
+	if creatorsPerSlot, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, header.Slot); err == nil {
 		creatorsPerSlotCount = uint64(len(creatorsPerSlot))
 	}
 
-	validatorsCount, err := bc.ValidatorStorage().GetActiveValidatorsCount(bc, block.Slot())
+	validatorsCount, err := bc.ValidatorStorage().GetActiveValidatorsCount(bc, header.Slot)
 	if err != nil {
-		log.Error("can`t verify block base fee, no validators for slot", "slot", block.Slot())
+		log.Error("can`t verify block base fee, no validators for slot", "slot", header.Slot)
 		return false
 	}
-	expectedBaseFee := misc.CalcSlotBaseFee(bc.Config(), creatorsPerSlotCount, validatorsCount, bc.Genesis().GasLimit(), block.Slot())
+	expectedBaseFee := misc.CalcSlotBaseFee(bc.Config(), creatorsPerSlotCount, validatorsCount, bc.Genesis().GasLimit(), header.Slot)
 
-	if expectedBaseFee.Cmp(block.BaseFee()) != 0 {
+	if expectedBaseFee.Cmp(header.BaseFee) != 0 {
 		log.Warn("Block verification: invalid base fee",
 			"calcBaseFee", expectedBaseFee.String(),
-			"blockBaseFee", block.BaseFee().String(),
-			"blockHash", block.Hash().Hex(),
+			"blockBaseFee", header.BaseFee.String(),
+			"blockHash", header.Hash().Hex(),
 		)
 		return false
 	}
 
 	return true
+}
+
+func (bc *BlockChain) VerifyBlockVersion(header *types.Header) error {
+	ver := header.Version()
+	bcConf := bc.Config()
+	if !bcConf.IsForkSlotValSyncProc(header.Slot) && ver != types.NoVer {
+		log.Warn("Block verification: invalid version (NoVer)",
+			"version", ver,
+			"slot", header.Slot,
+			"IsForkSlotValSyncProc", bcConf.IsForkSlotValSyncProc(header.Slot),
+			"blockHash", header.Hash().Hex(),
+		)
+		return ErrInvalidBlockVersion
+	}
+	if bcConf.IsForkSlotValSyncProc(header.Slot) && ver < types.Ver1 {
+		log.Warn("Block verification: invalid version (Ver1)",
+			"version", ver,
+			"slot", header.Slot,
+			"IsForkSlotValSyncProc", bcConf.IsForkSlotValSyncProc(header.Slot),
+			"blockHash", header.Hash().Hex(),
+		)
+		return ErrInvalidBlockVersion
+	}
+	return nil
 }
 
 func (bc *BlockChain) GetEVM(msg Message, state *state.StateDB, header *types.Header, vmConfig *vm.Config) (*vm.EVM, func() error, error) {
