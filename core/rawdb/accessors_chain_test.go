@@ -720,7 +720,7 @@ func TestWriteAndReadEra(t *testing.T) {
 	testEra := era.NewEra(0, 1000, 2000, common.Hash{}, common.Hash{})
 
 	// Test writing the era to the database
-	WriteEra(db, 1, *testEra)
+	WriteEra(db, 1, testEra)
 
 	// Test reading the era from the database
 	readEra := ReadEra(db, 1)
@@ -773,13 +773,13 @@ func TestFindEra(t *testing.T) {
 
 	// Create some eras and add them to the database
 	era0 := era.NewEra(0, 0, 10, common.Hash{}, common.Hash{})
-	WriteEra(db, era0.Number, *era0)
+	WriteEra(db, era0.Number, era0)
 
 	era1 := era.NewEra(1, 11, 20, common.Hash{}, common.Hash{})
-	WriteEra(db, era1.Number, *era1)
+	WriteEra(db, era1.Number, era1)
 
 	era2 := era.NewEra(2, 21, 30, common.Hash{}, common.Hash{})
-	WriteEra(db, era2.Number, *era2)
+	WriteEra(db, era2.Number, era2)
 
 	// Test case 1: Return exact era
 	lastEra = FindEra(db, 1)

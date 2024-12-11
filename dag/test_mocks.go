@@ -592,7 +592,7 @@ func (mr *MockblockChainMockRecorder) SetLastCoordinatedCheckpoint(cp interface{
 }
 
 // SetNewEraInfo mocks base method.
-func (m *MockblockChain) SetNewEraInfo(newEra era.Era) {
+func (m *MockblockChain) SetNewEraInfo(newEra *era.Era) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "SetNewEraInfo", newEra)
 }

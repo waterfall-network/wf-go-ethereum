@@ -92,8 +92,7 @@ type Creator struct {
 
 	current *environment // An environment for current running cycle.
 
-	mu    sync.RWMutex // The lock used to protect the coinbase and extra fields
-	extra []byte
+	mu sync.RWMutex // The lock used to protect the coinbase fields
 
 	snapshotMu       sync.RWMutex // The lock used to protect the snapshots below
 	snapshotBlock    *types.Block
@@ -187,17 +186,6 @@ func (c *Creator) PendingBlockAndReceipts() (*types.Block, types.Receipts) {
 // to the given channel.
 func (c *Creator) SubscribePendingLogs(ch chan<- []*types.Log) event.Subscription {
 	return c.pendingLogsFeed.Subscribe(ch)
-}
-
-// SetExtra sets the content used to initialize the block extra field.
-func (c *Creator) SetExtra(extra []byte) error {
-	if uint64(len(extra)) > params.MaximumExtraDataSize {
-		return fmt.Errorf("extra exceeds max length. %d > %v", len(extra), params.MaximumExtraDataSize)
-	}
-	c.mu.Lock()
-	defer c.mu.Unlock()
-	c.extra = extra
-	return nil
 }
 
 // SetGasCeil sets the gaslimit to strive for when block creation post 1559.
@@ -385,13 +373,25 @@ func (c *Creator) prepareBlockHeader(assigned *Assignment, tipsBlocks types.Bloc
 		era++
 	}
 
+	blockTime, err := c.bc.GetSlotInfo().StartSlotTime(assigned.Slot)
+	if err != nil {
+		log.Error("Creator calculate block time failed", "err", err)
+		return nil, err
+	}
+
+	extra, err := c.makeExtraData(assigned.Slot)
+	if err != nil {
+		return nil, err
+	}
+
 	header := &types.Header{
 		ParentHashes: parentHashes,
 		Slot:         assigned.Slot,
 		Era:          era,
 		Height:       newHeight,
 		GasLimit:     core.CalcGasLimit(tipsBlocks.AvgGasLimit(), c.config.GasCeil),
-		Time:         uint64(time.Now().Unix()),
+		Time:         uint64(blockTime.Unix()),
+		Extra:        extra,
 		// Checkpoint spine block
 		CpHash:        cpHeader.Hash(),
 		CpNumber:      cpHeader.Nr(),
@@ -1013,4 +1013,17 @@ func (c *Creator) signBlockHeader(h *types.Header) (*types.Header, error) {
 	}
 
 	return types.SignBlockHeader(h, key)
+}
+
+func (c *Creator) makeExtraData(slot uint64) ([]byte, error) {
+	var (
+		ver  = types.NoVer
+		data []byte
+	)
+	bcConf := c.bc.Config()
+	if bcConf.IsForkSlotValSyncProc(slot) {
+		ver = types.Ver1
+		data = make([]byte, 0)
+	}
+	return types.MakeExtraData(ver, data)
 }
