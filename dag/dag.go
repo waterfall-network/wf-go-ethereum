@@ -76,7 +76,7 @@ type blockChain interface {
 	SetSlotInfo(si *types.SlotInfo) error
 	Config() *params.ChainConfig
 	GetEraInfo() *era.EraInfo
-	SetNewEraInfo(newEra era.Era)
+	SetNewEraInfo(newEra *era.Era)
 	EnterNextEra(nextEraEpochFrom uint64, root common.Hash, blockHash common.Hash) (*era.Era, error)
 	StartTransitionPeriod(cp *types.Checkpoint, spineRoot common.Hash, spineHash common.Hash) error
 	//SyncEraToSlot(slot uint64)
