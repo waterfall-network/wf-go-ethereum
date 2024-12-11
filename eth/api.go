@@ -270,6 +270,15 @@ func (api *PublicDebugAPI) DumpBlock(blockNr rpc.BlockNumber) (state.Dump, error
 		_, stateDb := api.eth.dag.Creator().Pending()
 		return stateDb.RawDump(opts), nil
 	}
+	if blockNr == rpc.CheckpointBlockNumber || blockNr == rpc.SafeBlockNumber {
+		header := api.eth.BlockChain().GetHeader(api.eth.BlockChain().GetCanonicalHash())
+		stateDb, err := api.eth.BlockChain().StateAt(header.Root)
+		if err != nil {
+			return state.Dump{}, err
+		}
+
+		return stateDb.RawDump(opts), nil
+	}
 	var block *types.Block
 	if blockNr == rpc.LatestBlockNumber {
 		block = api.eth.blockchain.GetLastFinalizedBlock()
@@ -320,6 +329,12 @@ func (api *PublicDebugAPI) AccountRange(blockNrOrHash rpc.BlockNumberOrHash, sta
 			// both the pending block as well as the pending state from
 			// the miner and operate on those
 			_, stateDb = api.eth.dag.Creator().Pending()
+		} else if number == rpc.CheckpointBlockNumber || number == rpc.SafeBlockNumber {
+			header := api.eth.BlockChain().GetHeaderByHash(api.eth.blockchain.GetCanonicalHash())
+			stateDb, err = api.eth.BlockChain().StateAt(header.Root)
+			if err != nil {
+				return state.IteratorDump{}, err
+			}
 		} else {
 			var block *types.Block
 			if number == rpc.LatestBlockNumber {

@@ -103,6 +103,13 @@ func (b *EthAPIBackend) HeaderByNumber(ctx context.Context, number rpc.BlockNumb
 		bl := b.eth.blockchain.GetLastFinalizedBlock()
 		return bl.Header(), nil
 	}
+
+	if number == rpc.CheckpointBlockNumber || number == rpc.SafeBlockNumber {
+		header := b.Blockchain().GetHeader(b.BlockChain().GetCanonicalHash())
+		if header != nil {
+			return header, nil
+		}
+	}
 	return b.eth.blockchain.GetHeaderByNumber(uint64(number)), nil
 }
 
@@ -116,8 +123,17 @@ func (b *EthAPIBackend) HeaderByNumberOrHash(ctx context.Context, blockNrOrHash 
 		if header == nil {
 			return nil, errors.New("header for hash not found")
 		}
-		if blockNrOrHash.RequireCanonical && b.eth.blockchain.GetCanonicalHash(header.Nr()) != hash {
-			return nil, errors.New("hash is not currently canonical")
+		if blockNrOrHash.RequireCanonical && header.Height > 0 {
+			if header.Nr() == 0 {
+				return nil, errors.New("header is not canonical")
+			}
+			canonical, err := b.HeaderByHash(ctx, b.eth.blockchain.GetCanonicalHash())
+			if err != nil {
+				return nil, err
+			}
+			if header.Nr() > canonical.Nr() {
+				return nil, errors.New("hash is not currently canonical")
+			}
 		}
 		return header, nil
 	}
@@ -141,6 +157,11 @@ func (b *EthAPIBackend) BlockByNumber(ctx context.Context, number rpc.BlockNumbe
 		bl := b.eth.blockchain.GetLastFinalizedBlock()
 		return bl, nil
 	}
+	if number == rpc.CheckpointBlockNumber || number == rpc.SafeBlockNumber {
+		block := b.BlockChain().GetBlockByHash(b.BlockChain().GetCanonicalHash())
+		return block, nil
+	}
+
 	return b.eth.blockchain.GetBlockByNumber(uint64(number)), nil
 }
 
@@ -159,8 +180,17 @@ func (b *EthAPIBackend) BlockByNumberOrHash(ctx context.Context, blockNrOrHash r
 		if header == nil {
 			return nil, errors.New("header for hash not found")
 		}
-		if blockNrOrHash.RequireCanonical && b.eth.blockchain.GetCanonicalHash(header.Nr()) != hash {
-			return nil, errors.New("hash is not currently canonical")
+		if blockNrOrHash.RequireCanonical && header.Height > 0 {
+			if header.Nr() == 0 {
+				return nil, errors.New("header is not canonical")
+			}
+			canonical, err := b.HeaderByHash(ctx, b.eth.blockchain.GetCanonicalHash())
+			if err != nil {
+				return nil, err
+			}
+			if header.Nr() > canonical.Nr() {
+				return nil, errors.New("hash is not currently canonical")
+			}
 		}
 		block := b.eth.blockchain.GetBlock(ctx, hash)
 		if block == nil {
@@ -177,7 +207,7 @@ func (b *EthAPIBackend) PendingBlockAndReceipts() (*types.Block, types.Receipts)
 
 func (b *EthAPIBackend) StateAndHeaderByNumber(ctx context.Context, number rpc.BlockNumber) (*state.StateDB, *types.Header, error) {
 	// Pending state is only known by the miner
-	if number == rpc.CheckpointBlockNumber {
+	if number == rpc.CheckpointBlockNumber || number == rpc.SafeBlockNumber {
 		cp := b.eth.blockchain.GetLastCoordinatedCheckpoint()
 		if cp == nil {
 			return nil, nil, errors.New("current cp not found")
@@ -225,8 +255,17 @@ func (b *EthAPIBackend) StateAndHeaderByNumberOrHash(ctx context.Context, blockN
 		if header == nil {
 			return nil, nil, errors.New("header for hash not found")
 		}
-		if blockNrOrHash.RequireCanonical && b.eth.blockchain.GetCanonicalHash(header.Nr()) != hash {
-			return nil, nil, errors.New("hash is not currently canonical")
+		if blockNrOrHash.RequireCanonical && header.Height > 0 {
+			if header.Nr() == 0 {
+				return nil, nil, errors.New("header is not canonical")
+			}
+			canonical, err := b.HeaderByHash(ctx, b.eth.blockchain.GetCanonicalHash())
+			if err != nil {
+				return nil, nil, err
+			}
+			if header.Nr() > canonical.Nr() {
+				return nil, nil, errors.New("hash is not currently canonical")
+			}
 		}
 		stateDb, err := b.eth.BlockChain().StateAt(header.Root)
 		return stateDb, header, err
