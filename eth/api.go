@@ -107,11 +107,10 @@ func (api *PrivateMinerAPI) Stop() {
 }
 
 // SetExtra sets the extra data string that is included when this miner mines a block.
+// Deprecated
 func (api *PrivateMinerAPI) SetExtra(extra string) (bool, error) {
-	if err := api.e.dag.Creator().SetExtra([]byte(extra)); err != nil {
-		return false, err
-	}
-	return true, nil
+	log.Warn("SetExtra deprecated", "value", extra)
+	return false, nil
 }
 
 // SetGasPrice sets the minimum accepted gas price for the miner.
