@@ -195,7 +195,7 @@ type TxPoolConfig struct {
 
 	Lifetime time.Duration // Maximum amount of time non-executable transaction are queued
 
-	DroppedAddresses []common.Address
+	DroppedAddresses map[common.Address]struct{}
 }
 
 // DefaultTxPoolConfig contains the default configurations for the transaction
@@ -219,6 +219,8 @@ var DefaultTxPoolConfig = TxPoolConfig{
 	//GlobalQueue:  1024,
 
 	Lifetime: 3 * time.Hour,
+
+	DroppedAddresses: map[common.Address]struct{}{},
 }
 
 // sanitize checks the provided user configurations and changes anything that's
@@ -1359,8 +1361,7 @@ func (pool *TxPool) addTxs(txs []*types.Transaction, local, sync bool) []error {
 		}
 
 		if local {
-			err = pool.checkDroppedAddresses(from)
-			if err != nil {
+			if pool.findDroppedAddress(from) {
 				errs[i] = ErrDroppedSender
 				invalidTxMeter.Mark(1)
 				continue
@@ -2354,14 +2355,10 @@ func (pool *TxPool) demoteUnexecutables() {
 	}
 }
 
-func (pool *TxPool) checkDroppedAddresses(from common.Address) error {
-	for _, address := range pool.config.DroppedAddresses {
-		if address == from {
-			return errors.New("dropped addresses are not allowed")
-		}
-	}
+func (pool *TxPool) findDroppedAddress(from common.Address) bool {
+	_, ok := pool.config.DroppedAddresses[from]
 
-	return nil
+	return ok
 }
 
 // addressByHeartbeat is an account address tagged with its last activity timestamp.

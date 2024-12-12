@@ -1251,9 +1251,9 @@ func setTxPool(ctx *cli.Context, cfg *core.TxPoolConfig) {
 		blocked := strings.Split(ctx.GlobalString(TxPoolDroppedFlag.Name), ",")
 		for _, account := range blocked {
 			if trimmed := strings.TrimSpace(account); !common.IsHexAddress(trimmed) {
-				Fatalf("Invalid account in --txpool.blockedaddresses: %s", trimmed)
+				Fatalf("Invalid account in --txpool.dropped: %s", trimmed)
 			} else {
-				cfg.DroppedAddresses = append(cfg.DroppedAddresses, common.HexToAddress(account))
+				cfg.DroppedAddresses[common.HexToAddress(account)] = struct{}{}
 			}
 		}
 	}
