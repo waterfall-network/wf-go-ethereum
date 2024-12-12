@@ -174,6 +174,10 @@ type blockChain interface {
 	GetSlotInfo() *types.SlotInfo
 	GetEraInfo() *era.EraInfo
 	Database() ethdb.Database
+
+	GetLastCoordinatedCheckpoint() *types.Checkpoint
+	GetEpoch(epoch uint64) common.Hash
+	EpochToEra(uint64) *era.Era
 }
 
 // TxPoolConfig are the configuration parameters of the transaction pool.
@@ -1921,20 +1925,17 @@ func (pool *TxPool) runReorg(done chan struct{}, reset *txpoolResetRequest, dirt
 		//if reset.newHead != nil && pool.chainconfig.IsLondon(new(big.Int).SetUint64(reset.newHead.Height+1)) {
 		if reset.newHead != nil {
 			// Get active validators number
-			statedb, err := pool.chain.StateAt(reset.newHead.Root)
-			if err != nil {
-				log.Error("Failed to reset txpool state", "new.Nr", reset.newHead.Nr(), "new.Height", reset.newHead.Height, "new.Hash", reset.newHead.Hash(), "err", err)
-				statedb = pool.currentState
+			validatorsCount, err := pool.chain.ValidatorStorage().GetActiveValidatorsCount(pool.chain, reset.newHead.Slot)
+			if err == nil {
+				pendingBaseFee := misc.CalcSlotBaseFee(
+					pool.chainconfig,
+					pool.chainconfig.ValidatorsPerSlot,
+					validatorsCount,
+					pool.chain.Genesis().GasLimit(),
+					reset.newHead.Slot,
+				)
+				pool.priced.SetBaseFee(pendingBaseFee)
 			}
-			validators := pool.chain.ValidatorStorage().GetValidatorsList(statedb)
-			pendingBaseFee := misc.CalcSlotBaseFee(
-				pool.chainconfig,
-				pool.chainconfig.ValidatorsPerSlot,
-				uint64(len(validators)),
-				pool.chain.Genesis().GasLimit(),
-				reset.newHead.Slot,
-			)
-			pool.priced.SetBaseFee(pendingBaseFee)
 		}
 	}
 	// Ensure pool.queue and pool.pending sizes stay within the configured limits.

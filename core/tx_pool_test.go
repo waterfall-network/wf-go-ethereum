@@ -158,6 +158,21 @@ type testBlockChain struct {
 	genesisBlock       *types.Block
 }
 
+func (bc *testBlockChain) GetLastCoordinatedCheckpoint() *types.Checkpoint {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (bc *testBlockChain) GetEpoch(epoch uint64) common.Hash {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (bc *testBlockChain) EpochToEra(u uint64) *era.Era {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (bc *testBlockChain) GetHeaderByHash(hash common.Hash) *types.Header {
 	//TODO implement me
 	panic("implement me")
