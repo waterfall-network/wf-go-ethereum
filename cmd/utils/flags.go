@@ -331,6 +331,10 @@ var (
 		Usage: "Maximum amount of time non-executable transaction are queued",
 		Value: ethconfig.Defaults.TxPool.Lifetime,
 	}
+	TxPoolDroppedFlag = cli.StringFlag{
+		Name:  "txpool.dropped",
+		Usage: "Comma-separated list of addresses whose transactions will be rejected by the txpool",
+	}
 	// Performance tuning settings
 	CacheFlag = cli.IntFlag{
 		Name:  "cache",
@@ -1240,6 +1244,16 @@ func setTxPool(ctx *cli.Context, cfg *core.TxPoolConfig) {
 				Fatalf("Invalid account in --txpool.locals: %s", trimmed)
 			} else {
 				cfg.Locals = append(cfg.Locals, common.HexToAddress(account))
+			}
+		}
+	}
+	if ctx.GlobalIsSet(TxPoolDroppedFlag.Name) {
+		blocked := strings.Split(ctx.GlobalString(TxPoolDroppedFlag.Name), ",")
+		for _, account := range blocked {
+			if trimmed := strings.TrimSpace(account); !common.IsHexAddress(trimmed) {
+				Fatalf("Invalid account in --txpool.blockedaddresses: %s", trimmed)
+			} else {
+				cfg.DroppedAddresses = append(cfg.DroppedAddresses, common.HexToAddress(account))
 			}
 		}
 	}
