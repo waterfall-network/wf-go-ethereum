@@ -533,8 +533,8 @@ func (lc *LightChain) HasHeader(hash common.Hash) bool {
 }
 
 // GetCanonicalHash returns the canonical hash for a given block number
-func (bc *LightChain) GetCanonicalHash(number uint64) common.Hash {
-	return bc.hc.GetCanonicalHash(number)
+func (bc *LightChain) GetCanonicalHash(ctx context.Context) common.Hash {
+	return bc.GetLastCoordinatedCheckpoint().Spine
 }
 
 // GetBlockHashesFromHash retrieves a number of block hashes starting at a given

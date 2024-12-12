@@ -3345,6 +3345,26 @@ func (bc *BlockChain) UpdateFinalizingState(block *types.Block, stateBlock *type
 		activeState *state.StateDB
 	)
 
+	// validate cp state
+	cpHeader := bc.GetHeader(block.CpHash())
+	if cpHeader == nil {
+		log.Error("Finalization: checkpoint block not found", "err", ErrCpBlockNotNotFound)
+		return ErrCpBlockNotNotFound
+	}
+	if cpHeader.Root != block.CpRoot() {
+		log.Error("Finalization: validate checkpoint state failed",
+			"err", ErrCpBadFinalization,
+			"nr", block.Nr(), "hash", block.Hash().Hex(),
+			"cp.Number", cpHeader.Nr(), "CpNumber", block.CpNumber(),
+			"cp.Root", cpHeader.Root.Hex(), "CpRoot", block.CpRoot().Hex(),
+			"cp.GasUsed", cpHeader.GasUsed, "CpGasUsed", block.CpGasUsed(),
+			"cp.BaseFee", cpHeader.BaseFee, "CpBaseFee", block.CpBaseFee(),
+			"cp.ReceiptHash", cpHeader.ReceiptHash.Hex(), "CpReceiptHash", block.CpReceiptHash().Hex(),
+			"cp.Bloom", fmt.Sprintf("%#x", cpHeader.Bloom), "CpBloom", fmt.Sprintf("%#x", block.CpBloom()),
+		)
+		return ErrCpBadFinalization
+	}
+
 	defer func() {
 		lfb := bc.GetLastFinalizedBlock()
 		if lastCanon != nil && lfb.Hash() == lastCanon.Hash() {
@@ -3378,17 +3398,6 @@ func (bc *BlockChain) UpdateFinalizingState(block *types.Block, stateBlock *type
 	activeState = statedb
 
 	header := block.Header()
-
-	// Set baseFee and GasLimit
-	creatorsPerSlotCount := bc.Config().ValidatorsPerSlot
-	if creatorsPerSlot, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, header.Slot); err == nil {
-		creatorsPerSlotCount = uint64(len(creatorsPerSlot))
-	}
-	validatorsCount, err := bc.ValidatorStorage().GetActiveValidatorsCount(bc, header.Slot)
-	if err != nil {
-		return err
-	}
-	header.BaseFee = misc.CalcSlotBaseFee(bc.Config(), creatorsPerSlotCount, validatorsCount, bc.Genesis().GasLimit(), block.Slot())
 
 	// Process block using the parent state as reference point
 	subStart := time.Now()
