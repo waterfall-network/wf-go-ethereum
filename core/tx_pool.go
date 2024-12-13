@@ -69,6 +69,8 @@ var (
 	// ErrInvalidSender is returned if the transaction contains an invalid signature.
 	ErrInvalidSender = errors.New("invalid sender")
 
+	ErrDroppedSender = errors.New("dropped sender")
+
 	// ErrUnderpriced is returned if a transaction's gas price is below the minimum
 	// configured for the transaction pool.
 	ErrUnderpriced = errors.New("transaction underpriced")
@@ -196,6 +198,8 @@ type TxPoolConfig struct {
 	GlobalQueue  uint64 // Maximum number of non-executable transaction slots for all accounts
 
 	Lifetime time.Duration // Maximum amount of time non-executable transaction are queued
+
+	DroppedAddresses map[common.Address]struct{}
 }
 
 // DefaultTxPoolConfig contains the default configurations for the transaction
@@ -219,6 +223,8 @@ var DefaultTxPoolConfig = TxPoolConfig{
 	//GlobalQueue:  1024,
 
 	Lifetime: 3 * time.Hour,
+
+	DroppedAddresses: map[common.Address]struct{}{},
 }
 
 // sanitize checks the provided user configurations and changes anything that's
@@ -1351,12 +1357,21 @@ func (pool *TxPool) addTxs(txs []*types.Transaction, local, sync bool) []error {
 		// Exclude transactions with invalid signatures as soon as
 		// possible and cache senders in transactions before
 		// obtaining lock
-		_, err := types.Sender(pool.signer, tx)
+		from, err := types.Sender(pool.signer, tx)
 		if err != nil {
 			errs[i] = ErrInvalidSender
 			invalidTxMeter.Mark(1)
 			continue
 		}
+
+		if local {
+			if pool.findDroppedAddress(from) {
+				errs[i] = ErrDroppedSender
+				invalidTxMeter.Mark(1)
+				continue
+			}
+		}
+
 		// Accumulate all unknown transactions for deeper processing
 		news = append(news, tx)
 	}
@@ -2339,6 +2354,12 @@ func (pool *TxPool) demoteUnexecutables() {
 			delete(pool.processing, addr)
 		}
 	}
+}
+
+func (pool *TxPool) findDroppedAddress(from common.Address) bool {
+	_, ok := pool.config.DroppedAddresses[from]
+
+	return ok
 }
 
 // addressByHeartbeat is an account address tagged with its last activity timestamp.
