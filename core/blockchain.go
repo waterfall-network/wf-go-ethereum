@@ -198,6 +198,7 @@ type BlockChain struct {
 	logsFeed       event.Feed
 	blockProcFeed  event.Feed
 	processingFeed event.Feed
+	cancelProcFeed event.Feed
 	rmTxFeed       event.Feed
 	scope          event.SubscriptionScope
 	genesisBlock   *types.Block
@@ -581,6 +582,21 @@ func (bc *BlockChain) SetLastCoordinatedCheckpoint(cp *types.Checkpoint) {
 			}
 		}
 	}()
+
+	// clear finalized tx
+	go func() {
+		if currCp != nil && cp.Root != currCp.Root {
+			prevCpHeader := bc.GetHeader(currCp.Spine)
+			newCpHeader := bc.GetHeader(cp.Spine)
+			if prevCpHeader != nil {
+				for i := prevCpHeader.Nr() + 1; i <= newCpHeader.Nr(); i++ {
+					block := bc.GetBlockByNumber(i)
+					bc.RemoveTxsFromPool(block.Transactions())
+					log.Info("Clear finalized tx", "finSlot", newCpHeader.Slot, "blNr", i, "txs", len(block.Transactions()))
+				}
+			}
+		}
+	}()
 }
 
 func (bc *BlockChain) ClearStaleBlockDags(uptoNr uint64) {
@@ -949,6 +965,14 @@ func (bc *BlockChain) rmBlockData(hash common.Hash, slot *uint64) {
 		return
 	}
 	//collect related data
+	block := bc.GetBlock(context.Background(), hash)
+	if block != nil {
+		sl := block.Slot()
+		slot = &sl
+		// handle pooled txs
+		bc.CancelProcessingTxs(block)
+	}
+
 	if slot == nil {
 		hdr := rawdb.ReadHeader(bc.db, hash)
 		if hdr != nil {
@@ -1196,8 +1220,6 @@ func (bc *BlockChain) writeFinalizedBlock(finNr uint64, block *types.Block, isHe
 
 		bc.chainHeadFeed.Send(ChainHeadEvent{Block: block, Type: ET_NETWORK})
 	}
-
-	bc.RemoveTxsFromPool(block.Transactions())
 
 	return nil
 }
@@ -2291,6 +2313,12 @@ func (bc *BlockChain) VerifyBlock(block *types.Block) (bool, error) {
 	)
 	timeTrack = time.Now()
 
+	if bc.Config().IsForkSlotValSyncProc(block.Slot()) {
+		if !bc.verifyBlockTxsOrderByNonce(block) {
+			return false, nil
+		}
+	}
+
 	// Verify body hash and transactions hash
 	if !bc.verifyBlockHashes(block) {
 		return false, nil
@@ -2458,6 +2486,42 @@ func (bc *BlockChain) verifyBlockHeight(block *types.Block, ancestorsCount int) 
 			"cpHeight", cpHeader.Height,
 		)
 		return false
+	}
+	return true
+}
+
+// verifyBlockTxsOrderByNonce validate txs order in accordance with nonce asc.
+func (bc *BlockChain) verifyBlockTxsOrderByNonce(block *types.Block) bool {
+	defer func(ts time.Time) {
+		log.Info("^^^^^^^^^^^^ TIME",
+			"elapsed", common.PrettyDuration(time.Since(ts)),
+			"fn:", "verifyBlockTxsOrderByNonce",
+			"txs", len(block.Transactions()),
+			"hash", block.Hash(),
+		)
+	}(time.Now())
+
+	signer := types.MakeSigner(bc.chainConfig)
+
+	var prevTx *types.Transaction
+	for i, tx := range block.Transactions() {
+		if prevTx != nil && tx.Nonce() != prevTx.Nonce()+1 {
+			from, _ := types.Sender(signer, tx)
+			prevFrom, _ := types.Sender(signer, prevTx)
+			if from == prevFrom {
+				log.Warn("Block verification: invalid transactions nonce order",
+					"i", i,
+					"expNonce", prevTx.Nonce(),
+					"txNonce", tx.Nonce(),
+					"txHash", tx.Hash().Hex(),
+					"txFrom", from.Hex(),
+					"hash", block.Hash().Hex(),
+					"creator", block.Coinbase().Hex(),
+				)
+				return false
+			}
+		}
+		prevTx = tx
 	}
 	return true
 }
@@ -4626,6 +4690,15 @@ func (bc *BlockChain) WriteTxLookupEntry(txIndex int, txHash, blockHash common.H
 	return false
 }
 
+func (bc *BlockChain) CancelProcessingTxs(block *types.Block) {
+	if block == nil {
+		return
+	}
+	txs := types.NewBlockTransactions(block.Hash())
+	txs.Transactions = block.Transactions()
+	bc.cancelProcFeed.Send(txs)
+}
+
 func (bc *BlockChain) moveTxsToProcessing(txs *types.BlockTransactions) {
 	bc.processingFeed.Send(txs)
 }
@@ -4637,13 +4710,7 @@ func (bc *BlockChain) MoveTxsToProcessing(block *types.Block) {
 
 	txs := types.NewBlockTransactions(block.Hash())
 	bc.handleBlockValidatorSyncTxs(block)
-	//txs.Transactions = append(txs.Transactions, block.Transactions()...)
 	txs.Transactions = block.Transactions()
-
-	//sort.Slice(txs.Transactions, func(i, j int) bool {
-	//	return txs.Transactions[i].Nonce() < txs.Transactions[j].Nonce()
-	//})
-
 	bc.moveTxsToProcessing(txs)
 }
 
