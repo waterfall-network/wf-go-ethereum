@@ -225,6 +225,9 @@ type BlockChain interface {
 	//SetSyncProvider set provider of access to synchronization functionality
 	SetSyncProvider(provider types.SyncProvider)
 	IsSynced() bool
+
+	VerifyBlockBaseFee(header *types.Header) bool
+	VerifyBlockVersion(header *types.Header) error
 }
 
 // New creates a new downloader to fetch hashes and blocks from remote peers.
@@ -1137,7 +1140,7 @@ func (d *Downloader) fetchHashesBySpines(p *peerConnection, baseSpine common.Has
 
 // fetchDagHeaders retrieves the dag headers by hashes from a remote peer.
 func (d *Downloader) fetchDagHeaders(p *peerConnection, hashes common.HashArray) (headers []*types.Header, err error) {
-	p.log.Info("Retrieving remote dag headers: start", "hashes", len(hashes))
+	p.log.Info("Sync: headers by hashes: start", "hashes", len(hashes))
 
 	//multi peers sync support
 	d.setPeerSync(p.id)
@@ -1171,15 +1174,56 @@ func (d *Downloader) fetchDagHeaders(p *peerConnection, hashes common.HashArray)
 			err = d.redirectPacketToSyncPeerChan(packet, receiptCh)
 		case packet := <-peerCh:
 			// handle redirected packet at peer chan
-			log.Info("Sync: header by hash: received packet", "packet.peer", packet.PeerId(), "peer", p.id)
+			log.Info("Sync: headers by hashes: received packet", "packet.peer", packet.PeerId(), "peer", p.id)
 			// Discard anything not from the origin peer
 			if packet.PeerId() != p.id {
-				log.Error("Sync: header by hash: received from incorrect peer", "packet.peer", packet.PeerId(), "peer", p.id)
+				log.Error("Sync: headers by hashes: received from incorrect peer", "packet.peer", packet.PeerId(), "peer", p.id)
 				break
 			}
 			headers = packet.(*headerPack).headers
 			if len(headers) == 0 {
 				err = errInvalidDag
+			}
+			for i, hdr := range headers {
+				//todo rm test
+				//if hdr.Nr() == 150 {
+				//	hdr.BaseFee = common.Big0.Sub(hdr.BaseFee, common.Big256)
+				//}
+
+				if hdr == nil {
+					log.Warn("Sync: headers by hashes: header is nil",
+						"i", i,
+						"hash", fmt.Sprintf("%#x", hashes[i]),
+						"peer", p.id,
+					)
+					continue
+				}
+				if hi := hashes.IndexOf(hdr.Hash()); hi < 0 {
+					log.Error("Sync: headers by hashes: check hash failed:",
+						"hash", fmt.Sprintf("%#x", hashes[hi]),
+						"hNr", hdr.Nr(),
+						"hHash", fmt.Sprintf("%#x", hdr.Hash()),
+						"error", errBadPeer,
+						"peer", p.id,
+					)
+					return nil, errBadPeer
+				}
+				err = d.blockchain.VerifyBlockVersion(hdr)
+				if err != nil {
+					return nil, err
+				}
+				if !d.blockchain.Config().IsForkSlotValSyncProc(hdr.Slot) && !d.blockchain.VerifyBlockBaseFee(hdr) {
+					log.Error("Sync: headers by hashes: bad baseFee:",
+						"i", i,
+						"hash", fmt.Sprintf("%#x", hashes[i]),
+						"hNr", hdr.Nr(),
+						"hHash", hdr.Hash(),
+						"hBaseFee", hdr.BaseFee.String(),
+						"error", errBadPeer,
+						"peer", p.id,
+					)
+					return nil, errBadPeer
+				}
 			}
 			return headers, err
 
@@ -1559,7 +1603,7 @@ func (d *Downloader) checkPeer(p *peerConnection, baseSpine common.Hash, spines 
 // fetchHeaderByNr retrieves the header by finalized number from a remote peer.
 // nolint:unused
 func (d *Downloader) fetchHeaderByNr(p *peerConnection, nr uint64) (header *types.Header, err error) {
-	p.log.Info("Sync: Retrieving remote chain header by nr")
+	p.log.Info("Sync: header by nr: start", "nr", nr)
 	fetch := 1
 
 	//multi peers sync support
@@ -1606,6 +1650,28 @@ func (d *Downloader) fetchHeaderByNr(p *peerConnection, nr uint64) (header *type
 				return nil, errBadPeer
 			}
 			header = headers[0]
+			if header == nil {
+				log.Warn("Sync: header by nr: header is nil",
+					"nr", nr,
+					"peer", p.id,
+				)
+				return header, nil
+			}
+			err = d.blockchain.VerifyBlockVersion(header)
+			if err != nil {
+				return nil, err
+			}
+			if !d.blockchain.Config().IsForkSlotValSyncProc(header.Slot) && !d.blockchain.VerifyBlockBaseFee(header) {
+				log.Error("Sync: header by nr: bad baseFee:",
+					"nr", nr,
+					"hNr", header.Nr(),
+					"hHash", header.Hash(),
+					"hBaseFee", header.BaseFee.String(),
+					"error", errBadPeer,
+					"peer", p.id,
+				)
+				return nil, errBadPeer
+			}
 			return header, nil
 
 		case <-timeout:
@@ -1617,7 +1683,7 @@ func (d *Downloader) fetchHeaderByNr(p *peerConnection, nr uint64) (header *type
 
 // fetchHeaderByHash retrieves the header by hash from a remote peer.
 func (d *Downloader) fetchHeaderByHash(p *peerConnection, hash common.Hash) (header *types.Header, err error) {
-	p.log.Info("Sync: Retrieving remote chain header by hash")
+	p.log.Info("Sync: header by hash: start", "hash", fmt.Sprintf("%#x", hash))
 	fetch := 1
 
 	//multi peers sync support
@@ -1664,6 +1730,38 @@ func (d *Downloader) fetchHeaderByHash(p *peerConnection, hash common.Hash) (hea
 				return nil, errCanceled
 			}
 			header = headers[0]
+			if header == nil {
+				log.Warn("Sync: header by hash: header is nil",
+					"hash", hash.Hex(),
+					"peer", p.id,
+				)
+				return header, nil
+			}
+			if header.Hash() != hash {
+				log.Error("Sync: header by hash: check hash failed:",
+					"hash", fmt.Sprintf("%#x", hash),
+					"hNr", header.Nr(),
+					"hHash", fmt.Sprintf("%#x", header.Hash()),
+					"error", errBadPeer,
+					"peer", p.id,
+				)
+				return nil, errBadPeer
+			}
+			err = d.blockchain.VerifyBlockVersion(header)
+			if err != nil {
+				return nil, err
+			}
+			if !d.blockchain.Config().IsForkSlotValSyncProc(header.Slot) && !d.blockchain.VerifyBlockBaseFee(header) {
+				log.Error("Sync: header by hash: bad baseFee:",
+					"hash", hash.Hex(),
+					"hNr", header.Nr(),
+					"hHash", header.Hash(),
+					"hBaseFee", header.BaseFee.String(),
+					"error", errBadPeer,
+					"peer", p.id,
+				)
+				return nil, errBadPeer
+			}
 			return header, nil
 		case <-timeout:
 			p.log.Warn("Sync: header by hash: timed out", "elapsed", ttl)

@@ -69,6 +69,8 @@ var (
 	// ErrInvalidSender is returned if the transaction contains an invalid signature.
 	ErrInvalidSender = errors.New("invalid sender")
 
+	ErrDroppedSender = errors.New("dropped sender")
+
 	// ErrUnderpriced is returned if a transaction's gas price is below the minimum
 	// configured for the transaction pool.
 	ErrUnderpriced = errors.New("transaction underpriced")
@@ -175,6 +177,10 @@ type blockChain interface {
 	GetSlotInfo() *types.SlotInfo
 	GetEraInfo() *era.EraInfo
 	Database() ethdb.Database
+
+	GetLastCoordinatedCheckpoint() *types.Checkpoint
+	GetEpoch(epoch uint64) common.Hash
+	EpochToEra(uint64) *era.Era
 }
 
 // TxPoolConfig are the configuration parameters of the transaction pool.
@@ -193,6 +199,8 @@ type TxPoolConfig struct {
 	GlobalQueue  uint64 // Maximum number of non-executable transaction slots for all accounts
 
 	Lifetime time.Duration // Maximum amount of time non-executable transaction are queued
+
+	DroppedAddresses map[common.Address]struct{}
 }
 
 // DefaultTxPoolConfig contains the default configurations for the transaction
@@ -204,12 +212,20 @@ var DefaultTxPoolConfig = TxPoolConfig{
 	PriceLimit: 1,
 	PriceBump:  10,
 
-	AccountSlots: 16,
-	GlobalSlots:  (4096 + 1024) * 20, // urgent + floating queue capacity with 4:1 ratio
-	AccountQueue: 64,
-	GlobalQueue:  1024,
+	//AccountSlots: 16,
+	//GlobalSlots:  4096 + 1024, // urgent + floating queue capacity with 4:1 ratio
+	AccountSlots: 720_000,
+	GlobalSlots:  720_000,
+	AccountQueue: 720_000,
+	GlobalQueue:  720_000,
+	//AccountSlots: 30_000,
+	//GlobalSlots:  240_000,
+	//AccountQueue: 64,
+	//GlobalQueue:  1024,
 
 	Lifetime: 3 * time.Hour,
+
+	DroppedAddresses: map[common.Address]struct{}{},
 }
 
 // sanitize checks the provided user configurations and changes anything that's
@@ -1363,12 +1379,21 @@ func (pool *TxPool) addTxs(txs []*types.Transaction, local, sync bool) []error {
 		// Exclude transactions with invalid signatures as soon as
 		// possible and cache senders in transactions before
 		// obtaining lock
-		_, err := types.Sender(pool.signer, tx)
+		from, err := types.Sender(pool.signer, tx)
 		if err != nil {
 			errs[i] = ErrInvalidSender
 			invalidTxMeter.Mark(1)
 			continue
 		}
+
+		if local {
+			if pool.findDroppedAddress(from) {
+				errs[i] = ErrDroppedSender
+				invalidTxMeter.Mark(1)
+				continue
+			}
+		}
+
 		// Accumulate all unknown transactions for deeper processing
 		news = append(news, tx)
 	}
@@ -1883,20 +1908,17 @@ func (pool *TxPool) runReorg(done chan struct{}, reset *txpoolResetRequest, dirt
 		//if reset.newHead != nil && pool.chainconfig.IsLondon(new(big.Int).SetUint64(reset.newHead.Height+1)) {
 		if reset.newHead != nil {
 			// Get active validators number
-			statedb, err := pool.chain.StateAt(reset.newHead.Root)
-			if err != nil {
-				log.Error("Failed to reset txpool state", "new.Nr", reset.newHead.Nr(), "new.Height", reset.newHead.Height, "new.Hash", reset.newHead.Hash(), "err", err)
-				statedb = pool.currentState
+			validatorsCount, err := pool.chain.ValidatorStorage().GetActiveValidatorsCount(pool.chain, reset.newHead.Slot)
+			if err == nil {
+				pendingBaseFee := misc.CalcSlotBaseFee(
+					pool.chainconfig,
+					pool.chainconfig.ValidatorsPerSlot,
+					validatorsCount,
+					pool.chain.Genesis().GasLimit(),
+					reset.newHead.Slot,
+				)
+				pool.priced.SetBaseFee(pendingBaseFee)
 			}
-			validators := pool.chain.ValidatorStorage().GetValidatorsList(statedb)
-			pendingBaseFee := misc.CalcSlotBaseFee(
-				pool.chainconfig,
-				pool.chainconfig.ValidatorsPerSlot,
-				uint64(len(validators)),
-				pool.chain.Genesis().GasLimit(),
-				reset.newHead.Slot,
-			)
-			pool.priced.SetBaseFee(pendingBaseFee)
 		}
 	}
 	// Ensure pool.queue and pool.pending sizes stay within the configured limits.
@@ -2300,6 +2322,12 @@ func (pool *TxPool) demoteUnexecutables() {
 			delete(pool.processing, addr)
 		}
 	}
+}
+
+func (pool *TxPool) findDroppedAddress(from common.Address) bool {
+	_, ok := pool.config.DroppedAddresses[from]
+
+	return ok
 }
 
 // addressByHeartbeat is an account address tagged with its last activity timestamp.

@@ -66,10 +66,7 @@ func (s *PublicEthereumAPI) GasPrice(ctx context.Context) (*hexutil.Big, error) 
 	if err != nil {
 		return nil, err
 	}
-	head := s.b.GetLastFinalizedHeader()
-	if head.BaseFee != nil {
-		tipcap.Add(tipcap, head.BaseFee)
-	}
+
 	return (*hexutil.Big)(tipcap), err
 }
 
@@ -830,7 +827,7 @@ func (s *PublicBlockChainAPI) GetCode(ctx context.Context, address common.Addres
 		return nil, err
 	}
 	if address == *s.b.ChainConfig().ValidatorsStateAddress || state.IsValidatorAddress(address) {
-		return nil, nil
+		return nil, fmt.Errorf("address: %s is validator or validator state address", address.Hex())
 	}
 	code := state.GetCode(address)
 	return code, state.Error()
@@ -1365,6 +1362,11 @@ func RPCMarshalHeader(head *types.Header) map[string]interface{} {
 		"logsBloom":        head.Bloom,
 		"size":             hexutil.Uint64(head.Size()),
 		"bodyRoot":         head.BodyHash,
+		"difficulty":       new(big.Int),
+	}
+
+	if len(head.ParentHashes) > 0 {
+		result["parentHash"] = head.ParentHashes[len(head.ParentHashes)-1]
 	}
 
 	if head.V != nil && head.R != nil && head.S != nil {

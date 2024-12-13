@@ -57,6 +57,12 @@ func init() {
 	testTxPoolConfig = DefaultTxPoolConfig
 	testTxPoolConfig.Journal = ""
 
+	testTxPoolConfig.AccountSlots = 16
+	testTxPoolConfig.GlobalSlots = (4096 + 1024) * 20
+
+	testTxPoolConfig.AccountQueue = 64
+	testTxPoolConfig.GlobalQueue = 1024
+
 	cpy := *params.TestChainConfig
 	eip1559Config = &cpy
 }
@@ -102,7 +108,7 @@ func defaultTestBC(addr common.Address) *BlockChain {
 	rawdb.WriteEpoch(database, 0, genesisCp.Spine)
 
 	genesisEraLength := era.EstimateEraLength(genesis.Config, uint64(len(genesis.Validators)), 0)
-	genesisEra := era.Era{0, 0, genesisEraLength - 1, genesisBlock.Root(), genesisBlock.Hash()}
+	genesisEra := &era.Era{0, 0, genesisEraLength - 1, genesisBlock.Root(), genesisBlock.Hash()}
 	rawdb.WriteEra(database, genesisEra.Number, genesisEra)
 	rawdb.WriteCurrentEra(database, genesisEra.Number)
 	// i.o. ethash.NewFaker()
@@ -152,6 +158,21 @@ type testBlockChain struct {
 	moveToProcessingCh chan *types.Transaction
 	removeTxFromPoolCh chan *types.Transaction
 	genesisBlock       *types.Block
+}
+
+func (bc *testBlockChain) GetLastCoordinatedCheckpoint() *types.Checkpoint {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (bc *testBlockChain) GetEpoch(epoch uint64) common.Hash {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (bc *testBlockChain) EpochToEra(u uint64) *era.Era {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (bc *testBlockChain) GetHeaderByHash(hash common.Hash) *types.Header {
