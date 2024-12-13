@@ -470,7 +470,7 @@ func OverrideTestnet5(conf *ChainConfig) *ChainConfig {
 	//conf.ForkSlotShanghai = 0
 	conf.ForkSlotValOpTracking = 0
 	conf.ForkSlotReduceBaseFee = 0
-	conf.ForkSlotValSyncProc = math.MaxUint64
+	conf.ForkSlotValSyncProc = 1024
 	//conf.StartEpochsPerEra = 0
 	//conf.AcceptCpRootOnFinEpoch = nil
 
