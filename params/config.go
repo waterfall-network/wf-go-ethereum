@@ -57,6 +57,7 @@ var TrustedCheckpoints = map[common.Hash]*TrustedCheckpoint{
 
 var (
 	validatorsStateAddress = common.HexToAddress("0x329c3A3d65Ab0bE08c6eff6695933391Cfc02cCA")
+	waterfallDummyAddress  = common.HexToAddress("0xB2b27625bC1F75386ba0c858aeF64BA8D25924F4") // This is the address for issuing tokens from the state address of the validators
 	// MainnetChainConfig is the chain parameters to run a node on the main network.
 	MainnetChainConfig = &ChainConfig{
 		ChainID:                big.NewInt(181),
@@ -249,6 +250,7 @@ type ChainConfig struct {
 	EpochsPerEra           uint64 `json:"epochsPerEra"`
 	TransitionPeriod       uint64 `json:"transitionPeriod"` // The number of epochs before new era starts
 	ValidatorsStateAddress *common.Address
+	WaterfallDammyAddress  common.Address
 	ValidatorsPerSlot      uint64   `json:"validatorsPerSlot"`
 	EffectiveBalance       *big.Int `json:"effectiveBalance"`
 	ValidatorOpExpireSlots uint64   `json:"validatorOpExpireSlots"`
@@ -289,7 +291,8 @@ func (c *CliqueConfig) String() string {
 func (c *ChainConfig) String() string {
 	return fmt.Sprintf("{ChainID: %v, SecondsPerSlot: %v, SlotsPerEpoch: %v, EpochsPerEra: %v, TransitionPeriod: %v, "+
 		"ValidatorsPerSlot %v, ValidatorsStateAddress %v, EffectiveBalance: %v, ValidatorOpExpireSlots: %v, ForkSlotSubNet1: %v, ForkSlotDelegate: %v, "+
-		"ForkSlotPrefixFin: %v, ForkSlotShanghai: %v, ForkSlotValOpTracking: %v, ForkSlotReduceBaseFee: %v, ForkSlotValSyncProc: %v, StartEpochsPerEra: %v, AcceptCpRootOnFinEpoch: %v}",
+		"ForkSlotPrefixFin: %v, ForkSlotShanghai: %v, ForkSlotValOpTracking: %v, ForkSlotReduceBaseFee: %v, ForkSlotValSyncProc: %v, StartEpochsPerEra: %v, AcceptCpRootOnFinEpoch: %v, "+
+		"WaterfallDammyAddress: %+v}",
 		c.ChainID,
 		c.SecondsPerSlot,
 		c.SlotsPerEpoch,
@@ -308,6 +311,7 @@ func (c *ChainConfig) String() string {
 		c.ForkSlotValSyncProc,
 		c.StartEpochsPerEra,
 		c.AcceptCpRootOnFinEpoch,
+		c.WaterfallDammyAddress,
 	)
 }
 
@@ -498,6 +502,12 @@ func OverrideTestnet9(conf *ChainConfig) *ChainConfig {
 	conf.ForkSlotValSyncProc = math.MaxUint64
 	conf.StartEpochsPerEra = 0
 	//conf.AcceptCpRootOnFinEpoch = nil
+
+	return conf
+}
+
+func OverrideDummyAddress(conf *ChainConfig) *ChainConfig {
+	conf.WaterfallDammyAddress = waterfallDummyAddress
 
 	return conf
 }

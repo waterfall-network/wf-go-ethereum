@@ -260,19 +260,8 @@ type WithdrawalFromValStateArgs struct {
 	Amount            *hexutil.Big    `json:"amount"`
 }
 
-func (s *PublicValidatorAPI) Validator_WithdrawalFromValStateData(args WithdrawalFromValStateArgs) (hexutil.Bytes, error) {
-	if args.WithdrawalAddress == nil {
-		return nil, operation.ErrNoWithdrawalAddress
-	}
-
-	if args.Amount == nil {
-		return nil, operation.ErrNoAmount
-	}
-
-	op, err := operation.NewWithdrawalFromValStateOperation(*args.WithdrawalAddress, (*big.Int)(args.Amount))
-	if err != nil {
-		return nil, err
-	}
+func (s *PublicValidatorAPI) Validator_WithdrawalFromValStateData() (hexutil.Bytes, error) {
+	op := operation.NewWithdrawalFromValStateOperation()
 
 	return operation.EncodeToBytes(op)
 }

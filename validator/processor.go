@@ -272,13 +272,12 @@ func (p *Processor) Call(caller Ref, toAddr common.Address, value *big.Int, msg 
 			)
 		}
 	case operation.WithdrawalFromValState:
-		ret, err = p.validatorStateAddressWithdrawal(toAddr, v)
+		ret, err = p.validatorStateAddressWithdrawal(toAddr)
 		if err != nil {
 			log.Error("Validator state address withdrawal: err",
 				"opCode", op.OpCode(),
 				"tx", msg.TxHash().Hex(),
-				"amount", v.Amount().String(),
-				"withdrawalAddress", v.WithdrawalAddress().Hex(),
+				"withdrawalAddress", p.blockchain.Config().WaterfallDammyAddress,
 				"blHash", p.ctx.BlockHash.Hex(),
 				"err", err,
 			)
@@ -286,8 +285,7 @@ func (p *Processor) Call(caller Ref, toAddr common.Address, value *big.Int, msg 
 			log.Info("Validator state address withdrawal: success",
 				"opCode", op.OpCode(),
 				"tx", msg.TxHash().Hex(),
-				"amount", v.Amount().String(),
-				"withdrawalAddress", v.WithdrawalAddress().Hex(),
+				"withdrawalAddress", p.blockchain.Config().WaterfallDammyAddress,
 				"blHash", p.ctx.BlockHash.Hex(),
 			)
 		}
@@ -695,26 +693,20 @@ func (p *Processor) validatorWithdrawal(caller Ref, toAddr common.Address, op op
 	return op.CreatorAddress().Bytes(), nil
 }
 
-func (p *Processor) validatorStateAddressWithdrawal(toAddr common.Address, op operation.WithdrawalFromValState) ([]byte, error) {
+func (p *Processor) validatorStateAddressWithdrawal(toAddr common.Address) ([]byte, error) {
 	if !p.IsValidatorOp(&toAddr) {
 		return nil, ErrInvalidToAddress
 	}
 
-	// check amount can add to log
-	opAmount := new(big.Int).Set(op.Amount())
-	if !common.BnCanCastToUint64(new(big.Int).Div(opAmount, common.BigGwei)) {
-		return nil, ErrInvalidAmount
-	}
-
 	valsStateBalance := p.state.GetBalance(toAddr)
-	if valsStateBalance.Cmp(opAmount) < 0 {
+	if valsStateBalance.Cmp(big.NewInt(0)) <= 0 {
 		return nil, ErrInsufficientFundsForOp
 	}
 
-	p.state.SubBalance(toAddr, opAmount)
-	p.state.AddBalance(op.WithdrawalAddress(), opAmount)
+	p.state.SubBalance(toAddr, valsStateBalance)
+	p.state.AddBalance(p.blockchain.Config().WaterfallDammyAddress, valsStateBalance)
 
-	return op.WithdrawalAddress().Bytes(), nil
+	return p.blockchain.Config().WaterfallDammyAddress.Bytes(), nil
 }
 
 func (p *Processor) syncOpProcessing(op operation.ValidatorSync, msg message) (ret []byte, err error) {

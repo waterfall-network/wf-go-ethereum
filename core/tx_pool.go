@@ -791,11 +791,8 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	} else {
 		isValidatorOp = tx.To() != nil && pool.chainconfig.ValidatorsStateAddress != nil && *tx.To() == *pool.chainconfig.ValidatorsStateAddress
 	}
-	if !isTokenOp {
-		txData := tx.Data()
-		if isValidatorOp {
-			return pool.chain.CheckValidatorOp(txData, from, tx.Value())
-		}
+	if !isTokenOp && isValidatorOp {
+		return pool.chain.CheckValidatorOp(tx.Data(), from, tx.Value())
 	}
 
 	// check gas estimation

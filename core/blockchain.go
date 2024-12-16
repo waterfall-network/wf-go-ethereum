@@ -5499,13 +5499,17 @@ func (bc *BlockChain) CheckValidatorOp(txData []byte, from common.Address, value
 		case validatorOp.Deposit:
 			return bc.checkDepositOperation(v, from, value)
 		case validatorOp.WithdrawalFromValState:
-			return bc.checkWithdrawalFromValState(v)
+			return bc.checkWithdrawalFromValState()
 		}
 	}
 
 	log.Warn("validator transaction has invalid txData", "txData", string(txData))
 
-	return errors.New("validator transaction has invalid txData")
+	if bc.Config().IsForkSlotValSyncProc(bc.slotInfo.CurrentSlot()) {
+		return errors.New("validator transaction has invalid txData")
+	}
+
+	return nil
 }
 
 func (bc *BlockChain) checkExitOperation(op validatorOp.Exit, from common.Address) error {
@@ -5666,24 +5670,9 @@ func (bc *BlockChain) checkWithdrawalOperation(op validatorOp.Withdrawal, from c
 	return nil
 }
 
-func (bc *BlockChain) checkWithdrawalFromValState(v validatorOp.WithdrawalFromValState) error {
+func (bc *BlockChain) checkWithdrawalFromValState() error {
 	if !bc.Config().IsForkSlotValSyncProc(bc.GetSlotInfo().CurrentSlot()) {
 		return errors.New("current fork does not support withdrawal from validators state address")
-	}
-
-	valStateAddress := bc.ValidatorStorage().GetValidatorsStateAddress()
-	if valStateAddress == nil {
-		return errors.New("empty validators state address")
-	}
-
-	stateDb, err := bc.State()
-	if err != nil {
-		return err
-	}
-
-	valStateBalance := stateDb.GetBalance(*valStateAddress)
-	if valStateBalance.Cmp(v.Amount()) < 0 {
-		return ErrInsufficientFundsForTransfer
 	}
 
 	return nil
