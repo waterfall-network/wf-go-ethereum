@@ -170,27 +170,28 @@ func (s *storage) GetValidators(bc blockchain, slot uint64, tmpFromWhere string)
 	stateDb, _ := bc.StateAt(slotEra.Root)
 	valList := s.GetValidatorsList(stateDb)
 	log.Info("GetValidators from state", "validators", len(valList), "slot", slot, "epoch", slotEpoch, "root", slotEra.Root.Hex())
-	eraValidators := make([]common.Address, 0)
-	for _, valAddress := range valList {
-		val, err := s.GetValidator(stateDb, valAddress)
+	for i := 0; i < len(valList); i++ {
+		val, err := s.GetValidator(stateDb, valList[i])
 		if err != nil {
-			log.Error("can`t get validator from state", "error", err, "address", valAddress.Hex())
+			log.Error("can`t get validator from state", "error", err, "address", valList[i].Hex())
 			continue
 		}
-		if val.ActivationEra <= slotEra.Number && val.ExitEra > slotEra.Number {
-			eraValidators = append(eraValidators, val.GetAddress())
+
+		if val.ActivationEra > slotEra.Number || val.ExitEra <= slotEra.Number {
+			valList = append(valList[:i], valList[i+1:]...)
+			i--
 		}
 	}
 
-	s.validatorsCache.addAllActiveValidatorsByEra(slotEra.Number, eraValidators)
+	s.validatorsCache.addAllActiveValidatorsByEra(slotEra.Number, valList)
 
 	log.Info("GetValidators", "callFunc", tmpFromWhere, "all", len(validators),
-		"active", len(eraValidators),
+		"active", len(valList),
 		"slot", slot, "epoch", slotEpoch,
 	)
 
-	validators = make([]common.Address, len(eraValidators))
-	copy(validators, eraValidators)
+	validators = make([]common.Address, len(valList))
+	copy(validators, valList)
 
 	return validators, nil
 }
@@ -369,17 +370,21 @@ func (s *storage) PrepareNextEraValidators(bc blockchain, era *era.Era) {
 	stateDb, _ := bc.StateAt(era.Root)
 
 	valList := s.GetValidatorsList(stateDb)
-	for _, valAddress := range valList {
-		val, err := s.GetValidator(stateDb, valAddress)
+
+	for i := 0; i < len(valList); i++ {
+		val, err := s.GetValidator(stateDb, valList[i])
 		if err != nil {
-			log.Error("can`t get validator from state", "error", err, "address", valAddress.Hex())
+			log.Error("can`t get validator from state", "error", err, "address", valList[i].Hex())
 			continue
 		}
 
-		if val.ActivationEra <= era.Number && val.ExitEra > era.Number {
-			s.validatorsCache.addValidator(val.Address, era.Number)
+		if val.ActivationEra > era.Number || val.ExitEra <= era.Number {
+			valList = append(valList[:i], valList[i+1:]...)
+			i--
 		}
 	}
+
+	s.validatorsCache.addAllActiveValidatorsByEra(era.Number, valList)
 
 	log.Info("Prepare next era validators",
 		"eraNumber", era.Number,
