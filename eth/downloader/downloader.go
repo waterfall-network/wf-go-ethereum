@@ -1877,43 +1877,40 @@ func (d *Downloader) syncBySpines(p *peerConnection, baseSpine, terminalSpine co
 		lastHash = remoteHashes[len(remoteHashes)-1]
 	}
 
-	var dag common.HashArray
-	if forceDownload {
-		dag = remoteHashes.Copy()
-	} else {
+	if !forceDownload {
 		// filter existed blocks
-		dag = make(common.HashArray, 0, len(remoteHashes))
 		dagBlocks := d.blockchain.GetBlocksByHashes(remoteHashes)
+		remoteHashes = make(common.HashArray, 0, len(remoteHashes))
 		for h, b := range dagBlocks {
 			if b == nil && h != (common.Hash{}) {
-				dag = append(dag, h)
+				remoteHashes = append(remoteHashes, h)
 			}
 		}
 	}
 
-	if len(dag) == 0 {
+	if len(remoteHashes) == 0 {
 		return lastHash, nil
 	}
 
-	log.Info("Sync by spines: dag hashes retrieved", "dag", len(dag))
+	log.Info("Sync by spines: dag hashes retrieved", "dag", len(remoteHashes))
 
-	headers, err := d.fetchDagHeaders(p, dag)
+	headers, err := d.fetchDagHeaders(p, remoteHashes)
 	log.Info("Sync by spines: dag headers retrieved", "count", len(headers), "headers", len(headers), "err", err)
 	if err != nil {
 		p.log.Error("Sync by spines: error 1", "err", err, "from", "baseSpine", baseSpine.Hex(), "terminalSpine", terminalSpine.Hex())
 		return lastHash, err
 	}
 	// request bodies for retrieved headers only
-	dag = make(common.HashArray, 0, len(headers))
+	remoteHashes = make(common.HashArray, 0, len(headers))
 	for _, hdr := range headers {
 		if hdr != nil {
-			dag = append(dag, hdr.Hash())
+			remoteHashes = append(remoteHashes, hdr.Hash())
 		}
 	}
-	if len(dag) == 0 {
+	if len(remoteHashes) == 0 {
 		return lastHash, nil
 	}
-	txsMap, err := d.fetchDagTxs(p, dag)
+	txsMap, err := d.fetchDagTxs(p, remoteHashes)
 	log.Info("Sync by spines: dag transactions retrieved", "count", len(txsMap), "txs", len(txsMap), "err", err)
 	if err != nil {
 		p.log.Error("Sync by spines: error 2", "err", err, "baseSpine", baseSpine.Hex(), "terminalSpine", terminalSpine.Hex())

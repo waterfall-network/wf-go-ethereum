@@ -1689,7 +1689,7 @@ func (bc *BlockChain) WriteSyncBlocks(blocks types.Blocks, validate bool) (faile
 	}
 	blocks = blocks.Deduplicate(true)
 
-	notExisted := blocks
+	//notExisted := blocks
 	//// rm existed blocks
 	//notExisted := make(types.Blocks, 0, len(blocks))
 	//for _, bl := range blocks {
@@ -1701,9 +1701,9 @@ func (bc *BlockChain) WriteSyncBlocks(blocks types.Blocks, validate bool) (faile
 	//}
 
 	// ordering by slot sequence to insert
-	blocksBySlot, err := notExisted.GroupBySlot()
+	blocksBySlot, err := blocks.GroupBySlot()
 	if err != nil {
-		bc.insBlockCache = notExisted
+		bc.insBlockCache = blocks
 		return nil, err
 	}
 	//sort by slots
@@ -1713,7 +1713,7 @@ func (bc *BlockChain) WriteSyncBlocks(blocks types.Blocks, validate bool) (faile
 	}
 	sort.Sort(slots)
 
-	orderedBlocks := make([]*types.Block, 0, len(notExisted))
+	orderedBlocks := make([]*types.Block, 0, len(blocks))
 	for _, slot := range slots {
 		slotBlocks := blocksBySlot[slot]
 		if len(slotBlocks) == 0 {
@@ -3083,13 +3083,13 @@ func (bc *BlockChain) insertBlocks(chain types.Blocks, validate bool, op string)
 		}
 	}()
 	// Start the parallel header verifier
-	headers := make([]*types.Header, len(chain))
-	headerMap := make(types.HeaderMap, len(chain))
+	//headers := make([]*types.Header, len(chain))
+	//headerMap := make(types.HeaderMap, len(chain))
 
-	for i, block := range chain {
-		headers[i] = block.Header()
-		headerMap[block.Hash()] = block.Header()
-	}
+	//for i, block := range chain {
+	//headers[i] = block.Header()
+	//headerMap[block.Hash()] = block.Header()
+	//}
 
 	// Peek the error for the first block to decide the directing import logic
 	it := newInsertIterator(chain, bc.validator)
@@ -3621,7 +3621,6 @@ func (bc *BlockChain) CollectAncestorsHashesByTips(tips types.Tips, cpHash commo
 		if tip.CpHash == cpHash {
 			ancestorsHashes = append(ancestorsHashes, tip.OrderedAncestorsHashes...)
 			ancestorsHashes = append(ancestorsHashes, tip.Hash)
-			ancestorsHashes.Deduplicate()
 			continue
 		}
 		// current cp must be in past of parent
@@ -3649,8 +3648,9 @@ func (bc *BlockChain) CollectAncestorsHashesByTips(tips types.Tips, cpHash commo
 			ancestorsHashes = append(ancestorsHashes, h)
 		}
 		ancestorsHashes = append(ancestorsHashes, tip.Hash)
-		ancestorsHashes.Deduplicate()
 	}
+
+	ancestorsHashes.Deduplicate()
 	return ancestorsHashes, nil
 }
 
