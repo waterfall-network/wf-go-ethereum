@@ -1964,13 +1964,7 @@ func (bc *BlockChain) syncInsertChain(chain types.Blocks) (int, error) {
 		maxFinNr = bc.GetLastFinalizedNumber()
 	)
 
-	// Start the parallel header verifier
-	headers := make([]*types.Header, len(chain))
-	headerMap := make(types.HeaderMap, len(chain))
-
-	for i, block := range chain {
-		headers[i] = block.Header()
-		headerMap[block.Hash()] = block.Header()
+	for _, block := range chain {
 		if block.Number() != nil {
 			if block.Nr() > maxFinNr {
 				maxFinNr = block.Nr()
@@ -3866,14 +3860,16 @@ func (bc *BlockChain) CommitBlockTransactions(block *types.Block, statedb *state
 		// Start executing the transaction
 		statedb.Prepare(tx.Hash(), i)
 
-		receipt, err := ApplyTransaction(bc.chainConfig, bc, &block.Header().Coinbase, gasPool, statedb, block.Header(), tx, gasUsed, *bc.GetVMConfig(), bc)
+		header := block.Header()
+
+		receipt, err := ApplyTransaction(bc.chainConfig, bc, &header.Coinbase, gasPool, statedb, header, tx, gasUsed, *bc.GetVMConfig(), bc)
 		receipts = append(receipts, receipt)
 		rlogs = append(rlogs, receipt.Logs...)
 		switch {
 		case errors.Is(err, ErrGasLimitReached):
 			// Pop the current out-of-gas transaction without shifting in the next from the account
 			log.Error("Gas limit exceeded for current block while recommit", "sender", from, "hash", tx.Hash().Hex())
-			errRestore := bc.RestoreValidatorSyncOp(tx, block.Header())
+			errRestore := bc.RestoreValidatorSyncOp(tx, header)
 			if errRestore != nil {
 				log.Error("Validator sync tx: restore op failed",
 					"failedTx", fmt.Sprintf("%#x", tx.Hash()),
@@ -3883,7 +3879,7 @@ func (bc *BlockChain) CommitBlockTransactions(block *types.Block, statedb *state
 		case errors.Is(err, ErrNonceTooLow):
 			// New head notification data race between the transaction pool and miner, shift
 			log.Error("Skipping transaction with low nonce while commit", "bl.height", block.Height(), "bl.hash", block.Hash().Hex(), "sender", from, "nonce", tx.Nonce(), "hash", tx.Hash().Hex())
-			errRestore := bc.RestoreValidatorSyncOp(tx, block.Header())
+			errRestore := bc.RestoreValidatorSyncOp(tx, header)
 			if errRestore != nil {
 				log.Error("Validator sync tx: restore op failed",
 					"failedTx", fmt.Sprintf("%#x", tx.Hash()),
@@ -3893,7 +3889,7 @@ func (bc *BlockChain) CommitBlockTransactions(block *types.Block, statedb *state
 		case errors.Is(err, ErrNonceTooHigh):
 			// Reorg notification data race between the transaction pool and miner, skip account =
 			log.Error("Skipping account with hight nonce while commit", "bl.height", block.Height(), "bl.hash", block.Hash().Hex(), "sender", from, "nonce", tx.Nonce(), "hash", tx.Hash().Hex())
-			errRestore := bc.RestoreValidatorSyncOp(tx, block.Header())
+			errRestore := bc.RestoreValidatorSyncOp(tx, header)
 			if errRestore != nil {
 				log.Error("Validator sync tx: restore op failed",
 					"failedTx", fmt.Sprintf("%#x", tx.Hash()),
@@ -4118,14 +4114,6 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, error) {
 			bc.chainHeadFeed.Send(ChainHeadEvent{lastCanon, ET_OTHER})
 		}
 	}()
-	// Start the parallel header verifier
-	headers := make([]*types.Header, len(chain))
-	headerMap := make(types.HeaderMap, len(chain))
-
-	for i, block := range chain {
-		headers[i] = block.Header()
-		headerMap[block.Hash()] = block.Header()
-	}
 
 	// Peek the error for the first block to decide the directing import logic
 	it := newInsertIterator(chain, bc.validator)

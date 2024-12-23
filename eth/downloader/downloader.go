@@ -1859,13 +1859,11 @@ func (d *Downloader) syncBySpines(p *peerConnection, baseSpine, terminalSpine co
 			"baseSpine", baseSpine.Hex(),
 			"terminalSpine", terminalSpine.Hex(),
 			"len(hashes)", len(remoteHashes),
-			"len(hashes)", len(remoteHashes),
-			"func:", "syncBySpines",
+			"func", "syncBySpines",
 		)
 	}(time.Now())
 
 	p.log.Info("Sync by spines: start", "baseSpine", baseSpine.Hex(), "terminalSpine", terminalSpine.Hex())
-	// fetch dag hashes
 
 	// fetch dag hashes
 	remoteHashes, err = d.fetchHashesBySpines(p, baseSpine, terminalSpine)
@@ -1880,7 +1878,7 @@ func (d *Downloader) syncBySpines(p *peerConnection, baseSpine, terminalSpine co
 	if !forceDownload {
 		// filter existed blocks
 		dagBlocks := d.blockchain.GetBlocksByHashes(remoteHashes)
-		remoteHashes = make(common.HashArray, 0, len(remoteHashes))
+		remoteHashes = remoteHashes[:0]
 		for h, b := range dagBlocks {
 			if b == nil && h != (common.Hash{}) {
 				remoteHashes = append(remoteHashes, h)
@@ -1895,13 +1893,13 @@ func (d *Downloader) syncBySpines(p *peerConnection, baseSpine, terminalSpine co
 	log.Info("Sync by spines: dag hashes retrieved", "dag", len(remoteHashes))
 
 	headers, err := d.fetchDagHeaders(p, remoteHashes)
-	log.Info("Sync by spines: dag headers retrieved", "count", len(headers), "headers", len(headers), "err", err)
+	log.Info("Sync by spines: dag headers retrieved", "count", len(remoteHashes), "err", err)
 	if err != nil {
 		p.log.Error("Sync by spines: error 1", "err", err, "from", "baseSpine", baseSpine.Hex(), "terminalSpine", terminalSpine.Hex())
 		return lastHash, err
 	}
-	// request bodies for retrieved headers only
-	remoteHashes = make(common.HashArray, 0, len(headers))
+
+	remoteHashes = remoteHashes[:0] // Reuse the slice
 	for _, hdr := range headers {
 		if hdr != nil {
 			remoteHashes = append(remoteHashes, hdr.Hash())
@@ -1911,7 +1909,7 @@ func (d *Downloader) syncBySpines(p *peerConnection, baseSpine, terminalSpine co
 		return lastHash, nil
 	}
 	txsMap, err := d.fetchDagTxs(p, remoteHashes)
-	log.Info("Sync by spines: dag transactions retrieved", "count", len(txsMap), "txs", len(txsMap), "err", err)
+	log.Info("Sync by spines: dag transactions retrieved", "count", len(txsMap), "err", err)
 	if err != nil {
 		p.log.Error("Sync by spines: error 2", "err", err, "baseSpine", baseSpine.Hex(), "terminalSpine", terminalSpine.Hex())
 		return lastHash, err
@@ -1926,6 +1924,9 @@ func (d *Downloader) syncBySpines(p *peerConnection, baseSpine, terminalSpine co
 			return lastHash, errInvalidBody
 		}
 		blocks[i] = block
+
+		delete(txsMap, header.Hash())
+		headers[i] = nil
 	}
 
 	if bl, err := d.blockchain.WriteSyncBlocks(blocks, false); err != nil {
