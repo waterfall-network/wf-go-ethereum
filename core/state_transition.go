@@ -344,11 +344,17 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	// Check clauses 4-5, subtract intrinsic gas if everything is correct
 	gas, err := IntrinsicGas(st.data, st.msg.AccessList(), isContractCreation, isValidatorOp)
 	if err != nil {
+		// Increment the nonce for the error
+		st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
+
 		return nil, err
 	}
 
 	if txType != ValidatorSyncTxType {
 		if st.gas < gas {
+			// Increment the nonce for the error
+			st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
+
 			return nil, fmt.Errorf("%w: have %d, want %d", ErrIntrinsicGas, st.gas, gas)
 		}
 		st.gas -= gas
@@ -356,6 +362,9 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 
 	// Check clause 6
 	if msg.Value().Sign() > 0 && !st.evm.Context.CanTransfer(st.state, msg.From(), msg.Value()) {
+		// Increment the nonce for the error
+		st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
+
 		return nil, fmt.Errorf("%w: address %v", ErrInsufficientFundsForTransfer, msg.From().Hex())
 	}
 
