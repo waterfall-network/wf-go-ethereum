@@ -37,6 +37,7 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/eth/downloader"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/ethdb"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/event"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/fixes/fixValidatorsStates"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/log"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/era"
@@ -306,8 +307,12 @@ func (d *Dag) HandleFinalize(data *types.FinalizationParams) *types.Finalization
 		log.Info("Handle Finalize: valSync", "i", i, "valSyncData", vs.Print())
 	}
 
+	//fix bad validators state
+	fixValSyncOps := fixValidatorsStates.GetFixValidatorSyncOps(d.bc, data.Checkpoint.FinEpoch)
+	valSyncData := append(data.ValSyncData, fixValSyncOps...)
+
 	// handle validator sync data
-	d.bc.AppendNotProcessedValidatorSyncData(data.ValSyncData)
+	d.bc.AppendNotProcessedValidatorSyncData(valSyncData)
 
 	lfHeader := d.bc.GetLastFinalizedHeader()
 
