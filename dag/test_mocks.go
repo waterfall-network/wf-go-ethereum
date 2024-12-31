@@ -134,6 +134,21 @@ type MockblockChain struct {
 	recorder *MockblockChainMockRecorder
 }
 
+func (m *MockblockChain) WriteTxLookupEntry(txIndex int, txHash, blockHash common.Hash, receiptStatus uint64) bool {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *MockblockChain) GetTxBlockHash(txHash common.Hash) common.Hash {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *MockblockChain) GetReceiptsByHash(blHash common.Hash) types.Receipts {
+	//TODO implement me
+	panic("implement me")
+}
+
 // MockblockChainMockRecorder is the mock recorder for MockblockChain.
 type MockblockChainMockRecorder struct {
 	mock *MockblockChain

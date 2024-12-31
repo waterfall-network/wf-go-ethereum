@@ -1,6 +1,8 @@
 package fixValidatorsStates
 
 import (
+	"fmt"
+
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/log"
@@ -62,7 +64,10 @@ func GetFixValidatorSyncOps(bc blockChain, currEpoch uint64) []*types.ValidatorS
 		//check init tx lookup entry
 		if op.TxBlock != (common.Hash{}) {
 			if txBlock := bc.GetTxBlockHash(op.InitTxHash); txBlock != op.TxBlock {
-				restoreLookupEntry(bc, op.InitTxHash)
+				err := restoreLookupEntry(bc, op.InitTxHash)
+				if err != nil {
+					continue
+				}
 			}
 		}
 		res[i] = op.CreateValidatorSync(procEpoch)
@@ -76,16 +81,21 @@ func GetFixValidatorSyncOps(bc blockChain, currEpoch uint64) []*types.ValidatorS
 	return res
 }
 
-func restoreLookupEntry(bc blockChain, blHash common.Hash) {
+func restoreLookupEntry(bc blockChain, blHash common.Hash) error {
 	block := bc.GetBlockByHash(blHash)
+	if block == nil {
+		log.Error("Fix validator sync: update tx lookup entry: no block", "blHash", blHash.Hex())
+		return fmt.Errorf("Fix validator sync: update tx lookup entry: no block")
+	}
 	receipts := bc.GetReceiptsByHash(blHash)
 	for i, tx := range block.Transactions() {
 		receipt := receipts[i]
 		if receipt == nil {
-			log.Error("Fix validator sync: update tx lookup entry: no receipt", "blNr", block.Nr(), "blHash", blHash, "txI", i, "txHash", tx.Hash())
-			continue
+			log.Error("Fix validator sync: update tx lookup entry: no receipt", "blNr", block.Nr(), "blHash", blHash.Hex(), "txI", i, "txHash", tx.Hash())
+			return fmt.Errorf("Fix validator sync: update tx lookup entry: no receipt")
 		}
-		log.Info("Fix validator sync: update tx lookup entry", "blNr", block.Nr(), "blHash", blHash, "txI", i, "txHash", tx.Hash())
+		log.Info("Fix validator sync: update tx lookup entry", "blNr", block.Nr(), "blHash", blHash.Hex(), "txI", i, "txHash", tx.Hash())
 		bc.WriteTxLookupEntry(i, tx.Hash(), block.Hash(), receipt.Status)
 	}
+	return nil
 }
