@@ -56,7 +56,7 @@ var LightClientGPO = gasprice.Config{
 var Defaults = Config{
 	SyncMode:                downloader.SnapSync,
 	NetworkId:               1,
-	TxLookupLimit:           2350000,
+	TxLookupLimit:           2_350_000 * 2,
 	LightPeers:              100,
 	UltraLightFraction:      75,
 	DatabaseCache:           512,

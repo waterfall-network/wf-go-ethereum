@@ -11,6 +11,10 @@ type blockChain interface {
 	GetSlotInfo() *types.SlotInfo
 	Config() *params.ChainConfig
 	Genesis() *types.Block
+	GetBlockByHash(hash common.Hash) *types.Block
+	WriteTxLookupEntry(txIndex int, txHash, blockHash common.Hash, receiptStatus uint64) bool
+	GetTxBlockHash(txHash common.Hash) common.Hash
+	GetReceiptsByHash(blHash common.Hash) types.Receipts
 }
 
 type FixOp struct {
@@ -19,6 +23,7 @@ type FixOp struct {
 	Creator    common.Address
 	InitTxHash common.Hash
 	PubKey     common.BlsPubKey
+	TxBlock    common.Hash //InitTx block hash
 }
 
 func (f FixOp) CreateValidatorSync(procEpoch uint64) *types.ValidatorSync {
@@ -54,6 +59,12 @@ func GetFixValidatorSyncOps(bc blockChain, currEpoch uint64) []*types.ValidatorS
 
 	res = make([]*types.ValidatorSync, len(ops))
 	for i, op := range ops {
+		//check init tx lookup entry
+		if op.TxBlock != (common.Hash{}) {
+			if txBlock := bc.GetTxBlockHash(op.InitTxHash); txBlock != op.TxBlock {
+				restoreLookupEntry(bc, op.InitTxHash)
+			}
+		}
 		res[i] = op.CreateValidatorSync(procEpoch)
 	}
 	log.Info("Fix validator sync: add sync ops",
@@ -63,4 +74,18 @@ func GetFixValidatorSyncOps(bc blockChain, currEpoch uint64) []*types.ValidatorS
 		"isMainnet", bc.Genesis().Hash() == params.MainnetGenesisHash,
 	)
 	return res
+}
+
+func restoreLookupEntry(bc blockChain, blHash common.Hash) {
+	block := bc.GetBlockByHash(blHash)
+	receipts := bc.GetReceiptsByHash(blHash)
+	for i, tx := range block.Transactions() {
+		receipt := receipts[i]
+		if receipt == nil {
+			log.Error("Fix validator sync: update tx lookup entry: no receipt", "blNr", block.Nr(), "blHash", blHash, "txI", i, "txHash", tx.Hash())
+			continue
+		}
+		log.Info("Fix validator sync: update tx lookup entry", "blNr", block.Nr(), "blHash", blHash, "txI", i, "txHash", tx.Hash())
+		bc.WriteTxLookupEntry(i, tx.Hash(), block.Hash(), receipt.Status)
+	}
 }

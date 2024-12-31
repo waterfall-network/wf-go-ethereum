@@ -103,6 +103,9 @@ type blockChain interface {
 	WriteCurrentTips()
 	GetBlockHashesBySlot(slot uint64) common.HashArray
 	HaveEpochBlocks(epoch uint64) (bool, error)
+	WriteTxLookupEntry(txIndex int, txHash, blockHash common.Hash, receiptStatus uint64) bool
+	GetTxBlockHash(txHash common.Hash) common.Hash
+	GetReceiptsByHash(blHash common.Hash) types.Receipts
 }
 
 type ethDownloader interface {
