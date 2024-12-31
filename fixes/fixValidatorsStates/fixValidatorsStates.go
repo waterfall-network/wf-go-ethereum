@@ -64,7 +64,7 @@ func GetFixValidatorSyncOps(bc blockChain, currEpoch uint64) []*types.ValidatorS
 		//check init tx lookup entry
 		if op.TxBlock != (common.Hash{}) {
 			if txBlock := bc.GetTxBlockHash(op.InitTxHash); txBlock != op.TxBlock {
-				err := restoreLookupEntry(bc, op.InitTxHash)
+				err := restoreLookupEntry(bc, op.TxBlock)
 				if err != nil {
 					continue
 				}
