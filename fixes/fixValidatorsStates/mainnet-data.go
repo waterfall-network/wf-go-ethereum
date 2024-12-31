@@ -139,7 +139,7 @@ var mainnetFixData = []*FixOp{
 		InitTxHash: common.HexToHash("0xff0111ad5b5b79dfcf64ca03179cdd2ccbcf9c7ba0c31494b41d534c8fd523db"),
 		PubKey:     common.HexToBlsPubKey("0xa69ef383aba81510c1472fdb665394a54ee467813e5788c006cef4b935b7f3d3461a207e4e29b0461156b6f5653eb33f"),
 		// eth.getTransaction("0xff0111ad5b5b79dfcf64ca03179cdd2ccbcf9c7ba0c31494b41d534c8fd523db").blockHash
-		TxBlock: common.HexToHash(""),
+		TxBlock: common.HexToHash("0xa9679e7416ab0be97cf64dff42a9c0b5f8164a6811188f8ba0615e6221162063"),
 	},
 	{
 		OpType:     types.Deactivate,
