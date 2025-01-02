@@ -681,10 +681,14 @@ func (bc *BlockChain) GetValidatorSyncData(initTxHash common.Hash) *types.Valida
 	// Short circuit if the body's already in the cache, retrieve otherwise
 	if cached, ok := bc.valSyncCache.Get(initTxHash); ok {
 		vs := cached.(*types.ValidatorSync)
-		return vs
+		if vs != nil {
+			return vs
+		}
+		log.Error("Validator sync tx handling: cached nil value", "hash", initTxHash.Hex())
 	}
 	vs := rawdb.ReadValidatorSync(bc.db, initTxHash)
 	if vs == nil {
+		log.Error("Validator sync tx handling: db not found", "hash", initTxHash.Hex())
 		return nil
 	}
 	// Cache the found data for next time and return
