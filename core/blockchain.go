@@ -332,10 +332,16 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 		lfb := bc.GetLastFinalizedBlock()
 		lastCP = bc.GetCoordinatedCheckpoint(lfb.CpHash())
 	}
+	//rollback to previous cp
+	rollbackCP := lastCP
+	if lastCP.Spine != bc.Genesis().Hash() {
+		lcpHeader := rawdb.ReadHeader(bc.db, lastCP.Spine)
+		rollbackCP = bc.GetCoordinatedCheckpoint(lcpHeader.CpHash)
+	}
 	lfHash := rawdb.ReadLastFinalizedHash(bc.db)
 	lfNr := rawdb.ReadFinalizedNumberByHash(bc.db, lfHash)
 	if lfNr != nil {
-		err = bc.RollbackFinalization(lastCP.Spine, *lfNr)
+		err = bc.RollbackFinalization(rollbackCP.Spine, *lfNr)
 		if err == nil {
 			err = bc.loadLastState()
 		}
@@ -343,14 +349,14 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 	if lfNr == nil || err != nil {
 		log.Error("Node initializing: rollback finalization failed: try hard reset", "lfNr", lfNr, "err", err)
 		// hard rollback
-		err = bc.SetHead(lastCP.Spine)
+		err = bc.SetHead(rollbackCP.Spine)
 		if err != nil {
 			// search valid checkpoint and try again
-			lastCP = bc.searchValidCheckpoint(lastCP.Epoch)
-			if lastCP == nil {
+			rollbackCP = bc.searchValidCheckpoint(rollbackCP.Epoch)
+			if rollbackCP == nil {
 				log.Crit("Node initializing failed", "err", err)
 			}
-			err = bc.SetHead(lastCP.Spine)
+			err = bc.SetHead(rollbackCP.Spine)
 			if err != nil {
 				log.Crit("Node initializing failed (retry)", "err", err)
 			}
@@ -588,7 +594,7 @@ func (bc *BlockChain) SetLastCoordinatedCheckpoint(cp *types.Checkpoint) {
 		if currCp != nil && cp.Root != currCp.Root {
 			prevCpHeader := bc.GetHeader(currCp.Spine)
 			newCpHeader := bc.GetHeader(cp.Spine)
-			if prevCpHeader != nil {
+			if prevCpHeader != nil && prevCpHeader.Height > 0 && prevCpHeader.Nr() > 0 {
 				for i := prevCpHeader.Nr() + 1; i <= newCpHeader.Nr(); i++ {
 					block := bc.GetBlockByNumber(i)
 					bc.RemoveTxsFromPool(block.Transactions())
