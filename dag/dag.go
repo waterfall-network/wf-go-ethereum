@@ -254,12 +254,12 @@ func (d *Dag) HandleFinalize(data *types.FinalizationParams) *types.Finalization
 			return res
 		}
 	case types.MainSync:
+		for i, vs := range data.ValSyncData {
+			log.Info("Handle Finalize: valSync: main sync append", "i", i, "valSyncData", vs.Print())
+		}
+		// handle validator sync data
+		d.bc.AppendNotProcessedValidatorSyncData(data.ValSyncData)
 		if err = d.downloader.MainSync(baseSpine, spines); err != nil {
-			for i, vs := range data.ValSyncData {
-				log.Info("Handle Finalize: valSync: main sync append", "i", i, "valSyncData", vs.Print())
-			}
-			// handle validator sync data
-			d.bc.AppendNotProcessedValidatorSyncData(data.ValSyncData)
 			strErr := err.Error()
 			res.Error = &strErr
 			log.Error("Handle Finalize: response (sync failed)", "syncMode", data.SyncMode, "result", res, "err", err)
@@ -271,7 +271,6 @@ func (d *Dag) HandleFinalize(data *types.FinalizationParams) *types.Finalization
 		}
 		// handle validator sync data
 		d.bc.AppendNotProcessedValidatorSyncData(data.ValSyncData)
-
 		if err = d.downloader.DagSync(data.Checkpoint.Spine, spines); err != nil {
 			strErr := err.Error()
 			res.Error = &strErr
