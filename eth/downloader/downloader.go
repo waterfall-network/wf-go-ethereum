@@ -1924,9 +1924,6 @@ func (d *Downloader) syncBySpines(p *peerConnection, baseSpine, terminalSpine co
 			return lastHash, errInvalidBody
 		}
 		blocks[i] = block
-
-		delete(txsMap, header.Hash())
-		headers[i] = nil
 	}
 
 	if bl, err := d.blockchain.WriteSyncBlocks(blocks, false); err != nil {
