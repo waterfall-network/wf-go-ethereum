@@ -95,8 +95,8 @@ func New(file string, cache int, handles int, namespace string, readonly bool) (
 		}
 		// Set default options
 		options.OpenFilesCacheCapacity = handles
-		options.BlockCacheCapacity = cache / 2 * opt.MiB
-		options.WriteBuffer = cache / 4 * opt.MiB // Two of these are used internally
+		options.BlockCacheCapacity = cache / 2 / 2 * opt.MiB
+		options.WriteBuffer = cache / 4 / 2 * opt.MiB // Two of these are used internally
 		if readonly {
 			options.ReadOnly = true
 		}
