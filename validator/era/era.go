@@ -212,7 +212,7 @@ func HandleEra(bc Blockchain, cp *types.Checkpoint) error {
 		)
 	}(time.Now())
 
-	log.Info("ERA started for new cp", "cp", cp.Epoch, "finEpoch", cp.FinEpoch, "root", cp.Spine.Hex())
+	log.Info("ERA started for new cp", "cp", cp.Epoch, "finEpoch", cp.FinEpoch, "spine", cp.Spine.Hex())
 
 	var spineRoot, spineHash common.Hash
 	// if cp != nil {
