@@ -843,7 +843,14 @@ func (bc *BlockChain) setHeadRecursive(head common.Hash) error {
 	}
 
 	// check head era
-	cpEra := bc.EpochToEra(headCp.FinEpoch)
+	var cpEra *era.Era
+	if bc.eraInfo == nil {
+		currentEraNumber := rawdb.ReadCurrentEra(bc.db)
+		if eraInfo := rawdb.ReadEra(bc.db, currentEraNumber); eraInfo != nil {
+			bc.SetNewEraInfo(eraInfo)
+		}
+	}
+	cpEra = bc.EpochToEra(headCp.FinEpoch)
 	if cpEra == nil {
 		// search valid checkpoint
 		cp := bc.searchValidCheckpoint(headEpoch)
