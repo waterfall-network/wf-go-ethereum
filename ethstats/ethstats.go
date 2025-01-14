@@ -31,7 +31,6 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
-	ethereum "gitlab.waterfall.network/waterfall/protocol/gwat"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common/mclock"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core"
@@ -39,6 +38,7 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/dag/creator"
 	ethproto "gitlab.waterfall.network/waterfall/protocol/gwat/eth/protocols/eth"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/event"
+	ethereum "gitlab.waterfall.network/waterfall/protocol/gwat/interfaces"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/log"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/node"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/p2p"

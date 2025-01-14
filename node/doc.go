@@ -15,7 +15,7 @@
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 /*
-Package node sets up multi-protocol Ethereum nodes.
+Package node sets up multi-protocol Ethereum nodes (Modified for Waterfall).
 
 In the model exposed by this package, a node is a collection of services which use shared
 resources to provide RPC APIs. Services can also offer devp2p protocols, which are wired
