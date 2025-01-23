@@ -17,6 +17,7 @@
 //- finalizing process
 //- block creation process
 
+// Package dag implements the Waterfall consensus.
 package dag
 
 import (
