@@ -278,10 +278,7 @@ func HandleEra(bc Blockchain, cp *types.Checkpoint) error {
 		)
 		return nil
 	} else if (bc.GetEraInfo().ToEpoch()+1)-bc.Config().TransitionPeriod == cp.FinEpoch && cp.FinEpoch <= bc.GetEraInfo().ToEpoch()+1 {
-		err := bc.StartTransitionPeriod(cp, spineRoot, spineHash)
-		if err != nil {
-			return err
-		}
+		return bc.StartTransitionPeriod(cp, spineRoot, spineHash)
 	}
 	return nil
 }
