@@ -4845,6 +4845,8 @@ func (bc *BlockChain) StartTransitionPeriod(cp *types.Checkpoint, spineRoot, spi
 			"toEp", bc.GetEraInfo().GetEra().To,
 			"nextEraFirstEpoch", bc.GetEraInfo().NextEraFirstEpoch(),
 			"nextEraFirstSlot", bc.GetEraInfo().NextEraFirstSlot(bc),
+			"spineRoot", spineRoot.Hex(),
+			"spineHash", spineHash.Hex(),
 		)
 
 		if int64(cp.FinEpoch)-int64(bc.Config().TransitionPeriod) < 0 {
@@ -4868,15 +4870,27 @@ func (bc *BlockChain) StartTransitionPeriod(cp *types.Checkpoint, spineRoot, spi
 
 		go bc.ValidatorStorage().PrepareNextEraValidators(bc, nextEra)
 
-		log.Info("Era transition period", "from", bc.GetEraInfo().Number(), "num", nextEra.Number, "begin", nextEra.From, "end", nextEra.To, "length", nextEra.Length())
+		log.Info("Era transition period",
+			"from", nextEra.From,
+			"to", nextEra.To,
+			"num", nextEra.Number,
+			"begin", nextEra.From,
+			"end", nextEra.To,
+			"length", nextEra.Length(),
+			"spineRoot", spineRoot.Hex(),
+			"spineHash", spineHash.Hex(),
+		)
 	} else {
 		log.Info("######## HandleEra transitionPeriod skipped already done", "cpEpoch", cp.Epoch,
 			"cpFinEpoch", cp.FinEpoch,
-			"curEpoch", bc.GetSlotInfo().SlotInEpoch(bc.GetSlotInfo().CurrentSlot()),
+			"slotInEpoch", bc.GetSlotInfo().SlotInEpoch(bc.GetSlotInfo().CurrentSlot()),
+			"curEpoch", bc.GetSlotInfo().SlotToEpoch(bc.GetSlotInfo().CurrentSlot()),
 			"curSlot", bc.GetSlotInfo().CurrentSlot(),
 			"bc.GetEraInfo().ToEpoch", bc.GetEraInfo().ToEpoch(),
 			"bc.GetEraInfo().FromEpoch", bc.GetEraInfo().FromEpoch(),
 			"bc.GetEraInfo().Number", bc.GetEraInfo().Number(),
+			"spineRoot", spineRoot.Hex(),
+			"spineHash", spineHash.Hex(),
 		)
 	}
 
@@ -5220,10 +5234,15 @@ func (bc *BlockChain) EpochToEra(epoch uint64) *era.Era {
 				spineHeader := bc.GetBlockByHash(bc.GetLastCoordinatedCheckpoint().Spine)
 
 				newEra := era.NewEra(eraNumber, from, to, spineHeader.Root(), spineHeader.Hash())
-				rawdb.WriteEra(bc.db, newEra.Number, newEra)
 				curEra = newEra
 				findingEra = curEra
-				bc.ValidatorStorage().PrepareNextEraValidators(bc, newEra)
+				log.Info("EpochToEra create new era",
+					"number", eraNumber,
+					"from", from,
+					"to", to,
+					"root", spineHeader.Root().Hex(),
+					"hash", spineHeader.Hash().Hex(),
+				)
 			}
 		}
 	}

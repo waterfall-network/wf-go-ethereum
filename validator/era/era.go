@@ -77,7 +77,7 @@ func NextEra(bc Blockchain, root, blockHash common.Hash, numValidators uint64) *
 
 // Length calculates the number of epochs in the era.
 func (e *Era) Length() uint64 {
-	return e.To - e.From
+	return e.To - e.From + 1
 }
 
 // IsContainsEpoch checks if a given epoch is within the era.
@@ -278,7 +278,10 @@ func HandleEra(bc Blockchain, cp *types.Checkpoint) error {
 		)
 		return nil
 	} else if (bc.GetEraInfo().ToEpoch()+1)-bc.Config().TransitionPeriod == cp.FinEpoch && cp.FinEpoch <= bc.GetEraInfo().ToEpoch()+1 {
-		bc.StartTransitionPeriod(cp, spineRoot, spineHash)
+		err := bc.StartTransitionPeriod(cp, spineRoot, spineHash)
+		if err != nil {
+			return err
+		}
 	}
 	return nil
 }
