@@ -357,7 +357,7 @@ func (d *Dag) HandleSyncSpines(spines common.HashArray) (bool, error) {
 	//skip if synchronising
 	if d.downloader.Synchronising() {
 		err := errSynchronization
-		log.Error("Handle SpineSync: response (no slot info)", "err", err)
+		log.Error("Handle SpineSync: response (synchronization)", "err", err)
 		return false, err
 	}
 
