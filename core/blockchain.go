@@ -92,6 +92,10 @@ var (
 	errInvalidBlock         = errors.New("invalid block")
 	ErrBadBlockNr           = errors.New("bad block nr")
 	errBlockNotFound        = errors.New("block not found")
+
+	// Errors related to Era processing.
+	errCheckpointInvalid = errors.New("invalid checkpoint") // Error when the checkpoint is invalid.
+	errHandleEraFailed   = errors.New("handle era failed")  // Error when handling the era fails.
 )
 
 const (
@@ -5215,6 +5219,12 @@ func (bc *BlockChain) EpochToEra(epoch uint64) *era.Era {
 			findingEra = rawdb.ReadEra(bc.db, eraNumber)
 			if findingEra == nil && eraNumber-1 != curEra.Number {
 				curEra = rawdb.ReadEra(bc.db, eraNumber-1)
+				if curEra == nil {
+					for curEra == nil {
+						eraNumber--
+						curEra = rawdb.ReadEra(bc.db, eraNumber-1)
+					}
+				}
 			}
 			if findingEra == nil {
 				slot, err := bc.GetSlotInfo().SlotOfEpochStart(curEra.To)
@@ -5570,4 +5580,55 @@ func (bc *BlockChain) verifyHibernateModeBlock(block *types.Block) (bool, error)
 
 func (bc *BlockChain) SetLastFinalisedHeader(head *types.Header, lastFinNr uint64) {
 	bc.hc.SetLastFinalisedHeader(head, lastFinNr)
+}
+
+// HandleEra manages transitions between eras in the blockchain.
+func (bc *BlockChain) HandleEra(cp *types.Checkpoint) error {
+	defer func(start time.Time) {
+		log.Info("^^^^^^^^^^^^ TIME",
+			"elapsed", common.PrettyDuration(time.Since(start)),
+			"func:", "HandleEra",
+		)
+	}(time.Now())
+
+	log.Info("ERA started for new cp", "cp", cp.Epoch, "finEpoch", cp.FinEpoch, "spine", cp.Spine.Hex())
+
+	var spineRoot, spineHash common.Hash
+	// if cp != nil {
+	header := bc.GetHeaderByHash(cp.Spine)
+	if header != nil {
+		spineRoot = header.Root
+		spineHash = header.Hash()
+	} else {
+		log.Error("Checkpoint spine header not found", "err", errCheckpointInvalid)
+		return errCheckpointInvalid
+	}
+
+	curToEpoch := bc.GetEraInfo().ToEpoch()
+	// New era
+	if bc.GetEraInfo().ToEpoch()+1 <= cp.FinEpoch {
+		for curToEpoch+1 <= cp.FinEpoch {
+			nextEra, err := bc.EnterNextEra(curToEpoch+1, spineRoot, spineHash)
+			if err != nil {
+				return err
+			}
+			if nextEra != nil {
+				curToEpoch = nextEra.To
+			} else {
+				return errHandleEraFailed
+			}
+		}
+		log.Info("Handle era", "cpEpoch", cp.Epoch,
+			"cpFinEpoch", cp.FinEpoch,
+			"curEpoch", bc.GetSlotInfo().SlotInEpoch(bc.GetSlotInfo().CurrentSlot()),
+			"curSlot", bc.GetSlotInfo().CurrentSlot(),
+			"bc.GetEraInfo().ToEpoch", bc.GetEraInfo().ToEpoch(),
+			"bc.GetEraInfo().FromEpoch", bc.GetEraInfo().FromEpoch(),
+			"bc.GetEraInfo().Number", bc.GetEraInfo().Number(),
+		)
+		return nil
+	} else if (bc.GetEraInfo().ToEpoch()+1)-bc.Config().TransitionPeriod == cp.FinEpoch && cp.FinEpoch <= bc.GetEraInfo().ToEpoch()+1 {
+		return bc.StartTransitionPeriod(cp, spineRoot, spineHash)
+	}
+	return nil
 }

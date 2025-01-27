@@ -103,6 +103,7 @@ type blockChain interface {
 	WriteCurrentTips()
 	GetBlockHashesBySlot(slot uint64) common.HashArray
 	HaveEpochBlocks(epoch uint64) (bool, error)
+	HandleEra(cp *types.Checkpoint) error
 }
 
 type ethDownloader interface {
@@ -296,7 +297,7 @@ func (d *Dag) HandleFinalize(data *types.FinalizationParams) *types.Finalization
 			res.Error = &e
 		} else {
 			d.bc.SetLastCoordinatedCheckpoint(data.Checkpoint)
-			if err := era.HandleEra(d.bc, data.Checkpoint); err != nil {
+			if err := d.bc.HandleEra(data.Checkpoint); err != nil {
 				strErr := err.Error()
 				res.Error = &strErr
 				log.Error("Handle Finalize: update era failed 1", "syncMode", data.SyncMode, "result", res, "err", err)
@@ -305,7 +306,7 @@ func (d *Dag) HandleFinalize(data *types.FinalizationParams) *types.Finalization
 		}
 	} else {
 		d.bc.SetLastCoordinatedCheckpoint(data.Checkpoint)
-		if err := era.HandleEra(d.bc, data.Checkpoint); err != nil {
+		if err := d.bc.HandleEra(data.Checkpoint); err != nil {
 			strErr := err.Error()
 			res.Error = &strErr
 			log.Error("Handle Finalize: update era failed 2", "syncMode", data.SyncMode, "result", res, "err", err)

@@ -18,20 +18,11 @@ Package era implements functionality for managing eras in the Waterfall blockcha
 package era
 
 import (
-	"errors"
 	"math"
-	"time"
 
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
-	"gitlab.waterfall.network/waterfall/protocol/gwat/log"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
-)
-
-// Errors related to Era processing.
-var (
-	ErrCheckpointInvalid = errors.New("invalid checkpoint") // Error when the checkpoint is invalid.
-	ErrHandleEraFailed   = errors.New("handle era failed")  // Error when handling the era fails.
 )
 
 // Blockchain defines an interface for interacting with the blockchain.
@@ -230,55 +221,4 @@ func EstimateEraLength(chainConfig *params.ChainConfig, numberOfValidators, eraN
 // roundUp rounds a floating-point number up to the nearest integer.
 func roundUp(num float64) uint64 {
 	return uint64(math.Ceil(num))
-}
-
-// HandleEra manages transitions between eras in the blockchain.
-func HandleEra(bc Blockchain, cp *types.Checkpoint) error {
-	defer func(start time.Time) {
-		log.Info("^^^^^^^^^^^^ TIME",
-			"elapsed", common.PrettyDuration(time.Since(start)),
-			"func:", "HandleEra",
-		)
-	}(time.Now())
-
-	log.Info("ERA started for new cp", "cp", cp.Epoch, "finEpoch", cp.FinEpoch, "spine", cp.Spine.Hex())
-
-	var spineRoot, spineHash common.Hash
-	// if cp != nil {
-	header := bc.GetHeaderByHash(cp.Spine)
-	if header != nil {
-		spineRoot = header.Root
-		spineHash = header.Hash()
-	} else {
-		log.Error("Checkpoint spine header not found", "err", ErrCheckpointInvalid)
-		return ErrCheckpointInvalid
-	}
-
-	curToEpoch := bc.GetEraInfo().ToEpoch()
-	// New era
-	if bc.GetEraInfo().ToEpoch()+1 <= cp.FinEpoch {
-		for curToEpoch+1 <= cp.FinEpoch {
-			nextEra, err := bc.EnterNextEra(curToEpoch+1, spineRoot, spineHash)
-			if err != nil {
-				return err
-			}
-			if nextEra != nil {
-				curToEpoch = nextEra.To
-			} else {
-				return ErrHandleEraFailed
-			}
-		}
-		log.Info("Handle era", "cpEpoch", cp.Epoch,
-			"cpFinEpoch", cp.FinEpoch,
-			"curEpoch", bc.GetSlotInfo().SlotInEpoch(bc.GetSlotInfo().CurrentSlot()),
-			"curSlot", bc.GetSlotInfo().CurrentSlot(),
-			"bc.GetEraInfo().ToEpoch", bc.GetEraInfo().ToEpoch(),
-			"bc.GetEraInfo().FromEpoch", bc.GetEraInfo().FromEpoch(),
-			"bc.GetEraInfo().Number", bc.GetEraInfo().Number(),
-		)
-		return nil
-	} else if (bc.GetEraInfo().ToEpoch()+1)-bc.Config().TransitionPeriod == cp.FinEpoch && cp.FinEpoch <= bc.GetEraInfo().ToEpoch()+1 {
-		return bc.StartTransitionPeriod(cp, spineRoot, spineHash)
-	}
-	return nil
 }
