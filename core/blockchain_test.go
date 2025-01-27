@@ -84,17 +84,6 @@ func TestEpochToEra(t *testing.T) {
 			},
 		},
 		{
-			name:  "Epoch from future era",
-			epoch: params.TestChainConfig.EpochsPerEra*2 + 1,
-			findingEra: &era.Era{
-				Number:    2,
-				From:      params.TestChainConfig.EpochsPerEra * 2,
-				To:        params.TestChainConfig.EpochsPerEra*3 - 1,
-				Root:      common.HexToHash("0xcefc25562123831f9d1fbcef7d30f03ba277e1b2c97ef259c69115c46f0fdebe"),
-				BlockHash: common.HexToHash("0xcf3214ba22ec4c54637ce5b9bf3a16723a18d7a803f47a675377fbcd785db9ae"),
-			},
-		},
-		{
 			name:  "Epoch from previous era",
 			epoch: params.TestChainConfig.EpochsPerEra / 2,
 			findingEra: &era.Era{
@@ -112,6 +101,17 @@ func TestEpochToEra(t *testing.T) {
 				Number:    1,
 				From:      8,
 				To:        15,
+				Root:      common.HexToHash("0xcefc25562123831f9d1fbcef7d30f03ba277e1b2c97ef259c69115c46f0fdebe"),
+				BlockHash: common.HexToHash("0xcf3214ba22ec4c54637ce5b9bf3a16723a18d7a803f47a675377fbcd785db9ae"),
+			},
+		},
+		{
+			name:  "Epoch from future era",
+			epoch: params.TestChainConfig.EpochsPerEra*2 + 1,
+			findingEra: &era.Era{
+				Number:    2,
+				From:      params.TestChainConfig.EpochsPerEra * 2,
+				To:        params.TestChainConfig.EpochsPerEra*3 - 1,
 				Root:      common.HexToHash("0xcefc25562123831f9d1fbcef7d30f03ba277e1b2c97ef259c69115c46f0fdebe"),
 				BlockHash: common.HexToHash("0xcf3214ba22ec4c54637ce5b9bf3a16723a18d7a803f47a675377fbcd785db9ae"),
 			},
