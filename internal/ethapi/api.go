@@ -1363,6 +1363,7 @@ func RPCMarshalHeader(head *types.Header) map[string]interface{} {
 		"size":             hexutil.Uint64(head.Size()),
 		"bodyRoot":         head.BodyHash,
 		"difficulty":       new(big.Int),
+		"sha3Uncles":       types.CalcUncleHash(head),
 	}
 
 	if len(head.ParentHashes) > 0 {
