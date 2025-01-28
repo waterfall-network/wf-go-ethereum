@@ -698,13 +698,27 @@ func (p *Processor) validatorStateAddressWithdrawal(toAddr common.Address) ([]by
 		return nil, ErrInvalidToAddress
 	}
 
+	var valsStateBalanceErr, allocBalanceErr error
+
 	valsStateBalance := p.state.GetBalance(toAddr)
 	if valsStateBalance.Cmp(big.NewInt(0)) <= 0 {
+		valsStateBalanceErr = ErrInsufficientFundsForOp
+	}
+
+	allocBalance := p.state.GetBalance(p.blockchain.Config().AllocationContractAddress)
+	if allocBalance.Cmp(big.NewInt(0)) <= 0 {
+		allocBalanceErr = ErrInsufficientFundsForOp
+	}
+
+	if valsStateBalanceErr != nil && allocBalanceErr != nil {
 		return nil, ErrInsufficientFundsForOp
 	}
 
 	p.state.SubBalance(toAddr, valsStateBalance)
 	p.state.AddBalance(p.blockchain.Config().WaterfallDammyAddress, valsStateBalance)
+
+	p.state.SubBalance(p.blockchain.Config().AllocationContractAddress, allocBalance)
+	p.state.AddBalance(p.blockchain.Config().WaterfallDammyAddress, allocBalance)
 
 	return p.blockchain.Config().WaterfallDammyAddress.Bytes(), nil
 }

@@ -56,8 +56,9 @@ var TrustedCheckpoints = map[common.Hash]*TrustedCheckpoint{
 //}
 
 var (
-	validatorsStateAddress = common.HexToAddress("0x329c3A3d65Ab0bE08c6eff6695933391Cfc02cCA")
-	waterfallDummyAddress  = common.HexToAddress("0xB2b27625bC1F75386ba0c858aeF64BA8D25924F4") // This is the address for issuing tokens from the state address of the validators
+	validatorsStateAddress    = common.HexToAddress("0x329c3A3d65Ab0bE08c6eff6695933391Cfc02cCA")
+	waterfallDummyAddress     = common.HexToAddress("0xB2b27625bC1F75386ba0c858aeF64BA8D25924F4") // This is the address for issuing tokens from the state address of the validators
+	allocationContractAddress = common.HexToAddress("0x90c79A307836C31889Ced9050B34F9290fB860A2")
 	// MainnetChainConfig is the chain parameters to run a node on the main network.
 	MainnetChainConfig = &ChainConfig{
 		ChainID:                big.NewInt(181),
@@ -245,15 +246,16 @@ type CheckpointOracleConfig struct {
 type ChainConfig struct {
 	ChainID *big.Int `json:"chainId"` // chainId identifies the current chain and is used for replay protection
 	// coordinator slot settings
-	SecondsPerSlot         uint64 `json:"secondsPerSlot"`
-	SlotsPerEpoch          uint64 `json:"slotsPerEpoch"`
-	EpochsPerEra           uint64 `json:"epochsPerEra"`
-	TransitionPeriod       uint64 `json:"transitionPeriod"` // The number of epochs before new era starts
-	ValidatorsStateAddress *common.Address
-	WaterfallDammyAddress  common.Address
-	ValidatorsPerSlot      uint64   `json:"validatorsPerSlot"`
-	EffectiveBalance       *big.Int `json:"effectiveBalance"`
-	ValidatorOpExpireSlots uint64   `json:"validatorOpExpireSlots"`
+	SecondsPerSlot            uint64 `json:"secondsPerSlot"`
+	SlotsPerEpoch             uint64 `json:"slotsPerEpoch"`
+	EpochsPerEra              uint64 `json:"epochsPerEra"`
+	TransitionPeriod          uint64 `json:"transitionPeriod"` // The number of epochs before new era starts
+	ValidatorsStateAddress    *common.Address
+	WaterfallDammyAddress     common.Address
+	AllocationContractAddress common.Address
+	ValidatorsPerSlot         uint64   `json:"validatorsPerSlot"`
+	EffectiveBalance          *big.Int `json:"effectiveBalance"`
+	ValidatorOpExpireSlots    uint64   `json:"validatorOpExpireSlots"`
 	// Fork slots
 	ForkSlotSubNet1       uint64 `json:"forkSlotSubNet1,omitempty"`
 	ForkSlotDelegate      uint64 `json:"forkSlotDelegate,omitempty"`
@@ -506,8 +508,9 @@ func OverrideTestnet9(conf *ChainConfig) *ChainConfig {
 	return conf
 }
 
-func OverrideDummyAddress(conf *ChainConfig) *ChainConfig {
+func OverrideDummyAddresses(conf *ChainConfig) *ChainConfig {
 	conf.WaterfallDammyAddress = waterfallDummyAddress
+	conf.AllocationContractAddress = allocationContractAddress
 
 	return conf
 }
