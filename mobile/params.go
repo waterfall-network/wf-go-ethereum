@@ -16,7 +16,7 @@
 
 // Contains all the wrappers from the params package.
 
-package geth
+package gwat
 
 import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/p2p/enode"

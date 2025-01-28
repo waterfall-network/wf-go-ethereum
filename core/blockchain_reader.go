@@ -253,8 +253,8 @@ func (bc *BlockChain) GetHeadersByHashes(hashes common.HashArray) types.HeaderMa
 }
 
 // GetCanonicalHash returns the canonical hash for a given block number
-func (bc *BlockChain) GetCanonicalHash(number uint64) common.Hash {
-	return bc.hc.GetCanonicalHash(number)
+func (bc *BlockChain) GetCanonicalHash() common.Hash {
+	return bc.GetLastCoordinatedCheckpoint().Spine
 }
 
 // GetBlockHashesFromHash retrieves a number of block hashes starting at a given
@@ -494,6 +494,10 @@ func (bc *BlockChain) SubscribeBlockProcessingEvent(ch chan<- bool) event.Subscr
 
 func (bc *BlockChain) SubscribeProcessing(ch chan<- *types.BlockTransactions) event.Subscription {
 	return bc.scope.Track(bc.processingFeed.Subscribe(ch))
+}
+
+func (bc *BlockChain) SubscribeCancelProcessing(ch chan<- *types.BlockTransactions) event.Subscription {
+	return bc.scope.Track(bc.cancelProcFeed.Subscribe(ch))
 }
 
 func (bc *BlockChain) SubscribeRemoveTxFromPool(ch chan<- types.Transactions) event.Subscription {

@@ -1,7 +1,23 @@
+// Copyright 2024   Blue Wave Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package storage
 
 import (
 	"context"
+	"fmt"
+	"math"
 	"testing"
 	"time"
 
@@ -74,7 +90,7 @@ func TestGetValidators(t *testing.T) {
 
 	bc := NewMockblockchain(ctrl)
 
-	validatorsList := make([]Validator, 0)
+	validatorsList := make([]*Validator, 0)
 	blockHash := common.HexToHash("0x1234")
 	block := types.NewBlock(&types.Header{Slot: slot}, nil, nil, nil)
 
@@ -107,74 +123,34 @@ func TestGetValidators(t *testing.T) {
 		Spine: common.BytesToHash(testutils.RandomData(32)),
 	})
 
-	for _, address := range testmodels.InputValidators {
-		validator := NewValidator(common.BlsPubKey{}, address, nil)
-
-		validatorsList = append(validatorsList, *validator)
+	for i, address := range testmodels.InputValidators {
+		validator := &Validator{
+			Address:       address,
+			Index:         uint64(i),
+			ActivationEra: 0,
+			ExitEra:       math.MaxUint64,
+		}
+		validatorsList = append(validatorsList, validator)
 		err := store.SetValidator(stateDb, validator)
 		testutils.AssertNoError(t, err)
 	}
 
 	tests := []struct {
-		name           string
-		slot           uint64
-		activeOnly     bool
-		needAddresses  bool
-		wantValidators []Validator
-		wantAddresses  []common.Address
+		name          string
+		slot          uint64
+		wantAddresses []common.Address
 	}{
 		{
-			name:           "activeOnly and needAddresses are both false",
-			slot:           uint64(testutils.RandomInt(0, len(testmodels.InputValidators)*int(testmodels.TestChainConfig.SlotsPerEpoch))),
-			activeOnly:     false,
-			needAddresses:  false,
-			wantValidators: validatorsList,
-			wantAddresses:  nil,
-		},
-		{
-			name:           "activeOnly is false and needAddresses is true",
-			slot:           uint64(testutils.RandomInt(0, len(testmodels.InputValidators)*int(testmodels.TestChainConfig.SlotsPerEpoch))),
-			activeOnly:     false,
-			needAddresses:  true,
-			wantValidators: validatorsList,
-			wantAddresses:  testmodels.InputValidators,
-		},
-		{
-			name:           "activeOnly is true and needAddresses is false",
-			slot:           uint64(testutils.RandomInt(0, len(testmodels.InputValidators)*int(testmodels.TestChainConfig.SlotsPerEpoch))),
-			activeOnly:     true,
-			needAddresses:  false,
-			wantValidators: make([]Validator, 0),
-			wantAddresses:  nil,
-		},
-		{
-			name:           "activeOnly and needAddresses are both true",
-			slot:           uint64(testutils.RandomInt(0, len(testmodels.InputValidators)*int(testmodels.TestChainConfig.SlotsPerEpoch))),
-			activeOnly:     true,
-			needAddresses:  true,
-			wantValidators: make([]Validator, 0),
-			wantAddresses:  make([]common.Address, 0),
+			name:          "correct test",
+			slot:          uint64(testutils.RandomInt(0, len(testmodels.InputValidators)*int(testmodels.TestChainConfig.SlotsPerEpoch))),
+			wantAddresses: testmodels.InputValidators,
 		},
 	}
 
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
-			if test.activeOnly {
-				for _, validator := range validatorsList {
-					if validator.ActivationEra <= bc.GetSlotInfo().SlotToEpoch(test.slot) && validator.ExitEra > bc.GetSlotInfo().SlotToEpoch(test.slot) {
-						test.wantValidators = append(test.wantValidators, validator)
-					}
-				}
-
-				if test.needAddresses {
-					for _, val := range test.wantValidators {
-						test.wantAddresses = append(test.wantAddresses, val.Address)
-					}
-				}
-			}
-
-			validators, addresses := store.GetValidators(bc, test.slot, test.activeOnly, test.needAddresses, "Tests")
-			testutils.AssertEqual(t, test.wantValidators, validators)
+			addresses, err := store.GetValidators(bc, test.slot, "Tests")
+			testutils.AssertNoError(t, err)
 			testutils.AssertEqual(t, test.wantAddresses, addresses)
 		})
 	}
@@ -215,12 +191,14 @@ func TestGetShuffledValidators(t *testing.T) {
 	store := NewStorage(testmodels.TestChainConfig)
 	store.SetValidatorsList(stateDb, testmodels.InputValidators)
 
-	validatorList := make([]Validator, len(testmodels.InputValidators))
 	for i, address := range testmodels.InputValidators {
-		validator := NewValidator(common.BlsPubKey{}, address, nil)
-		validator.ActivationEra = uint64(i + 1)
-		validatorList[i] = *validator
-		store.SetValidator(stateDb, validator)
+		validator := &Validator{
+			Address:       address,
+			Index:         uint64(i),
+			ActivationEra: 0,
+			ExitEra:       math.MaxUint64,
+		}
+		err := store.SetValidator(stateDb, validator)
 		testutils.AssertNoError(t, err)
 	}
 
@@ -233,6 +211,70 @@ func TestGetShuffledValidators(t *testing.T) {
 	result, err = store.GetCreatorsBySlot(bc, slot)
 	testutils.AssertNoError(t, err)
 	testutils.AssertEqual(t, []common.Address{
-		testmodels.Addr8,
-		testmodels.Addr3}, result)
+		testmodels.Addr5,
+		testmodels.Addr4}, result)
+}
+
+func BenchmarkPrepareNextEraValidators(b *testing.B) {
+	validators := make([]common.Address, 1000000)
+
+	stateDb, err := state.New(common.Hash{}, state.NewDatabase(testmodels.TestDb), nil)
+	if err != nil {
+		b.Fatal(err)
+	}
+
+	store := NewStorage(testmodels.TestChainConfig)
+	for i := range validators {
+		addr := common.HexToAddress(fmt.Sprintf("0x%x", i))
+		validators[i] = addr
+		err = store.SetValidator(stateDb, &Validator{
+			Address:       addr,
+			Index:         uint64(i),
+			ActivationEra: 0,
+			ExitEra:       math.MaxUint64,
+		})
+		if err != nil {
+			b.Fatal(err)
+		}
+	}
+	store.SetValidatorsList(stateDb, validators)
+
+	ctrl := gomock.NewController(b)
+	defer ctrl.Finish()
+
+	bc := NewMockblockchain(ctrl)
+
+	bc.EXPECT().GetSlotInfo().AnyTimes().Return(&types.SlotInfo{
+		GenesisTime:    uint64(time.Now().Unix()),
+		SecondsPerSlot: testmodels.TestChainConfig.SecondsPerSlot,
+		SlotsPerEpoch:  testmodels.TestChainConfig.SlotsPerEpoch,
+	})
+	bc.EXPECT().EpochToEra(gomock.AssignableToTypeOf(uint64(0))).AnyTimes().Return(&era.Era{
+		Number: 0,
+		From:   0,
+		To:     0,
+		Root:   common.Hash{},
+	})
+	bc.EXPECT().StateAt(gomock.AssignableToTypeOf(common.Hash{})).AnyTimes().Return(stateDb, nil)
+
+	sizes := []int{1000, 10000, 100000, 500000, 1000000}
+
+	for _, size := range sizes {
+		b.Run(fmt.Sprintf("Size_%d", size), func(b *testing.B) {
+			testValidators := validators[:size]
+			store.SetValidatorsList(stateDb, testValidators)
+
+			era := &era.Era{
+				Number:    0,
+				From:      0,
+				To:        0,
+				Root:      common.Hash{},
+				BlockHash: common.Hash{},
+			}
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				store.PrepareNextEraValidators(bc, era)
+			}
+		})
+	}
 }

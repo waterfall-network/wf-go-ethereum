@@ -201,15 +201,15 @@ func newHandler(config *handlerConfig) (*handler, error) {
 			)
 			return core.ErrFutureBlock
 		}
-
-		// check era
-		if !bc.VerifyBlockEra(header) {
-			log.Warn("Header verification: invalid era",
-				"headerEra", header.Era,
-				"calcEra", header.Era,
-				"hash", header.Hash().Hex(),
+		// validate block version
+		if err := bc.VerifyBlockVersion(header); err != nil {
+			log.Warn("Header verification: invalid version",
+				"headerVer", header.Version(),
+				"headerSlot", header.Slot,
+				"headerHash", header.Hash().Hex(),
+				"err", err.Error(),
 			)
-			return core.ErrInvalidEra
+			return err
 		}
 
 		if len(header.ParentHashes) == 0 {
