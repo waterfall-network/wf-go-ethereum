@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-// Package types contains data types related to Ethereum consensus.
+// Package types contains data types related to Ethereum consensus (Modified for Waterfall).
 package types
 
 import (
@@ -38,6 +38,8 @@ import (
 
 var (
 	EmptyRootHash = common.HexToHash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
+
+	EmptyUncleHash = rlpHash(common.HashArray{})
 )
 
 const uint32Length = 4
@@ -450,6 +452,13 @@ func CopyHeader(h *Header) *Header {
 		copy(cpy.Extra, h.Extra)
 	}
 	return &cpy
+}
+
+func CalcUncleHash(header *Header) common.Hash {
+	if len(header.ParentHashes) == 0 {
+		return EmptyUncleHash
+	}
+	return rlpHash(header.ParentHashes)
 }
 
 // DecodeRLP decodes the Ethereum

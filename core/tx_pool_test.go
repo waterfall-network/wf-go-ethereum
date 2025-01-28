@@ -140,6 +140,7 @@ func defaultTestBC1(statedb *state.StateDB) *testBlockChain {
 		chainHeadFeed:        new(event.Feed),
 		moveToProcessingFeed: new(event.Feed),
 		removeTxFromPoolFeed: new(event.Feed),
+		cancelProcFeed:       new(event.Feed),
 
 		genesisBlock: getTestGenesisBlock(),
 	}
@@ -152,6 +153,7 @@ type testBlockChain struct {
 	chainHeadFeed        *event.Feed
 	moveToProcessingFeed *event.Feed
 	removeTxFromPoolFeed *event.Feed
+	cancelProcFeed       *event.Feed
 
 	moveToProcessingCh chan *types.Transaction
 	removeTxFromPoolCh chan *types.Transaction
@@ -290,6 +292,10 @@ func (bc *testBlockChain) SubscribeProcessing(ch chan<- *types.BlockTransactions
 
 func (bc *testBlockChain) SubscribeRemoveTxFromPool(ch chan<- types.Transactions) event.Subscription {
 	return bc.removeTxFromPoolFeed.Subscribe(ch)
+}
+
+func (bc *testBlockChain) SubscribeCancelProcessing(ch chan<- *types.BlockTransactions) event.Subscription {
+	return bc.cancelProcFeed.Subscribe(ch)
 }
 
 func (bc *testBlockChain) ValidatorStorage() valStore.Storage {
@@ -2570,9 +2576,9 @@ func TestAddToProcessing(t *testing.T) {
 
 	tx := transaction(0, 21000, key)
 
-	tb := &types.TransactionBlocks{Transaction: tx, BlocksHashes: common.HashArray{}}
-
-	pool.moveToProcessing(tb)
+	blTxs := types.NewBlockTransactions(common.Hash{})
+	blTxs.Transactions = types.Transactions{tx}
+	pool.moveToProcessingAccelerated(blTxs)
 
 	if pool.Get(tx.Hash()) == nil {
 		t.Fatal("TX wasn't moved to processing")
@@ -2601,8 +2607,9 @@ func TestMoveToProcessing(t *testing.T) {
 	pool.mu.Lock()
 	tx := transaction(0, 21000, key)
 
-	tb := &types.TransactionBlocks{Transaction: tx, BlocksHashes: common.HashArray{}}
-	pool.moveToProcessing(tb)
+	blTxs := types.NewBlockTransactions(common.Hash{})
+	blTxs.Transactions = types.Transactions{tx}
+	pool.moveToProcessingAccelerated(blTxs)
 	pool.mu.Unlock()
 
 	pool.mu.RLock()
@@ -2648,8 +2655,9 @@ func TestMoveToProcessingFromQueue(t *testing.T) {
 	moveIndex := 2
 	pool.mu.Lock()
 	tx := transaction(0, 21000, key)
-	tb := &types.TransactionBlocks{Transaction: tx, BlocksHashes: common.HashArray{}}
-	pool.moveToProcessing(tb)
+	blTxs := types.NewBlockTransactions(common.Hash{})
+	blTxs.Transactions = types.Transactions{tx}
+	pool.moveToProcessingAccelerated(blTxs)
 	pool.mu.Unlock()
 
 	pool.mu.RLock()
@@ -2879,8 +2887,9 @@ func TestRemoveTxFromProcessing(t *testing.T) {
 	addr, _ := types.Sender(pool.signer, tx)
 
 	pool.mu.Lock()
-	tb := &types.TransactionBlocks{Transaction: tx, BlocksHashes: common.HashArray{}}
-	pool.moveToProcessing(tb)
+	blTxs := types.NewBlockTransactions(common.Hash{})
+	blTxs.Transactions = types.Transactions{tx}
+	pool.moveToProcessingAccelerated(blTxs)
 	pool.mu.Unlock()
 
 	pool.mu.RLock()
@@ -3061,5 +3070,88 @@ func (pool *TxPool) removeProcessedTx(tx *types.Transaction) {
 		if processing.Empty() {
 			delete(pool.processing, addr)
 		}
+	}
+}
+
+func TestCancelProcessingBlockTxs(t *testing.T) {
+	pool, _ := setupTxPool()
+	defer pool.Stop()
+
+	key0, _ := crypto.GenerateKey()
+	testAddBalance(pool, crypto.PubkeyToAddress(key0.PublicKey), big.NewInt(1000000000000))
+	key1, _ := crypto.GenerateKey()
+	testAddBalance(pool, crypto.PubkeyToAddress(key1.PublicKey), big.NewInt(1000000000000))
+
+	txs0 := types.Transactions{
+		transaction(0, 21000, key0),
+		transaction(1, 21000, key0),
+		transaction(2, 21000, key0),
+	}
+	txs1 := types.Transactions{
+		transaction(0, 21000, key1),
+		transaction(1, 21000, key1),
+		transaction(2, 21000, key1),
+	}
+
+	rndBlockHash0 := common.BytesToHash(testutils.RandomData(common.HashLength))
+	tb0 := &types.BlockTransactions{
+		Transactions: append(txs0, txs1...),
+		BlockHash:    rndBlockHash0,
+	}
+	pool.moveToProcessingAccelerated(tb0)
+
+	rndBlockHash1 := common.BytesToHash(testutils.RandomData(common.HashLength))
+	tb1 := &types.BlockTransactions{
+		Transactions: txs0,
+		BlockHash:    rndBlockHash1,
+	}
+	pool.moveToProcessingAccelerated(tb1)
+
+	//precheck state of pool
+	addr0, _ := types.Sender(pool.signer, txs0[0])
+	for _, tx := range txs0 {
+		blHashes := pool.processing[addr0].GetTxBlocksHashes(tx.Hash())
+		testutils.AssertEqual(t, common.HashArray{rndBlockHash0, rndBlockHash1}, blHashes)
+
+		tTx := pool.processing[addr0].txs.Get(tx.Nonce())
+		testutils.AssertEqual(t, tTx, tx)
+
+		testutils.AssertNil(t, pool.pending[addr0])
+		testutils.AssertNil(t, pool.queue[addr0])
+	}
+
+	addr1, _ := types.Sender(pool.signer, txs1[0])
+	for _, tx := range txs1 {
+		blHashes := pool.processing[addr1].GetTxBlocksHashes(tx.Hash())
+		testutils.AssertEqual(t, common.HashArray{rndBlockHash0}, blHashes)
+
+		tTx := pool.processing[addr1].txs.Get(tx.Nonce())
+		testutils.AssertEqual(t, tTx, tx)
+
+		testutils.AssertNil(t, pool.pending[addr1])
+		testutils.AssertNil(t, pool.queue[addr1])
+	}
+
+	//TEST
+	pool.cancelProcessingBlockTxs(tb0)
+
+	for _, tx := range txs0 {
+		blHashes := pool.processing[addr0].GetTxBlocksHashes(tx.Hash())
+		testutils.AssertEqual(t, common.HashArray{rndBlockHash1}, blHashes)
+
+		tTx := pool.processing[addr0].txs.Get(tx.Nonce())
+		testutils.AssertEqual(t, tTx, tx)
+
+		testutils.AssertNil(t, pool.pending[addr0])
+		testutils.AssertNil(t, pool.queue[addr0])
+	}
+
+	for _, tx := range txs1 {
+		testutils.AssertNil(t, pool.processing[addr1])
+
+		tTx := pool.pending[addr1].txs.Get(tx.Nonce())
+		testutils.AssertEqual(t, tTx, tx)
+
+		testutils.AssertNil(t, pool.queue[addr1])
 	}
 }

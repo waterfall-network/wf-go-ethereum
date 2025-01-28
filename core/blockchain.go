@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-// Package core implements the Ethereum consensus protocol.
+// Package core implements the Ethereum consensus protocol (Modified for Waterfall).
 package core
 
 import (
@@ -92,6 +92,10 @@ var (
 	errInvalidBlock         = errors.New("invalid block")
 	ErrBadBlockNr           = errors.New("bad block nr")
 	errBlockNotFound        = errors.New("block not found")
+
+	// Errors related to Era processing.
+	errCheckpointInvalid = errors.New("invalid checkpoint") // Error when the checkpoint is invalid.
+	errHandleEraFailed   = errors.New("handle era failed")  // Error when handling the era fails.
 )
 
 const (
@@ -198,6 +202,7 @@ type BlockChain struct {
 	logsFeed       event.Feed
 	blockProcFeed  event.Feed
 	processingFeed event.Feed
+	cancelProcFeed event.Feed
 	rmTxFeed       event.Feed
 	scope          event.SubscriptionScope
 	genesisBlock   *types.Block
@@ -581,6 +586,21 @@ func (bc *BlockChain) SetLastCoordinatedCheckpoint(cp *types.Checkpoint) {
 			}
 		}
 	}()
+
+	// clear finalized tx
+	go func() {
+		if currCp != nil && cp.Root != currCp.Root {
+			prevCpHeader := bc.GetHeader(currCp.Spine)
+			newCpHeader := bc.GetHeader(cp.Spine)
+			if prevCpHeader != nil && prevCpHeader.Height > 0 && prevCpHeader.Nr() > 0 {
+				for i := prevCpHeader.Nr() + 1; i <= newCpHeader.Nr(); i++ {
+					block := bc.GetBlockByNumber(i)
+					bc.RemoveTxsFromPool(block.Transactions())
+					log.Info("Clear finalized tx", "finSlot", newCpHeader.Slot, "blNr", i, "txs", len(block.Transactions()))
+				}
+			}
+		}
+	}()
 }
 
 func (bc *BlockChain) ClearStaleBlockDags(uptoNr uint64) {
@@ -659,10 +679,14 @@ func (bc *BlockChain) GetValidatorSyncData(initTxHash common.Hash) *types.Valida
 	// Short circuit if the body's already in the cache, retrieve otherwise
 	if cached, ok := bc.valSyncCache.Get(initTxHash); ok {
 		vs := cached.(*types.ValidatorSync)
-		return vs
+		if vs != nil {
+			return vs
+		}
+		log.Error("Validator sync tx handling: cached nil value", "hash", initTxHash.Hex())
 	}
 	vs := rawdb.ReadValidatorSync(bc.db, initTxHash)
 	if vs == nil {
+		log.Error("Validator sync tx handling: db not found", "hash", initTxHash.Hex())
 		return nil
 	}
 	// Cache the found data for next time and return
@@ -823,7 +847,14 @@ func (bc *BlockChain) setHeadRecursive(head common.Hash) error {
 	}
 
 	// check head era
-	cpEra := bc.EpochToEra(headCp.FinEpoch)
+	var cpEra *era.Era
+	if bc.eraInfo == nil {
+		currentEraNumber := rawdb.ReadCurrentEra(bc.db)
+		if eraInfo := rawdb.ReadEra(bc.db, currentEraNumber); eraInfo != nil {
+			bc.SetNewEraInfo(eraInfo)
+		}
+	}
+	cpEra = bc.EpochToEra(headCp.FinEpoch)
 	if cpEra == nil {
 		// search valid checkpoint
 		cp := bc.searchValidCheckpoint(headEpoch)
@@ -949,6 +980,14 @@ func (bc *BlockChain) rmBlockData(hash common.Hash, slot *uint64) {
 		return
 	}
 	//collect related data
+	block := bc.GetBlock(context.Background(), hash)
+	if block != nil {
+		sl := block.Slot()
+		slot = &sl
+		// handle pooled txs
+		bc.CancelProcessingTxs(block)
+	}
+
 	if slot == nil {
 		hdr := rawdb.ReadHeader(bc.db, hash)
 		if hdr != nil {
@@ -1196,8 +1235,6 @@ func (bc *BlockChain) writeFinalizedBlock(finNr uint64, block *types.Block, isHe
 
 		bc.chainHeadFeed.Send(ChainHeadEvent{Block: block, Type: ET_NETWORK})
 	}
-
-	bc.RemoveTxsFromPool(block.Transactions())
 
 	return nil
 }
@@ -2291,6 +2328,12 @@ func (bc *BlockChain) VerifyBlock(block *types.Block) (bool, error) {
 	)
 	timeTrack = time.Now()
 
+	if bc.Config().IsForkSlotValSyncProc(block.Slot()) {
+		if !bc.verifyBlockTxsOrderByNonce(block) {
+			return false, nil
+		}
+	}
+
 	// Verify body hash and transactions hash
 	if !bc.verifyBlockHashes(block) {
 		return false, nil
@@ -2458,6 +2501,42 @@ func (bc *BlockChain) verifyBlockHeight(block *types.Block, ancestorsCount int) 
 			"cpHeight", cpHeader.Height,
 		)
 		return false
+	}
+	return true
+}
+
+// verifyBlockTxsOrderByNonce validate txs order in accordance with nonce asc.
+func (bc *BlockChain) verifyBlockTxsOrderByNonce(block *types.Block) bool {
+	defer func(ts time.Time) {
+		log.Info("^^^^^^^^^^^^ TIME",
+			"elapsed", common.PrettyDuration(time.Since(ts)),
+			"fn:", "verifyBlockTxsOrderByNonce",
+			"txs", len(block.Transactions()),
+			"hash", block.Hash(),
+		)
+	}(time.Now())
+
+	signer := types.MakeSigner(bc.chainConfig)
+
+	var prevTx *types.Transaction
+	for i, tx := range block.Transactions() {
+		if prevTx != nil && tx.Nonce() != prevTx.Nonce()+1 {
+			from, _ := types.Sender(signer, tx)
+			prevFrom, _ := types.Sender(signer, prevTx)
+			if from == prevFrom {
+				log.Warn("Block verification: invalid transactions nonce order",
+					"i", i,
+					"expNonce", prevTx.Nonce(),
+					"txNonce", tx.Nonce(),
+					"txHash", tx.Hash().Hex(),
+					"txFrom", from.Hex(),
+					"hash", block.Hash().Hex(),
+					"creator", block.Coinbase().Hex(),
+				)
+				return false
+			}
+		}
+		prevTx = tx
 	}
 	return true
 }
@@ -4634,6 +4713,15 @@ func (bc *BlockChain) WriteTxLookupEntry(txIndex int, txHash, blockHash common.H
 	return false
 }
 
+func (bc *BlockChain) CancelProcessingTxs(block *types.Block) {
+	if block == nil {
+		return
+	}
+	txs := types.NewBlockTransactions(block.Hash())
+	txs.Transactions = block.Transactions()
+	bc.cancelProcFeed.Send(txs)
+}
+
 func (bc *BlockChain) moveTxsToProcessing(txs *types.BlockTransactions) {
 	bc.processingFeed.Send(txs)
 }
@@ -4645,13 +4733,7 @@ func (bc *BlockChain) MoveTxsToProcessing(block *types.Block) {
 
 	txs := types.NewBlockTransactions(block.Hash())
 	bc.handleBlockValidatorSyncTxs(block)
-	//txs.Transactions = append(txs.Transactions, block.Transactions()...)
 	txs.Transactions = block.Transactions()
-
-	//sort.Slice(txs.Transactions, func(i, j int) bool {
-	//	return txs.Transactions[i].Nonce() < txs.Transactions[j].Nonce()
-	//})
-
 	bc.moveTxsToProcessing(txs)
 }
 
@@ -4775,6 +4857,8 @@ func (bc *BlockChain) StartTransitionPeriod(cp *types.Checkpoint, spineRoot, spi
 			"toEp", bc.GetEraInfo().GetEra().To,
 			"nextEraFirstEpoch", bc.GetEraInfo().NextEraFirstEpoch(),
 			"nextEraFirstSlot", bc.GetEraInfo().NextEraFirstSlot(bc),
+			"spineRoot", spineRoot.Hex(),
+			"spineHash", spineHash.Hex(),
 		)
 
 		if int64(cp.FinEpoch)-int64(bc.Config().TransitionPeriod) < 0 {
@@ -4798,15 +4882,27 @@ func (bc *BlockChain) StartTransitionPeriod(cp *types.Checkpoint, spineRoot, spi
 
 		go bc.ValidatorStorage().PrepareNextEraValidators(bc, nextEra)
 
-		log.Info("Era transition period", "from", bc.GetEraInfo().Number(), "num", nextEra.Number, "begin", nextEra.From, "end", nextEra.To, "length", nextEra.Length())
+		log.Info("Era transition period",
+			"from", nextEra.From,
+			"to", nextEra.To,
+			"num", nextEra.Number,
+			"begin", nextEra.From,
+			"end", nextEra.To,
+			"length", nextEra.Length(),
+			"spineRoot", spineRoot.Hex(),
+			"spineHash", spineHash.Hex(),
+		)
 	} else {
 		log.Info("######## HandleEra transitionPeriod skipped already done", "cpEpoch", cp.Epoch,
 			"cpFinEpoch", cp.FinEpoch,
-			"curEpoch", bc.GetSlotInfo().SlotInEpoch(bc.GetSlotInfo().CurrentSlot()),
+			"slotInEpoch", bc.GetSlotInfo().SlotInEpoch(bc.GetSlotInfo().CurrentSlot()),
+			"curEpoch", bc.GetSlotInfo().SlotToEpoch(bc.GetSlotInfo().CurrentSlot()),
 			"curSlot", bc.GetSlotInfo().CurrentSlot(),
 			"bc.GetEraInfo().ToEpoch", bc.GetEraInfo().ToEpoch(),
 			"bc.GetEraInfo().FromEpoch", bc.GetEraInfo().FromEpoch(),
 			"bc.GetEraInfo().Number", bc.GetEraInfo().Number(),
+			"spineRoot", spineRoot.Hex(),
+			"spineHash", spineHash.Hex(),
 		)
 	}
 
@@ -5131,6 +5227,12 @@ func (bc *BlockChain) EpochToEra(epoch uint64) *era.Era {
 			findingEra = rawdb.ReadEra(bc.db, eraNumber)
 			if findingEra == nil && eraNumber-1 != curEra.Number {
 				curEra = rawdb.ReadEra(bc.db, eraNumber-1)
+				if curEra == nil {
+					for curEra == nil {
+						eraNumber--
+						curEra = rawdb.ReadEra(bc.db, eraNumber-1)
+					}
+				}
 			}
 			if findingEra == nil {
 				slot, err := bc.GetSlotInfo().SlotOfEpochStart(curEra.To)
@@ -5150,10 +5252,15 @@ func (bc *BlockChain) EpochToEra(epoch uint64) *era.Era {
 				spineHeader := bc.GetBlockByHash(bc.GetLastCoordinatedCheckpoint().Spine)
 
 				newEra := era.NewEra(eraNumber, from, to, spineHeader.Root(), spineHeader.Hash())
-				rawdb.WriteEra(bc.db, newEra.Number, newEra)
 				curEra = newEra
 				findingEra = curEra
-				bc.ValidatorStorage().PrepareNextEraValidators(bc, newEra)
+				log.Info("EpochToEra create new era",
+					"number", eraNumber,
+					"from", from,
+					"to", to,
+					"root", spineHeader.Root().Hex(),
+					"hash", spineHeader.Hash().Hex(),
+				)
 			}
 		}
 	}
@@ -5782,4 +5889,55 @@ func (bc *BlockChain) isValidatorTrialPeriod(validator *valStore.Validator) (boo
 		}
 	}
 	return false, nil
+}
+
+// HandleEra manages transitions between eras in the blockchain.
+func (bc *BlockChain) HandleEra(cp *types.Checkpoint) error {
+	defer func(start time.Time) {
+		log.Info("^^^^^^^^^^^^ TIME",
+			"elapsed", common.PrettyDuration(time.Since(start)),
+			"func:", "HandleEra",
+		)
+	}(time.Now())
+
+	log.Info("ERA started for new cp", "cp", cp.Epoch, "finEpoch", cp.FinEpoch, "spine", cp.Spine.Hex())
+
+	var spineRoot, spineHash common.Hash
+	// if cp != nil {
+	header := bc.GetHeaderByHash(cp.Spine)
+	if header != nil {
+		spineRoot = header.Root
+		spineHash = header.Hash()
+	} else {
+		log.Error("Checkpoint spine header not found", "err", errCheckpointInvalid)
+		return errCheckpointInvalid
+	}
+
+	curToEpoch := bc.GetEraInfo().ToEpoch()
+	// New era
+	if bc.GetEraInfo().ToEpoch()+1 <= cp.FinEpoch {
+		for curToEpoch+1 <= cp.FinEpoch {
+			nextEra, err := bc.EnterNextEra(curToEpoch+1, spineRoot, spineHash)
+			if err != nil {
+				return err
+			}
+			if nextEra != nil {
+				curToEpoch = nextEra.To
+			} else {
+				return errHandleEraFailed
+			}
+		}
+		log.Info("Handle era", "cpEpoch", cp.Epoch,
+			"cpFinEpoch", cp.FinEpoch,
+			"curEpoch", bc.GetSlotInfo().SlotInEpoch(bc.GetSlotInfo().CurrentSlot()),
+			"curSlot", bc.GetSlotInfo().CurrentSlot(),
+			"bc.GetEraInfo().ToEpoch", bc.GetEraInfo().ToEpoch(),
+			"bc.GetEraInfo().FromEpoch", bc.GetEraInfo().FromEpoch(),
+			"bc.GetEraInfo().Number", bc.GetEraInfo().Number(),
+		)
+		return nil
+	} else if (bc.GetEraInfo().ToEpoch()+1)-bc.Config().TransitionPeriod == cp.FinEpoch && cp.FinEpoch <= bc.GetEraInfo().ToEpoch()+1 {
+		return bc.StartTransitionPeriod(cp, spineRoot, spineHash)
+	}
+	return nil
 }

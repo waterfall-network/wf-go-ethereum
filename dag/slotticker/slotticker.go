@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// File contains slot ticker and timer-related functions.
+// Package slotticker implements slot ticker and timer-related functions.
 package slotticker
 
 import (
