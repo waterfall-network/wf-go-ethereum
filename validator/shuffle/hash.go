@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/*
+Package shuffle provides an implementation of a shuffling algorithm for Waterfall validators.
+*/
 package shuffle
 
 import (

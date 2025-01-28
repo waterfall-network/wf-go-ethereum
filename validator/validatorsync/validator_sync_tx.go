@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/*
+Package validatorsync implements functionality for handling ValidatorSync operations,
+enabling synchronization of validator-related data and processes.
+*/
 package validatorsync
 
 import (
