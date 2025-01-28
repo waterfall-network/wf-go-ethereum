@@ -1023,9 +1023,6 @@ web3._extend({
 			params: 2,
 			inputFormatter: [web3._extend.formatters.inputAddressFormatter, function(param) {
 				if (param != null) {
-					if (param == "final") {
-						return "final"
-					}
 					return web3._extend.formatters.inputDefaultBlockNumberFormatter(param)
 				}
 			}]

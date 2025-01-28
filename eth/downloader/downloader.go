@@ -26,7 +26,6 @@ import (
 	"sync/atomic"
 	"time"
 
-	ethereum "gitlab.waterfall.network/waterfall/protocol/gwat"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/rawdb"
@@ -36,6 +35,7 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/eth/protocols/snap"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/ethdb"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/event"
+	ethereum "gitlab.waterfall.network/waterfall/protocol/gwat/interfaces"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/log"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/metrics"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
@@ -1511,21 +1511,54 @@ func (d *Downloader) checkPeer(p *peerConnection, baseSpine common.Hash, spines 
 	baseHeader := d.lightchain.GetHeaderByHash(baseSpine)
 	if baseHeader == nil || baseHeader.Height > 0 && baseHeader.Nr() == 0 {
 		if baseHeader == nil {
-			log.Error("Check peer: invalid base spine: base header not found", "hash", baseSpine.Hex())
+			log.Error("Check peer: invalid base spine: base header not found", "baseSpine", baseSpine.Hex())
 		} else {
-			log.Error("Check peer: invalid base spine", "slot", baseHeader.Slot, "height", baseHeader.Height, "nr", baseHeader.Nr(), "height", baseHeader.Hash().Hex())
+			log.Error("Check peer: base header not finalized",
+				"base.slot", baseHeader.Slot,
+				"base.height", baseHeader.Height,
+				"base.nr", baseHeader.Nr(),
+				"base.hash", baseHeader.Hash().Hex(),
+			)
 		}
 		return false, nil, ErrInvalidBaseSpine
 	}
 	baseHash := baseHeader.Hash()
 	baseRemote, err := d.fetchHeaderByHash(p, baseHash)
 	if err == errBadPeer {
+		log.Error("Check peer: remote header by hash (bad peer)",
+			"err", err.Error(),
+			"base.slot", baseHeader.Slot,
+			"base.height", baseHeader.Height,
+			"base.nr", baseHeader.Nr(),
+			"base.hash", baseHeader.Hash().Hex(),
+		)
 		return false, nil, errCanceled
 	}
 	if err != nil {
+		log.Error("Check peer: remote header by hash failed",
+			"err", err.Error(),
+			"base.slot", baseHeader.Slot,
+			"base.height", baseHeader.Height,
+			"base.nr", baseHeader.Nr(),
+			"base.hash", baseHeader.Hash().Hex(),
+		)
 		return false, nil, err
 	}
 	if baseRemote.Hash() != baseHeader.Hash() {
+		log.Error("Check peer: invalid remote header (mismatch hashes)",
+			"err", err.Error(),
+			"base.slot", baseHeader.Slot,
+			"base.height", baseHeader.Height,
+			"base.nr", baseHeader.Nr(),
+			"base.hash", baseHeader.Hash().Hex(),
+			"base.root", baseHeader.Root.Hex(),
+
+			"remote.slot", baseHeader.Slot,
+			"remote.height", baseHeader.Height,
+			"remote.nr", baseHeader.Nr(),
+			"remote.hash", baseHeader.Hash().Hex(),
+			"remote.root", baseRemote.Root.Hex(),
+		)
 		return false, nil, errBadPeer
 	}
 	//baseNr := baseHeader.Nr()
@@ -1548,9 +1581,20 @@ func (d *Downloader) checkPeer(p *peerConnection, baseSpine common.Hash, spines 
 	}
 	terminalRemote, err = d.fetchHeaderByHash(p, terminalSpine)
 	if err != nil {
+		log.Error("Check peer: terminal spine failed",
+			"err", err.Error(),
+			"terminalSpine", terminalSpine.Hex(),
+		)
 		return false, terminalRemote, err
 	}
 	if terminalRemote.Hash() != terminalSpine {
+		log.Error("Check peer: terminal spine invalid (mismatch hashes)",
+			"err", err.Error(),
+			"terminalSpine", terminalSpine.Hex(),
+			"remote.hash", terminalRemote.Hash().Hex(),
+			"remote.slot", terminalRemote.Slot,
+			"remote.slot", terminalRemote.Nr(),
+		)
 		return false, terminalRemote, errBadPeer
 	}
 	return true, terminalRemote, nil

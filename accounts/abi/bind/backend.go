@@ -21,9 +21,9 @@ import (
 	"errors"
 	"math/big"
 
-	ethereum "gitlab.waterfall.network/waterfall/protocol/gwat"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
+	ethereum "gitlab.waterfall.network/waterfall/protocol/gwat/interfaces"
 )
 
 var (
