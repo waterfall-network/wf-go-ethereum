@@ -348,17 +348,17 @@ func (d *Dag) HandleFinalize(data *types.FinalizationParams) *types.Finalization
 
 // HandleSyncSpines run blocks finalization procedure
 func (d *Dag) HandleSyncSpines(spines common.HashArray) (bool, error) {
-	if len(spines) <= 1 {
-		return false, nil
-	}
 	start := time.Now()
 	defer func(start time.Time) {
-		log.Info("TIME",
+		log.Info("Handle SpineSync: TIME",
 			"elapsed", common.PrettyDuration(time.Since(start)),
 			"func:", "HandleSyncSpines",
 		)
 	}(start)
 
+	if len(spines) <= 1 {
+		return false, nil
+	}
 	if d.bc.GetSlotInfo() == nil {
 		err := fmt.Errorf("no slot info")
 		log.Error("Handle SpineSync: response (no slot info)", "err", err)
@@ -372,9 +372,6 @@ func (d *Dag) HandleSyncSpines(spines common.HashArray) (bool, error) {
 		return false, err
 	}
 
-	d.bc.DagMuLock()
-	defer d.bc.DagMuUnlock()
-
 	var err error
 	baseSpine := spines[0]
 	// if baseSpine is in spines - remove
@@ -385,27 +382,24 @@ func (d *Dag) HandleSyncSpines(spines common.HashArray) (bool, error) {
 		"baseSpine", fmt.Sprintf("%#x", baseSpine),
 		"spines", spines,
 	)
-	//forward finalization
-	spines, baseSpine, err = d.finalizer.ForwardFinalization(spines, baseSpine)
-	if err != nil {
-		log.Error("Handle SpineSync: forward finalization failed", "err", err)
-		return false, err
-	}
-
 	// based on NoSync
 	baseHeader := d.bc.GetHeaderByHash(baseSpine)
 	if baseHeader == nil || baseHeader.Nr() == 0 && baseHeader.Height > 0 {
+		log.Error("Handle SpineSync: response (check unloaded)", "err", downloader.ErrInvalidBaseSpine)
 		return false, downloader.ErrInvalidBaseSpine
 	}
 	isSync, err := d.hasUnloadedBlocks(spines)
 	if err != nil {
+		log.Error("Handle SpineSync: response (check unloaded)", "err", err)
 		return false, err
 	}
 	if !isSync {
+		log.Info("Handle SpineSync: response (no unloaded)")
 		return true, nil
 	}
 
 	if err = d.downloader.OptimisticSpineSync(spines); err != nil {
+		log.Error("Handle SpineSync: response (check unloaded)", "err", err)
 		return false, err
 	}
 	log.Info("Handle SpineSync: end",
