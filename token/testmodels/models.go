@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/*
+Package testmodels provides utility models for testing token functionality.
+*/
 package testmodels
 
 import (

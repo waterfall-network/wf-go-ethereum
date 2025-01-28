@@ -12,6 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/*
+Package txlog is used for creating logs related to validator operations,
+such as deposits, withdrawals, exits, and updates, and adding them to the blockchain state.
+Additionally, it provides marshalling and unmarshalling functions for each log type,
+enabling efficient encoding and decoding of log data.
+*/
 package txlog
 
 import (

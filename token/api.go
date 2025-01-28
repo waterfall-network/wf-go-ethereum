@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/*
+Package token implements native token functionality, including WRC-20 and WRC-721 standards.
+*/
 package token
 
 import (
