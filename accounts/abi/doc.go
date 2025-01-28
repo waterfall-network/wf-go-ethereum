@@ -15,7 +15,7 @@
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
 // Package abi implements the Ethereum ABI (Application Binary
-// Interface).
+// Interface) (Modified for Waterfall).
 //
 // The Ethereum ABI is strongly typed, known at compile time
 // and static. This ABI will handle basic type casting; unsigned

@@ -66,10 +66,7 @@ func (s *PublicEthereumAPI) GasPrice(ctx context.Context) (*hexutil.Big, error) 
 	if err != nil {
 		return nil, err
 	}
-	head := s.b.GetLastFinalizedHeader()
-	if head.BaseFee != nil {
-		tipcap.Add(tipcap, head.BaseFee)
-	}
+
 	return (*hexutil.Big)(tipcap), err
 }
 
@@ -1366,6 +1363,7 @@ func RPCMarshalHeader(head *types.Header) map[string]interface{} {
 		"size":             hexutil.Uint64(head.Size()),
 		"bodyRoot":         head.BodyHash,
 		"difficulty":       new(big.Int),
+		"sha3Uncles":       types.CalcUncleHash(head),
 	}
 
 	if len(head.ParentHashes) > 0 {

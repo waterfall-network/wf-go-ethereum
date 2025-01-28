@@ -59,6 +59,7 @@ type jsonWriter interface {
 type BlockNumber int64
 
 const (
+	SafeBlockNumber       = BlockNumber(-4)
 	CheckpointBlockNumber = BlockNumber(-3)
 	PendingBlockNumber    = BlockNumber(-2)
 	LatestBlockNumber     = BlockNumber(-1)
@@ -87,8 +88,11 @@ func (bn *BlockNumber) UnmarshalJSON(data []byte) error {
 	case "pending":
 		*bn = PendingBlockNumber
 		return nil
-	case "final":
+	case "finalized":
 		*bn = CheckpointBlockNumber
+		return nil
+	case "safe":
+		*bn = SafeBlockNumber
 		return nil
 	}
 
@@ -114,6 +118,10 @@ func (bn BlockNumber) MarshalText() ([]byte, error) {
 		return []byte("latest"), nil
 	case PendingBlockNumber:
 		return []byte("pending"), nil
+	case CheckpointBlockNumber:
+		return []byte("finalized"), nil
+	case SafeBlockNumber:
+		return []byte("safe"), nil
 	default:
 		return hexutil.Uint64(bn).MarshalText()
 	}
@@ -160,8 +168,12 @@ func (bnh *BlockNumberOrHash) UnmarshalJSON(data []byte) error {
 		bn := PendingBlockNumber
 		bnh.BlockNumber = &bn
 		return nil
-	case "final":
+	case "finalized":
 		bn := CheckpointBlockNumber
+		bnh.BlockNumber = &bn
+		return nil
+	case "safe":
+		bn := SafeBlockNumber
 		bnh.BlockNumber = &bn
 		return nil
 	default:

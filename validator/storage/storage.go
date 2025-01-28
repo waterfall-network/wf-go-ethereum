@@ -383,8 +383,8 @@ func (s *storage) PrepareNextEraValidators(bc blockchain, era *era.Era) {
 
 	log.Info("Prepare next era validators",
 		"eraNumber", era.Number,
-		"eraRoot", era.Root,
-		"eraBlockHash", era.BlockHash,
+		"eraRoot", era.Root.Hex(),
+		"eraBlockHash", era.BlockHash.Hex(),
 		"validatorsCount", len(s.validatorsCache.allActiveValidatorsCache[era.Number]),
 	)
 
