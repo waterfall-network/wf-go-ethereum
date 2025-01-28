@@ -48,6 +48,13 @@ func AssertNil(t *testing.T, act interface{}) {
 	}
 }
 
+func AssertNotNil(t *testing.T, act interface{}) {
+	t.Helper()
+	if isNil(act) {
+		t.Fatalf("\n\tExpect not nil\n\tGot:\tnil")
+	}
+}
+
 func isNil(object interface{}) bool {
 	if object == nil {
 		return true

@@ -14,17 +14,17 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-// Package accounts implements high level Ethereum account management.
+// Package accounts implements high level Ethereum account management (Modified for Waterfall).
 package accounts
 
 import (
 	"fmt"
 	"math/big"
 
-	ethereum "gitlab.waterfall.network/waterfall/protocol/gwat"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/event"
+	ethereum "gitlab.waterfall.network/waterfall/protocol/gwat/interfaces"
 	"golang.org/x/crypto/sha3"
 )
 

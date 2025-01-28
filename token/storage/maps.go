@@ -12,6 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/*
+Package storage manages token-related data and interacts with the blockchain state.
+*/
 package storage
 
 import (
