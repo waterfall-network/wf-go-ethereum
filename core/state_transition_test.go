@@ -49,7 +49,7 @@ func TestProcessRewards(t *testing.T) {
 		},
 	}
 
-	rawdb.WriteEra(bc.Database(), 0, era.Era{
+	rawdb.WriteEra(bc.Database(), 0, &era.Era{
 		Number: 0,
 		From:   0,
 		To:     20,
