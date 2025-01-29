@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-// Package gethclient provides an RPC client for geth-specific APIs.
+// Package gethclient provides an RPC client for gwat-specific APIs.
 package gethclient
 
 import (
@@ -23,10 +23,10 @@ import (
 	"runtime"
 	"runtime/debug"
 
-	ethereum "gitlab.waterfall.network/waterfall/protocol/gwat"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common/hexutil"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
+	ethereum "gitlab.waterfall.network/waterfall/protocol/gwat/interfaces"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/p2p"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/rpc"
 )

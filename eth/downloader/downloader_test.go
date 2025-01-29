@@ -25,7 +25,7 @@ package downloader
 //	"testing"
 //	"time"
 //
-//	ethereum "gitlab.waterfall.network/waterfall/protocol/gwat"
+//	ethereum "gitlab.waterfall.network/waterfall/protocol/gwat/interfaces"
 //	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
 //	"gitlab.waterfall.network/waterfall/protocol/gwat/core"
 //	"gitlab.waterfall.network/waterfall/protocol/gwat/core/rawdb"
