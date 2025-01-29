@@ -1683,39 +1683,31 @@ func (bc *BlockChain) rollbackBlockFinalization(finNr uint64) error {
 	return nil
 }
 
-// WriteSyncBlocks writes the blocks and all associated state to the database while synchronization process.
-func (bc *BlockChain) WriteSyncBlocks(blocks types.Blocks, validate bool) (failed *types.Block, err error) {
+// WriteSyncBlocks writes the dag blocks to the database for dag synchronization process.
+func (bc *BlockChain) WriteSyncBlocks(blocks types.Blocks, validate bool) error {
 	bc.blockProcFeed.Send(true)
 	defer bc.blockProcFeed.Send(false)
 
 	// Pre-checks passed, start the full block imports
 	if !bc.chainmu.TryLock() {
-		return nil, errInsertionInterrupted
+		return errInsertionInterrupted
 	}
 
-	// include delayed blocks
-	if len(bc.insBlockCache) > 0 {
-		blocks = append(blocks, bc.insBlockCache...)
-		bc.insBlockCache = []*types.Block{}
+	targetBlocks := append(blocks, bc.insBlockCache...)
+	for i := 0; i < len(targetBlocks); i++ {
+		block := targetBlocks[i]
+		if block == nil || block.Header() == nil {
+			targetBlocks = append(targetBlocks[:i], targetBlocks[i+1:]...)
+			i--
+		}
 	}
 	blocks = blocks.Deduplicate(true)
 
-	notExisted := blocks
-	//// rm existed blocks
-	//notExisted := make(types.Blocks, 0, len(blocks))
-	//for _, bl := range blocks {
-	//	if hdr := bc.GetHeader(bl.Hash()); hdr != nil {
-	//		log.Info("Insert delayed blocks: skip inserted", "slot", bl.Slot(), "hash", bl.Hash().Hex())
-	//		continue
-	//	}
-	//	notExisted = append(notExisted, bl)
-	//}
-
 	// ordering by slot sequence to insert
-	blocksBySlot, err := notExisted.GroupBySlot()
+	blocksBySlot, err := targetBlocks.GroupBySlot()
 	if err != nil {
-		bc.insBlockCache = notExisted
-		return nil, err
+		bc.insBlockCache = targetBlocks
+		return err
 	}
 	//sort by slots
 	slots := common.SorterAscU64{}
@@ -1724,35 +1716,26 @@ func (bc *BlockChain) WriteSyncBlocks(blocks types.Blocks, validate bool) (faile
 	}
 	sort.Sort(slots)
 
-	orderedBlocks := make([]*types.Block, 0, len(notExisted))
+	bc.insBlockCache = make([]*types.Block, 0, len(targetBlocks))
+
 	for _, slot := range slots {
 		slotBlocks := blocksBySlot[slot]
-		if len(slotBlocks) == 0 {
-			continue
-		}
-		orderedBlocks = append(orderedBlocks, slotBlocks...)
-	}
-
-	// insert process
-	n, err := bc.insertBlocks(orderedBlocks, validate, opSync)
-	bc.chainmu.Unlock()
-	if err == ErrInsertUncompletedDag {
-		processing := make(map[common.Hash]bool, len(bc.insBlockCache))
-		for _, b := range bc.insBlockCache {
-			processing[b.Hash()] = true
-		}
-		for i, bl := range orderedBlocks {
-			log.Info("Delay syncing block", "height", bl.Height(), "hash", bl.Hash().Hex())
-			if i >= n && !processing[bl.Hash()] {
+		for _, bl := range slotBlocks {
+			// insert process
+			_, err = bc.insertBlocks(types.Blocks{bl}, validate, opSync)
+			switch err {
+			case nil:
+				log.Info("Write sync blocks: success", "slot", bl.Slot(), "hash", bl.Hash().Hex(), "parents", bl.ParentHashes())
+			case ErrInsertUncompletedDag:
 				bc.insBlockCache = append(bc.insBlockCache, bl)
-				processing[bl.Hash()] = true
+				log.Warn("Write sync blocks: delay block", "slot", bl.Slot(), "hash", bl.Hash().Hex(), "parents", bl.ParentHashes())
+			default:
+				log.Error("Write sync blocks: insert block failed", "slot", bl.Slot(), "hash", bl.Hash().Hex(), "error", err, "parents", bl.ParentHashes())
 			}
 		}
-		return orderedBlocks[n], ErrInsertUncompletedDag
-	} else if err != nil {
-		return orderedBlocks[n], err
 	}
-	return nil, nil
+	bc.chainmu.Unlock()
+	return nil
 }
 
 // WriteCreatedDagBlock writes the dag block created locally.

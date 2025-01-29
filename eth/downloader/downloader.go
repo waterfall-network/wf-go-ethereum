@@ -28,7 +28,6 @@ import (
 
 	ethereum "gitlab.waterfall.network/waterfall/protocol/gwat"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
-	"gitlab.waterfall.network/waterfall/protocol/gwat/core"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/rawdb"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/state/snapshot"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
@@ -160,8 +159,8 @@ type LightChain interface {
 	// SetHead rewinds the local chain to a new head.
 	SetHead(array common.Hash) error
 
-	// WriteSyncBlocks writes the dag blocks and all associated state to the database for dag synchronization process
-	WriteSyncBlocks(blocks types.Blocks, validate bool) (failed *types.Block, err error)
+	// WriteSyncBlocks writes the dag blocks to the database for dag synchronization process.
+	WriteSyncBlocks(blocks types.Blocks, validate bool) error
 
 	GetInsertDelayedHashes() common.HashArray
 
@@ -696,28 +695,10 @@ func (d *Downloader) syncWithPeerUnknownDagBlocks(p *peerConnection, dag common.
 	log.Info("Sync of unknown dag blocks: SpineSortBlocks 444", "blocks", len(blocks), "err", err)
 
 	//try to insert all blocks
-	for {
-		var bl *types.Block
-		if bl, err = d.blockchain.WriteSyncBlocks(insBlocks, true); err != nil {
-			log.Error("Sync of unknown dag blocks: Failed writing blocks to chain  (sync unl)", "err", err, "bl.Slot", bl.Slot(), "hash", bl.Hash().Hex())
-			//if insertion failed - trying to insert after failed block
-			if bl != nil {
-				failedIx := 0
-				for i, b := range insBlocks {
-					failedIx = i
-					if bl.Hash() == b.Hash() {
-						break
-					}
-				}
-				if failedIx+1 < len(insBlocks) {
-					insBlocks = insBlocks[failedIx+1:]
-					continue
-				}
-				return nil
-			}
-		}
-		return nil
+	if err = d.blockchain.WriteSyncBlocks(insBlocks, true); err != nil {
+		log.Error("Sync of unknown dag blocks: Failed writing blocks to chain  (sync unl)", "err", err, "blocks", blocks.GetHashes())
 	}
+	return nil
 }
 
 // syncWithPeerUnknownBlocksWithParents fetching unloaded blocks by hashes from remote peer.
@@ -875,28 +856,11 @@ func (d *Downloader) syncWithPeerUnknownBlocksWithParents(p *peerConnection, has
 	log.Info("Sync unknown blocks: sort blocks", "blocks", len(blocks), "slots", slots)
 
 	//try to insert all blocks
-	for {
-		var bl *types.Block
-		if bl, err = d.blockchain.WriteSyncBlocks(insBlocks, true); err != nil {
-			log.Error("Sync unknown blocks: Failed writing blocks to chain  (sync unl)", "err", err, "bl.Slot", bl.Slot(), "hash", bl.Hash().Hex())
-			//if insertion failed - trying to insert after failed block
-			if bl != nil {
-				failedIx := 0
-				for i, b := range insBlocks {
-					failedIx = i
-					if bl.Hash() == b.Hash() {
-						break
-					}
-				}
-				if failedIx+1 < len(insBlocks) {
-					insBlocks = insBlocks[failedIx+1:]
-					continue
-				}
-				return nil
-			}
-		}
-		return nil
+	if err = d.blockchain.WriteSyncBlocks(insBlocks, true); err != nil {
+		log.Error("Sync unknown blocks: Failed writing blocks to chain  (sync unl)", "err", err, "blocks", blocks.GetHashes())
+		return err
 	}
+	return nil
 }
 
 // cancel aborts all of the operations and resets the queue. However, cancel does
@@ -1931,12 +1895,8 @@ func (d *Downloader) syncBySpines(p *peerConnection, baseSpine, terminalSpine co
 		blocks[i] = block
 	}
 
-	if bl, err := d.blockchain.WriteSyncBlocks(blocks, false); err != nil {
-		if errors.Is(err, core.ErrInsertUncompletedDag) {
-			log.Warn("Sync by spines: writing blocks failed", "err", err, "bl.Slot", bl.Slot(), "hash", bl.Hash().Hex())
-			return lastHash, nil
-		}
-		log.Error("Sync by spines: writing blocks failed", "err", err, "bl.Slot", bl.Slot(), "hash", bl.Hash().Hex())
+	if err = d.blockchain.WriteSyncBlocks(blocks, false); err != nil {
+		log.Error("Sync by spines: writing blocks failed", "err", err, "blocks", blocks.GetHashes())
 		return lastHash, err
 	}
 	return lastHash, err
@@ -2015,12 +1975,8 @@ func (d *Downloader) syncBySlots(p *peerConnection, from, to uint64) error {
 		blocks[i] = block
 	}
 
-	if bl, err := d.blockchain.WriteSyncBlocks(blocks, true); err != nil {
-		if errors.Is(err, core.ErrInsertUncompletedDag) {
-			log.Warn("Sync by slots: writing blocks failed", "err", err, "bl.Slot", bl.Slot(), "hash", bl.Hash().Hex())
-			return nil
-		}
-		log.Error("Sync by slots: writing blocks failed", "err", err, "bl.Slot", bl.Slot(), "hash", bl.Hash().Hex())
+	if err = d.blockchain.WriteSyncBlocks(blocks, true); err != nil {
+		log.Error("Sync by slots: writing blocks failed", "err", err, "blocks", blocks.GetHashes())
 		return err
 	}
 	return nil
