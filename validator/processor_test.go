@@ -2967,13 +2967,13 @@ func TestProcessorCheckAndFixActivationStatus(t *testing.T) {
 		msg.EXPECT().TxHash().AnyTimes().Return(common.Hash{})
 
 		db := rawdb.NewMemoryDatabase()
-		eraInfo_0 := era.NewEraInfo(era.Era{
+		eraInfo_0 := era.NewEraInfo(&era.Era{
 			Number: 0,
 			From:   0,
 			To:     500,
 			Root:   common.BytesToHash(testutils.RandomData(32)),
 		})
-		rawdb.WriteEra(db, eraInfo_0.Number(), *eraInfo_0.GetEra())
+		rawdb.WriteEra(db, eraInfo_0.Number(), eraInfo_0.GetEra())
 
 		bc = NewMockblockchain(ctrl)
 		bc.EXPECT().Config().Return(testmodels.TestChainConfig).AnyTimes()
@@ -2983,7 +2983,7 @@ func TestProcessorCheckAndFixActivationStatus(t *testing.T) {
 			SlotsPerEpoch:  testmodels.TestChainConfig.SlotsPerEpoch,
 		})
 		bc.EXPECT().EpochToEra(uint64(100)).AnyTimes().Return(&testmodels.TestEra)
-		bc.EXPECT().GetEraInfo().AnyTimes().Return(&eraInfo)
+		bc.EXPECT().GetEraInfo().AnyTimes().Return(eraInfo)
 		bc.EXPECT().Database().AnyTimes().Return(db)
 		bc.EXPECT().GetTransaction(initTxHash).Return(initTx, common.Hash{}, uint64(0)).AnyTimes()
 		initTxRcp := &types.Receipt{Status: types.ReceiptStatusSuccessful}
