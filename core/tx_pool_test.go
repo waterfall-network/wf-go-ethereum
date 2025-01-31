@@ -3102,14 +3102,14 @@ func TestCancelProcessingBlockTxs(t *testing.T) {
 	testAddBalance(pool, crypto.PubkeyToAddress(key1.PublicKey), big.NewInt(1000000000000))
 
 	txs0 := types.Transactions{
-		transaction(0, 21000, key0),
-		transaction(1, 21000, key0),
-		transaction(2, 21000, key0),
+		transaction(0, 21000, key0, nil),
+		transaction(1, 21000, key0, nil),
+		transaction(2, 21000, key0, nil),
 	}
 	txs1 := types.Transactions{
-		transaction(0, 21000, key1),
-		transaction(1, 21000, key1),
-		transaction(2, 21000, key1),
+		transaction(0, 21000, key1, nil),
+		transaction(1, 21000, key1, nil),
+		transaction(2, 21000, key1, nil),
 	}
 
 	rndBlockHash0 := common.BytesToHash(testutils.RandomData(common.HashLength))
