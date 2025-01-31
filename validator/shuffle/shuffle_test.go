@@ -1,7 +1,22 @@
+// Copyright 2024   Blue Wave Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package shuffle
 
 import (
 	"crypto/sha256"
+	"fmt"
 	"reflect"
 	"strconv"
 	"testing"
@@ -96,6 +111,30 @@ func TestSwapOrNot(t *testing.T) {
 			swapOrNot(buf, test.byteV, 1, 2, input, test.source, CustomSHA256Hasher())
 			if !reflect.DeepEqual(input, test.expectedOutput) {
 				t.Errorf("expected output: %v, got: %v", test.expectedOutput, input)
+			}
+		})
+	}
+}
+
+func BenchmarkShuffleValidators(b *testing.B) {
+	var validators = make([]common.Address, 10000000)
+	for i := range validators {
+		validators[i] = common.HexToAddress(strconv.Itoa(i))
+	}
+
+	seed := common.HexToHash("0xabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdefabcdef")
+
+	sizes := []int{1000, 10000, 100000, 500000, 1000000, 10000000}
+
+	for _, size := range sizes {
+		b.Run(fmt.Sprintf("Size_%d", size), func(b *testing.B) {
+			subset := validators[:size]
+			b.ResetTimer()
+			for i := 0; i < b.N; i++ {
+				_, err := ShuffleValidators(subset, seed)
+				if err != nil {
+					b.Fatalf("Error shuffling validators: %v", err)
+				}
 			}
 		})
 	}

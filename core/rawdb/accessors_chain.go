@@ -1098,7 +1098,7 @@ func DeleteChildren(db ethdb.KeyValueWriter, parent common.Hash) {
 }
 
 // WriteEra writes an era to a key-value database.
-func WriteEra(db ethdb.KeyValueWriter, number uint64, era era.Era) {
+func WriteEra(db ethdb.KeyValueWriter, number uint64, era *era.Era) {
 	key := eraKey(number)
 
 	encoded, err := rlp.EncodeToBytes(era)

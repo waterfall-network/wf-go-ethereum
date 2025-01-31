@@ -1,8 +1,23 @@
+// Copyright 2024   Blue Wave Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 //Package dag implements:
 //- consensus functionality
 //- finalizing process
 //- block creation process
 
+// Package dag implements the Waterfall consensus.
 package dag
 
 import (
@@ -62,9 +77,9 @@ type blockChain interface {
 	SetSlotInfo(si *types.SlotInfo) error
 	Config() *params.ChainConfig
 	GetEraInfo() *era.EraInfo
-	SetNewEraInfo(newEra era.Era)
-	EnterNextEra(nextEraEpochFrom uint64, root, blockHash common.Hash) *era.Era
-	StartTransitionPeriod(cp *types.Checkpoint, spineRoot, spineHash common.Hash)
+	SetNewEraInfo(newEra *era.Era)
+	EnterNextEra(nextEraEpochFrom uint64, root common.Hash, blockHash common.Hash) (*era.Era, error)
+	StartTransitionPeriod(cp *types.Checkpoint, spineRoot common.Hash, spineHash common.Hash) error
 	//SyncEraToSlot(slot uint64)
 	ValidatorStorage() valStore.Storage
 	StateAt(root common.Hash) (*state.StateDB, error)
@@ -88,6 +103,7 @@ type blockChain interface {
 	WriteCurrentTips()
 	GetBlockHashesBySlot(slot uint64) common.HashArray
 	HaveEpochBlocks(epoch uint64) (bool, error)
+	HandleEra(cp *types.Checkpoint) error
 }
 
 type ethDownloader interface {
@@ -231,6 +247,11 @@ func (d *Dag) HandleFinalize(data *types.FinalizationParams) *types.Finalization
 			return res
 		}
 	case types.MainSync:
+		for i, vs := range data.ValSyncData {
+			log.Info("Handle Finalize: valSync: main sync append", "i", i, "valSyncData", vs.Print())
+		}
+		// handle validator sync data
+		d.bc.AppendNotProcessedValidatorSyncData(data.ValSyncData)
 		if err = d.downloader.MainSync(baseSpine, spines); err != nil {
 			strErr := err.Error()
 			res.Error = &strErr
@@ -238,6 +259,11 @@ func (d *Dag) HandleFinalize(data *types.FinalizationParams) *types.Finalization
 			return res
 		}
 	case types.HeadSync:
+		for i, vs := range data.ValSyncData {
+			log.Info("Handle Finalize: valSync: head sync append", "i", i, "valSyncData", vs.Print())
+		}
+		// handle validator sync data
+		d.bc.AppendNotProcessedValidatorSyncData(data.ValSyncData)
 		if err = d.downloader.DagSync(data.Checkpoint.Spine, spines); err != nil {
 			strErr := err.Error()
 			res.Error = &strErr
@@ -262,7 +288,7 @@ func (d *Dag) HandleFinalize(data *types.FinalizationParams) *types.Finalization
 			res.Error = &e
 		} else {
 			d.bc.SetLastCoordinatedCheckpoint(data.Checkpoint)
-			if err := era.HandleEra(d.bc, data.Checkpoint); err != nil {
+			if err := d.bc.HandleEra(data.Checkpoint); err != nil {
 				strErr := err.Error()
 				res.Error = &strErr
 				log.Error("Handle Finalize: update era failed 1", "syncMode", data.SyncMode, "result", res, "err", err)
@@ -271,7 +297,7 @@ func (d *Dag) HandleFinalize(data *types.FinalizationParams) *types.Finalization
 		}
 	} else {
 		d.bc.SetLastCoordinatedCheckpoint(data.Checkpoint)
-		if err := era.HandleEra(d.bc, data.Checkpoint); err != nil {
+		if err := d.bc.HandleEra(data.Checkpoint); err != nil {
 			strErr := err.Error()
 			res.Error = &strErr
 			log.Error("Handle Finalize: update era failed 2", "syncMode", data.SyncMode, "result", res, "err", err)
@@ -279,12 +305,13 @@ func (d *Dag) HandleFinalize(data *types.FinalizationParams) *types.Finalization
 		}
 	}
 
-	for i, vs := range data.ValSyncData {
-		log.Info("Handle Finalize: valSync", "i", i, "valSyncData", vs.Print())
-	}
-
 	// handle validator sync data
-	d.bc.AppendNotProcessedValidatorSyncData(data.ValSyncData)
+	if data.SyncMode == types.NoSync {
+		for i, vs := range data.ValSyncData {
+			log.Info("Handle Finalize: valSync", "i", i, "valSyncData", vs.Print())
+		}
+		d.bc.AppendNotProcessedValidatorSyncData(data.ValSyncData)
+	}
 
 	lfHeader := d.bc.GetLastFinalizedHeader()
 

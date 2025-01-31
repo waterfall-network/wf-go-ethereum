@@ -173,7 +173,7 @@ var (
 		SlotsPerEpoch:          32,
 		EpochsPerEra:           8,
 		TransitionPeriod:       2,
-		ValidatorsStateAddress: nil,
+		ValidatorsStateAddress: &common.Address{'1', '2', '3', '4'},
 		ValidatorsPerSlot:      6,
 		EffectiveBalance:       big.NewInt(3200),
 		ValidatorOpExpireSlots: 14400,
@@ -470,7 +470,7 @@ func OverrideTestnet5(conf *ChainConfig) *ChainConfig {
 	//conf.ForkSlotShanghai = 0
 	conf.ForkSlotValOpTracking = 0
 	conf.ForkSlotReduceBaseFee = 0
-	conf.ForkSlotValSyncProc = math.MaxUint64
+	conf.ForkSlotValSyncProc = 1024
 	//conf.StartEpochsPerEra = 0
 	//conf.AcceptCpRootOnFinEpoch = nil
 

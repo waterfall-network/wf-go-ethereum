@@ -1022,10 +1022,9 @@ web3._extend({
 			call: 'wat_validator_GetInfo',
 			params: 2,
 			inputFormatter: [web3._extend.formatters.inputAddressFormatter, function(param) {
-				if (param == null || param == "final") {
-					return "final"
+				if (param != null) {
+					return web3._extend.formatters.inputDefaultBlockNumberFormatter(param)
 				}
-				return web3._extend.formatters.inputDefaultBlockNumberFormatter(param)
 			}]
 		}),	
 

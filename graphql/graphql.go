@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-// Package graphql provides a GraphQL interface to Ethereum node data.
+// Package graphql provides a GraphQL interface to Ethereum node data (Modified for Waterfall).
 package graphql
 
 import (
@@ -24,13 +24,13 @@ import (
 	"math/big"
 	"strconv"
 
-	ethereum "gitlab.waterfall.network/waterfall/protocol/gwat"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common/hexutil"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common/math"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/state"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/eth/filters"
+	ethereum "gitlab.waterfall.network/waterfall/protocol/gwat/interfaces"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/internal/ethapi"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/rpc"
 )

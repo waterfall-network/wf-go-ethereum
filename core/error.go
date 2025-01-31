@@ -37,7 +37,8 @@ var (
 	// ErrInsertUncompletedDag is returned when dag of inserting propagated block is uncompleted.
 	ErrInsertUncompletedDag = errors.New("insert uncompleted dag chain")
 
-	ErrInvalidEra = errors.New("invalid era")
+	ErrInvalidEra          = errors.New("invalid era")
+	ErrInvalidBlockVersion = errors.New("invalid block version")
 
 	// ErrCpIsnotAncestor is returned when checkpoint is not in past of block.
 	ErrCpIsnotAncestor = errors.New("checkpoint is not ancestor")
@@ -108,4 +109,8 @@ var (
 
 	// ErrCpNotFinalized is returned if the checkpoint is not finalized yet.
 	ErrCpNotFinalized = errors.New("checkpoint is not finalized")
+
+	ErrCpBlockNotNotFound = errors.New("checkpoint block not found")
+
+	ErrCpBadFinalization = errors.New("checkpoint bad finalization")
 )
