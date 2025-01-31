@@ -1,3 +1,24 @@
+// Copyright 2024   Blue Wave Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Package operation implements operations related to validators.
+// This package includes modules for specific validator operations, including the implementation
+// of delegating stake functionalities.
+
+/*
+Package operation implements all operations related to Waterfall validators (Deposit, Withdrawal, Exit).
+*/
 package operation
 
 import (
@@ -16,15 +37,18 @@ var (
 )
 
 var (
-	minDsdLen = minDelegatingStakeDataLen() //20
+	minDsdLen = minDelegatingStakeDataLen() // Minimum binary length for DelegatingStakeData
 )
 
+// DelegatingStakeData represents the data structure for managing delegation of stakes to validators.
 type DelegatingStakeData struct {
-	Rules       DelegatingStakeRules `json:"rules"`       // rules after trial period
-	TrialPeriod uint64               `json:"trialPeriod"` // period while trial_rules are active (in slots, starts from activation slot)
-	TrialRules  DelegatingStakeRules `json:"trialRules"`  // rules for trial period
+	Rules       DelegatingStakeRules `json:"rules"`       // Rules applied after the trial period.
+	TrialPeriod uint64               `json:"trialPeriod"` // Duration of the trial period in slots.
+	TrialRules  DelegatingStakeRules `json:"trialRules"`  // Rules applied during the trial period.
 }
 
+// init initializes the DelegatingStakeData structure with the provided rules and trial information.
+// Validates both the main rules and trial rules, ensuring correct configuration for delegation.
 func (dsd *DelegatingStakeData) init(
 	rules *DelegatingStakeRules,
 	trialPeriod uint64,
@@ -39,7 +63,7 @@ func (dsd *DelegatingStakeData) init(
 	if trialRules == nil {
 		trialRules = &DelegatingStakeRules{}
 	}
-	// while trial
+	// Validate trial rules if a trial period is specified.
 	if trialPeriod > 0 && len(trialRules.ProfitShare()) > 0 {
 		if err := trialRules.ValidateProfitShare(); err != nil {
 			return fmt.Errorf("delegate trial rules err: %w", err)
@@ -57,7 +81,7 @@ func (dsd *DelegatingStakeData) init(
 	return nil
 }
 
-// NewDelegatingStakeOperation creates an operation for creating validator delegate stake
+// NewDelegatingStakeData creates a new instance of DelegatingStakeData with the provided rules and trial period.
 func NewDelegatingStakeData(
 	rules *DelegatingStakeRules,
 	trialPeriod uint64,
@@ -70,12 +94,12 @@ func NewDelegatingStakeData(
 	return &dsd, nil
 }
 
-// NewDelegatingStakeDataFromBinary create new instance from binary data.
-// Support to init nil values.
+// NewDelegatingStakeDataFromBinary creates a new DelegatingStakeData instance from binary data.
+// Returns nil if the binary data corresponds to a nil instance.
 func NewDelegatingStakeDataFromBinary(bin []byte) (*DelegatingStakeData, error) {
 	dsd := &DelegatingStakeData{}
 	err := dsd.UnmarshalBinary(bin)
-	// if binary data conforms to nil instance
+	// Check if the binary data corresponds to a nil instance.
 	if errors.Is(err, errDelegatingStakeNilValBin) {
 		return nil, nil
 	}
@@ -85,13 +109,14 @@ func NewDelegatingStakeDataFromBinary(bin []byte) (*DelegatingStakeData, error) 
 	return dsd, nil
 }
 
+// rlpDelegatingStakeOperation is an internal helper structure used for encoding and decoding stake data.
 type rlpDelegatingStakeOperation struct {
-	R  []byte
-	TP uint64
-	TR []byte
+	R  []byte // Binary-encoded rules
+	TP uint64 // Trial period duration
+	TR []byte // Binary-encoded trial rules
 }
 
-// MarshalBinary marshals a create operation to byte encoding
+// MarshalBinary encodes the DelegatingStakeData structure into a binary format.
 func (dsd *DelegatingStakeData) MarshalBinary() ([]byte, error) {
 	if dsd == nil {
 		return make([]byte, common.Uint32Size), nil
@@ -115,17 +140,17 @@ func (dsd *DelegatingStakeData) MarshalBinary() ([]byte, error) {
 		return nil, err
 	}
 	binData := make([]byte, common.Uint32Size+len(enc))
-	// set len of encoded data
+	// Set the length of the encoded data.
 	binary.BigEndian.PutUint32(binData[:common.Uint32Size], uint32(len(enc)))
-	// set encoded data
+	// Set the encoded data.
 	copy(binData[common.Uint32Size:], enc)
 	return binData, nil
 }
 
-// UnmarshalBinary unmarshals a create operation from byte encoding
+// UnmarshalBinary decodes binary data into a DelegatingStakeData structure.
 func (dsd *DelegatingStakeData) UnmarshalBinary(b []byte) error {
 	if len(b) < minDsdLen {
-		// if binary data conforms to nil instance
+		// Check if the binary data corresponds to a nil instance.
 		if bytes.Equal(b, make([]byte, common.Uint32Size)) {
 			return errDelegatingStakeNilValBin
 		}
@@ -154,6 +179,7 @@ func (dsd *DelegatingStakeData) UnmarshalBinary(b []byte) error {
 	return nil
 }
 
+// Copy creates a deep copy of the DelegatingStakeData instance.
 func (dsd *DelegatingStakeData) Copy() *DelegatingStakeData {
 	if dsd == nil {
 		return nil
@@ -167,7 +193,7 @@ func (dsd *DelegatingStakeData) Copy() *DelegatingStakeData {
 	}
 }
 
-// IsEmpty returns true if no content rules to apply.
+// IsEmpty checks whether the DelegatingStakeData has no rules defined.
 func (dsd *DelegatingStakeData) IsEmpty() bool {
 	if dsd == nil {
 		return true
@@ -175,6 +201,7 @@ func (dsd *DelegatingStakeData) IsEmpty() bool {
 	return len(dsd.Rules.Withdrawal()) == 0
 }
 
+// minDelegatingStakeDataLen calculates the minimum length of binary data for a DelegatingStakeData instance.
 func minDelegatingStakeDataLen() int {
 	emptyBin, err := (&DelegatingStakeData{}).MarshalBinary()
 	if err != nil {

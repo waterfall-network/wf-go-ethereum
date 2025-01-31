@@ -1,3 +1,17 @@
+// Copyright 2024   Blue Wave Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package storage
 
 import (
@@ -43,7 +57,7 @@ type Storage interface {
 	GetDepositCount(stateDb vm.StateDB) uint64
 	IncrementDepositCount(stateDb vm.StateDB)
 
-	PrepareNextEraValidators(bc blockchain, slot uint64)
+	PrepareNextEraValidators(bc blockchain, era *era.Era)
 }
 
 type storage struct {
@@ -163,7 +177,7 @@ func (s *storage) GetValidators(bc blockchain, slot uint64, tmpFromWhere string)
 			log.Error("can`t get validator from state", "error", err, "address", valAddress.Hex())
 			continue
 		}
-		if val.ActivationEra <= slotEra.Number+1 && val.ExitEra > slotEra.Number {
+		if val.ActivationEra <= slotEra.Number && val.ExitEra > slotEra.Number {
 			eraValidators = append(eraValidators, val.GetAddress())
 		}
 	}
@@ -171,7 +185,7 @@ func (s *storage) GetValidators(bc blockchain, slot uint64, tmpFromWhere string)
 	s.validatorsCache.addAllActiveValidatorsByEra(slotEra.Number, eraValidators)
 
 	log.Info("GetValidators", "callFunc", tmpFromWhere, "all", len(validators),
-		"active", len(validators),
+		"active", len(eraValidators),
 		"slot", slot, "epoch", slotEpoch,
 	)
 
@@ -350,11 +364,9 @@ func (s *storage) GetActiveValidatorsCount(bc blockchain, slot uint64) (uint64, 
 	return count, nil
 }
 
-func (s *storage) PrepareNextEraValidators(bc blockchain, slot uint64) {
-	slotEpoch := bc.GetSlotInfo().SlotToEpoch(slot)
-	slotEra := bc.EpochToEra(slotEpoch)
-	s.processTransition[slotEra.Number] = struct{}{}
-	stateDb, _ := bc.StateAt(slotEra.Root)
+func (s *storage) PrepareNextEraValidators(bc blockchain, era *era.Era) {
+	s.processTransition[era.Number] = struct{}{}
+	stateDb, _ := bc.StateAt(era.Root)
 
 	valList := s.GetValidatorsList(stateDb)
 	for _, valAddress := range valList {
@@ -364,12 +376,19 @@ func (s *storage) PrepareNextEraValidators(bc blockchain, slot uint64) {
 			continue
 		}
 
-		if val.ActivationEra <= slotEra.Number+1 && val.ExitEra > slotEra.Number {
-			s.validatorsCache.addValidator(val.Address, slotEra.Number+1)
+		if val.ActivationEra <= era.Number && val.ExitEra > era.Number {
+			s.validatorsCache.addValidator(val.Address, era.Number)
 		}
 	}
 
-	delete(s.processTransition, slotEra.Number)
+	log.Info("Prepare next era validators",
+		"eraNumber", era.Number,
+		"eraRoot", era.Root.Hex(),
+		"eraBlockHash", era.BlockHash.Hex(),
+		"validatorsCount", len(s.validatorsCache.allActiveValidatorsCache[era.Number]),
+	)
+
+	delete(s.processTransition, era.Number)
 }
 
 func (s *storage) checkTransitionProcessing(era uint64) error {

@@ -24,7 +24,6 @@ import (
 	"sync"
 	"time"
 
-	ethereum "gitlab.waterfall.network/waterfall/protocol/gwat"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/accounts/abi"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/accounts/abi/bind"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
@@ -39,6 +38,7 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/eth/filters"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/ethdb"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/event"
+	ethereum "gitlab.waterfall.network/waterfall/protocol/gwat/interfaces"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/log"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/rpc"
@@ -106,7 +106,7 @@ func NewSimulatedBackendWithDatabase(database ethdb.Database, alloc core.Genesis
 	rawdb.WriteEpoch(database, 0, genesisCp.Spine)
 
 	genesisEraLength := era.EstimateEraLength(genesis.Config, uint64(len(genesis.Validators)), 0)
-	genesisEra := era.Era{
+	genesisEra := &era.Era{
 		Number: 0,
 		From:   0,
 		To:     genesisEraLength - 1,
