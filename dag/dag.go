@@ -17,6 +17,7 @@
 //- finalizing process
 //- block creation process
 
+// Package dag implements the Waterfall consensus.
 package dag
 
 import (
@@ -102,6 +103,7 @@ type blockChain interface {
 	WriteCurrentTips()
 	GetBlockHashesBySlot(slot uint64) common.HashArray
 	HaveEpochBlocks(epoch uint64) (bool, error)
+	HandleEra(cp *types.Checkpoint) error
 }
 
 type ethDownloader interface {
@@ -254,6 +256,11 @@ func (d *Dag) HandleFinalize(data *types.FinalizationParams) *types.Finalization
 			return res
 		}
 	case types.MainSync:
+		for i, vs := range data.ValSyncData {
+			log.Info("Handle Finalize: valSync: main sync append", "i", i, "valSyncData", vs.Print())
+		}
+		// handle validator sync data
+		d.bc.AppendNotProcessedValidatorSyncData(data.ValSyncData)
 		if err = d.downloader.MainSync(baseSpine, spines); err != nil {
 			strErr := err.Error()
 			res.Error = &strErr
@@ -261,6 +268,11 @@ func (d *Dag) HandleFinalize(data *types.FinalizationParams) *types.Finalization
 			return res
 		}
 	case types.HeadSync:
+		for i, vs := range data.ValSyncData {
+			log.Info("Handle Finalize: valSync: head sync append", "i", i, "valSyncData", vs.Print())
+		}
+		// handle validator sync data
+		d.bc.AppendNotProcessedValidatorSyncData(data.ValSyncData)
 		if err = d.downloader.DagSync(data.Checkpoint.Spine, spines); err != nil {
 			strErr := err.Error()
 			res.Error = &strErr
@@ -285,7 +297,7 @@ func (d *Dag) HandleFinalize(data *types.FinalizationParams) *types.Finalization
 			res.Error = &e
 		} else {
 			d.bc.SetLastCoordinatedCheckpoint(data.Checkpoint)
-			if err := era.HandleEra(d.bc, data.Checkpoint); err != nil {
+			if err := d.bc.HandleEra(data.Checkpoint); err != nil {
 				strErr := err.Error()
 				res.Error = &strErr
 				log.Error("Handle Finalize: update era failed 1", "syncMode", data.SyncMode, "result", res, "err", err)
@@ -294,7 +306,7 @@ func (d *Dag) HandleFinalize(data *types.FinalizationParams) *types.Finalization
 		}
 	} else {
 		d.bc.SetLastCoordinatedCheckpoint(data.Checkpoint)
-		if err := era.HandleEra(d.bc, data.Checkpoint); err != nil {
+		if err := d.bc.HandleEra(data.Checkpoint); err != nil {
 			strErr := err.Error()
 			res.Error = &strErr
 			log.Error("Handle Finalize: update era failed 2", "syncMode", data.SyncMode, "result", res, "err", err)
@@ -302,12 +314,13 @@ func (d *Dag) HandleFinalize(data *types.FinalizationParams) *types.Finalization
 		}
 	}
 
-	for i, vs := range data.ValSyncData {
-		log.Info("Handle Finalize: valSync", "i", i, "valSyncData", vs.Print())
-	}
-
 	// handle validator sync data
-	d.bc.AppendNotProcessedValidatorSyncData(data.ValSyncData)
+	if data.SyncMode == types.NoSync {
+		for i, vs := range data.ValSyncData {
+			log.Info("Handle Finalize: valSync", "i", i, "valSyncData", vs.Print())
+		}
+		d.bc.AppendNotProcessedValidatorSyncData(data.ValSyncData)
+	}
 
 	lfHeader := d.bc.GetLastFinalizedHeader()
 
