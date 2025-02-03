@@ -73,6 +73,7 @@ func NewEVMBlockContext(header *types.Header, chain ChainContext, author *common
 		Slot:        header.Slot,
 		BlockHash:   header.Hash(),
 		Random:      random,
+		Difficulty:  big.NewInt(0),
 	}
 }
 
