@@ -341,8 +341,8 @@ func (s *storage) GetActiveValidatorsCount(bc blockchain, slot uint64) (uint64, 
 		return 0, err
 	}
 
-	vals, ok := s.validatorsCache.allActiveValidatorsCache[slotEra.Number]
-	if ok {
+	vals := s.validatorsCache.getAllActiveValidatorsByEra(slotEra.Number)
+	if vals != nil {
 		return uint64(len(vals)), nil
 	}
 
