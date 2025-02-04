@@ -2347,6 +2347,11 @@ func (api *PublicDagAPI) ValidateFinalization(ctx context.Context, data common.H
 	return api.b.Dag().HandleValidateFinalization(data)
 }
 
+// SyncSpines synchronize spines chain.
+func (api *PublicDagAPI) SyncSpines(ctx context.Context, data common.HashArray) (bool, error) {
+	return api.b.Dag().HandleSyncSpines(data)
+}
+
 // SyncSlotInfo sync slot info.
 func (api *PublicDagAPI) SyncSlotInfo(ctx context.Context, data types.SlotInfo) (bool, error) {
 	return api.b.Dag().HandleSyncSlotInfo(data)

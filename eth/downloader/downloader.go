@@ -1297,12 +1297,6 @@ func (d *Downloader) requestDagTxs(p *peerConnection, hashes common.HashArray) (
 				log.Error("Sync: body by hashes: received from incorrect peer", "packet.peer", packet.PeerId(), "peer", p.id)
 				break
 			}
-
-			// Discard anything not from the origin peer
-			if packet.PeerId() != p.id {
-				log.Warn("Sync: body by hashes: received from incorrect peer", "packet.peer", packet.PeerId(), "peer", p.id)
-				break
-			}
 			return packet.(*bodyPack).transactions, nil
 		case <-timeout:
 			p.log.Warn("Sync: body by hashes: timed out", "elapsed", ttl)

@@ -348,6 +348,68 @@ func (d *Dag) HandleFinalize(data *types.FinalizationParams) *types.Finalization
 	return res
 }
 
+// HandleSyncSpines run blocks finalization procedure
+func (d *Dag) HandleSyncSpines(spines common.HashArray) (bool, error) {
+	start := time.Now()
+	defer func(start time.Time) {
+		log.Info("Handle SpineSync: TIME",
+			"elapsed", common.PrettyDuration(time.Since(start)),
+			"func:", "HandleSyncSpines",
+		)
+	}(start)
+
+	if len(spines) <= 1 {
+		return false, nil
+	}
+	if d.bc.GetSlotInfo() == nil {
+		err := fmt.Errorf("no slot info")
+		log.Error("Handle SpineSync: response (no slot info)", "err", err)
+		return false, err
+	}
+
+	//skip if synchronising
+	if d.downloader.Synchronising() {
+		err := errSynchronization
+		log.Error("Handle SpineSync: response (synchronization)", "err", err)
+		return false, err
+	}
+
+	var err error
+	baseSpine := spines[0]
+	// if baseSpine is in spines - remove
+	if bi := spines.IndexOf(baseSpine); bi >= 0 {
+		spines = spines[bi+1:]
+	}
+	log.Info("Handle SpineSync: start",
+		"baseSpine", fmt.Sprintf("%#x", baseSpine),
+		"spines", spines,
+	)
+	// based on NoSync
+	baseHeader := d.bc.GetHeaderByHash(baseSpine)
+	if baseHeader == nil || baseHeader.Nr() == 0 && baseHeader.Height > 0 {
+		log.Error("Handle SpineSync: response (check unloaded)", "err", downloader.ErrInvalidBaseSpine)
+		return false, downloader.ErrInvalidBaseSpine
+	}
+	isSync, err := d.hasUnloadedBlocks(spines)
+	if err != nil {
+		log.Error("Handle SpineSync: response (check unloaded)", "err", err)
+		return false, err
+	}
+	if !isSync {
+		log.Info("Handle SpineSync: response (no unloaded)")
+		return true, nil
+	}
+
+	if err = d.downloader.OptimisticSpineSync(spines); err != nil {
+		log.Error("Handle SpineSync: response (check unloaded)", "err", err)
+		return false, err
+	}
+	log.Info("Handle SpineSync: end",
+		"spines", spines,
+	)
+	return true, nil
+}
+
 // handleSyncUnloadedBlocks:
 // 1. check is synchronization required
 // 2. switch on sync mode
