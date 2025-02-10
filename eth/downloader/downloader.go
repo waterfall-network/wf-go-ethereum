@@ -1368,6 +1368,9 @@ func (d *Downloader) MainSync(baseSpine common.Hash, spines common.HashArray) er
 // param spines is optional and used for check remote peer and completeness data retrieved.
 func (d *Downloader) DagSync(baseSpine common.Hash, spines common.HashArray) error {
 	log.Info("Sync chain by spines", "baseSpine", baseSpine.Hex(), "spines", len(spines), "len(d.peers)", len(d.peers.peers))
+	if len(spines) == 0 {
+		return nil
+	}
 	if d.peers.Len() == 0 {
 		log.Error("Sync chain by spines", "baseSpine", baseSpine.Hex(), "spines", spines, "peers.Len", d.peers.Len(), "err", errNoPeers)
 		return errNoPeers
