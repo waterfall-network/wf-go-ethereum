@@ -3208,16 +3208,20 @@ func (bc *BlockChain) insertBlocks(chain types.Blocks, validate bool, op string)
 		log.Info("Insert blocks:", "op", op, "Slot", block.Slot(), "Height", block.Height(), "Hash", block.Hash().Hex(), "txs", len(block.Transactions()), "parents", block.ParentHashes())
 
 		rawdb.WriteBlock(bc.db, block)
+		log.Info("Insert blocks: WriteBlock", "op", op, "slot", block.Slot(), "Hash", block.Hash().Hex())
 		rawdb.AddSlotBlockHash(bc.Database(), block.Slot(), block.Hash())
+		log.Info("Insert blocks: AddSlotBlockHash", "op", op, "slot", block.Slot(), "Hash", block.Hash().Hex())
 		bc.AppendToChildren(block.Hash(), block.ParentHashes())
+		log.Info("Insert blocks: AppendToChildren", "op", op, "slot", block.Slot(), "Hash", block.Hash().Hex())
 
-		log.Debug("Insert blocks: remove optimistic spines from cache", "op", op, "slot", block.Slot())
 		bc.removeOptimisticSpinesFromCache(block.Slot())
+		log.Info("Insert blocks: AppendToChildren", "op", op, "slot", block.Slot(), "Hash", block.Hash().Hex())
 
 		//for case if finalized tip is current cp
 		commonCpHash := block.CpHash()
 		cpCpAncestorsHashes := common.HashArray{}
 		for _, ph := range block.ParentHashes() {
+			log.Info("Insert blocks: iter parents 0", "op", op, "slot", block.Slot(), "Hash", block.Hash().Hex(), "parent", ph.Hex(), "cond", ph == block.CpHash())
 			if ph == block.CpHash() {
 				bdag := bc.GetBlockDag(ph)
 				if bdag == nil {
@@ -3288,6 +3292,7 @@ func (bc *BlockChain) insertBlocks(chain types.Blocks, validate bool, op string)
 
 		tmpTips := types.Tips{}
 		for _, h := range block.ParentHashes() {
+			log.Info("Insert blocks: iter parents 1", "op", op, "slot", block.Slot(), "Hash", block.Hash().Hex(), "parent", h.Hex(), "cond", h == block.CpHash())
 			if h == block.CpHash() {
 				continue
 			}
@@ -3373,13 +3378,16 @@ func (bc *BlockChain) insertBlocks(chain types.Blocks, validate bool, op string)
 			bdag.OrderedAncestorsHashes = bdag.OrderedAncestorsHashes.Difference(common.HashArray{bc.Genesis().Hash()})
 			tmpTips.Add(bdag)
 		}
+		log.Info("Insert blocks: CollectAncestorsHashesByTips start", "op", op, "slot", block.Slot(), "Hash", block.Hash().Hex())
 		dagChainHashes, err := bc.CollectAncestorsHashesByTips(tmpTips, commonCpHash)
+		log.Info("Insert blocks: CollectAncestorsHashesByTips end", "op", op, "slot", block.Slot(), "Hash", block.Hash().Hex(), "err", err)
 		if err != nil {
 			return it.index, err
 		}
 		dagChainHashes = dagChainHashes.Difference(cpCpAncestorsHashes)
 		cpHeader := bc.GetHeader(block.CpHash())
 		if cpHeader == nil {
+			log.Error("Insert blocks: dagChainHashes", "op", op, "slot", block.Slot(), "Hash", block.Hash().Hex(), "err", ErrInsertUncompletedDag)
 			return it.index, ErrInsertUncompletedDag
 		}
 		dagBlock := &types.BlockDAG{
@@ -3390,9 +3398,13 @@ func (bc *BlockChain) insertBlocks(chain types.Blocks, validate bool, op string)
 			CpHeight:               cpHeader.Height,
 			OrderedAncestorsHashes: dagChainHashes,
 		}
+		log.Info("Insert blocks: AddTips", "op", op, "slot", block.Slot(), "Hash", block.Hash().Hex())
 		bc.AddTips(dagBlock)
+		log.Info("Insert blocks: RemoveTips", "op", op, "slot", block.Slot(), "Hash", block.Hash().Hex())
 		bc.RemoveTips(dagBlock.OrderedAncestorsHashes)
+		log.Info("Insert blocks: WriteCurrentTips", "op", op, "slot", block.Slot(), "Hash", block.Hash().Hex())
 		bc.WriteCurrentTips()
+		log.Info("Insert blocks: MoveTxsToProcessing", "op", op, "slot", block.Slot(), "Hash", block.Hash().Hex())
 		bc.MoveTxsToProcessing(block)
 
 		log.Info("Insert blocks: success", "op", op, "slot", block.Slot(), "height", block.Height(), "hash", block.Hash().Hex())
@@ -3591,11 +3603,13 @@ func (bc *BlockChain) InsertChain(chain types.Blocks) (int, error) {
 func (bc *BlockChain) CollectAncestorsHashesByTips(tips types.Tips, cpHash common.Hash) (common.HashArray, error) {
 	cpHeader := bc.GetHeader(cpHash)
 	cpBlDag := bc.GetBlockDag(cpHash)
+	log.Info("Insert blocks: CollectAncestorsHashesByTips 000", "Hash", cpHash.Hex(), "tips", tips.Print())
 	if cpBlDag == nil {
 		cpCpHash := cpHeader.CpHash
 		if cpHeader.Height == 0 {
 			cpCpHash = cpHash
 		}
+		log.Info("Insert blocks: CollectAncestorsHashesByTips 111", "Hash", cpHash.Hex())
 		_, anc, _, err := bc.CollectAncestorsAftCpByParents(cpHeader.ParentHashes, cpCpHash)
 		if err != nil {
 			return nil, err
@@ -3611,8 +3625,11 @@ func (bc *BlockChain) CollectAncestorsHashesByTips(tips types.Tips, cpHash commo
 		bc.SaveBlockDag(cpBlDag)
 	}
 
+	log.Info("Insert blocks: CollectAncestorsHashesByTips 222", "Hash", cpHash.Hex())
+
 	ancestorsHashes := make(common.HashArray, 0)
 	for _, tip := range tips {
+		log.Info("Insert blocks: CollectAncestorsHashesByTips iter tips", "cond1", tip.Hash == cpHash, "cond2", tip.CpHash == cpHash, "tip.Hash", tip.Hash.Hex(), "Hash", cpHash.Hex())
 		if tip.Hash == cpHash {
 			continue
 		}
@@ -3649,6 +3666,7 @@ func (bc *BlockChain) CollectAncestorsHashesByTips(tips types.Tips, cpHash commo
 		ancestorsHashes = append(ancestorsHashes, tip.Hash)
 		ancestorsHashes.Deduplicate()
 	}
+	log.Info("Insert blocks: CollectAncestorsHashesByTips end", "Hash", cpHash.Hex())
 	return ancestorsHashes, nil
 }
 
