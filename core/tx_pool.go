@@ -496,7 +496,12 @@ func (pool *TxPool) loop() {
 					)
 				}(time.Now())
 
+				log.Info("Insert blocks: moveToProcessingAccelerated TxPool 000", "syncMode", syncMode)
+
 				pool.mu.Lock()
+
+				log.Info("Insert blocks: moveToProcessingAccelerated TxPool 111", "syncMode", syncMode)
+
 				defer pool.mu.Unlock()
 
 				// while sync - just removing tx from pool
@@ -1703,19 +1708,29 @@ func (pool *TxPool) removeTx(hash common.Hash, outofbound bool) {
 	// Fetch the transaction we wish to delete
 	tx := pool.all.Get(hash)
 
+	log.Info("Insert blocks: removeTx TxPool 000", "txIsNil", tx == nil, "tx", hash.Hex())
+
 	if tx == nil {
 		return
 	}
 	addr, _ := types.Sender(pool.signer, tx) // already validated during insertion
+
+	log.Info("Insert blocks: removeTx TxPool 111", "outofbound", outofbound, "tx", hash.Hex())
 
 	// Remove it from the list of known transactions
 	pool.all.Remove(hash)
 	if outofbound {
 		pool.priced.Removed(1)
 	}
+
+	log.Info("Insert blocks: removeTx TxPool 222", "cond", pool.locals.contains(addr), "tx", hash.Hex())
+
 	if pool.locals.contains(addr) {
 		localGauge.Dec(1)
 	}
+
+	log.Info("Insert blocks: removeTx TxPool 333", "cond", pool.pending[addr] != nil, "tx", hash.Hex())
+
 	// Remove the transaction from the pending lists and reset the account nonce
 	if pending := pool.pending[addr]; pending != nil {
 		if removed, invalids := pending.Remove(tx); removed {
@@ -1735,6 +1750,8 @@ func (pool *TxPool) removeTx(hash common.Hash, outofbound bool) {
 			return
 		}
 	}
+	log.Info("Insert blocks: removeTx TxPool 444", "cond", pool.queue[addr] != nil, "tx", hash.Hex())
+
 	// Transaction is in the future queue
 	if future := pool.queue[addr]; future != nil {
 		if removed, _ := future.Remove(tx); removed {
@@ -1747,6 +1764,7 @@ func (pool *TxPool) removeTx(hash common.Hash, outofbound bool) {
 		}
 		return
 	}
+	log.Info("Insert blocks: removeTx TxPool 555", "cond", pool.processing[addr] != nil, "tx", hash.Hex())
 
 	if proc := pool.processing[addr]; proc != nil {
 		proc.Delete(tx)
@@ -1757,6 +1775,7 @@ func (pool *TxPool) removeTx(hash common.Hash, outofbound bool) {
 		pendingGauge.Dec(int64(1))
 		return
 	}
+	log.Info("Insert blocks: removeTx TxPool 666", "tx", hash.Hex())
 }
 
 // requestReset requests a pool reset to the new head block.

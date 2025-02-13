@@ -4724,9 +4724,13 @@ func (bc *BlockChain) MoveTxsToProcessing(block *types.Block) {
 		return
 	}
 
+	log.Info("Insert blocks: MoveTxsToProcessing 000", "slot", block.Slot(), "Hash", block.Hash().Hex())
 	txs := types.NewBlockTransactions(block.Hash())
+	log.Info("Insert blocks: MoveTxsToProcessing 111", "slot", block.Slot(), "Hash", block.Hash().Hex())
 	bc.handleBlockValidatorSyncTxs(block)
+	log.Info("Insert blocks: MoveTxsToProcessing 222", "slot", block.Slot(), "Hash", block.Hash().Hex())
 	txs.Transactions = block.Transactions()
+	log.Info("Insert blocks: MoveTxsToProcessing 333", "slot", block.Slot(), "Hash", block.Hash().Hex())
 	bc.moveTxsToProcessing(txs)
 }
 

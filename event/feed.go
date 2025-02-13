@@ -20,6 +20,8 @@ import (
 	"errors"
 	"reflect"
 	"sync"
+
+	"gitlab.waterfall.network/waterfall/protocol/gwat/log"
 )
 
 var errBadChannel = errors.New("event: Subscribe argument does not have sendable channel type")
@@ -128,25 +130,38 @@ func (f *Feed) remove(sub *feedSub) {
 func (f *Feed) Send(value interface{}) (nsent int) {
 	rvalue := reflect.ValueOf(value)
 
+	log.Info("Insert blocks: MoveTxsToProcessing 000", "nsent", nsent)
+
 	f.once.Do(f.init)
 	<-f.sendLock
 
+	log.Info("Insert blocks: MoveTxsToProcessing 111", "nsent", nsent)
+
 	// Add new cases from the inbox after taking the send lock.
 	f.mu.Lock()
+
+	log.Info("Insert blocks: MoveTxsToProcessing 222", "nsent", nsent)
+
 	f.sendCases = append(f.sendCases, f.inbox...)
 	f.inbox = nil
 
 	if !f.typecheck(rvalue.Type()) {
+		log.Info("Insert blocks: MoveTxsToProcessing 333", "nsent", nsent)
 		f.sendLock <- struct{}{}
+		log.Info("Insert blocks: MoveTxsToProcessing 444", "nsent", nsent)
 		f.mu.Unlock()
 		panic(feedTypeError{op: "Send", got: rvalue.Type(), want: f.etype})
 	}
+	log.Info("Insert blocks: MoveTxsToProcessing 555", "nsent", nsent)
 	f.mu.Unlock()
 
 	// Set the sent value on all channels.
 	for i := firstSubSendCase; i < len(f.sendCases); i++ {
+		log.Info("Insert blocks: MoveTxsToProcessing 666", "i", i, "nsent", nsent)
 		f.sendCases[i].Send = rvalue
 	}
+
+	log.Info("Insert blocks: MoveTxsToProcessing 777", "nsent", nsent)
 
 	// Send until all channels except removeSub have been chosen. 'cases' tracks a prefix
 	// of sendCases. When a send succeeds, the corresponding case moves to the end of
@@ -163,6 +178,8 @@ func (f *Feed) Send(value interface{}) (nsent int) {
 				i--
 			}
 		}
+		log.Info("Insert blocks: MoveTxsToProcessing 888", "cond", len(cases) == firstSubSendCase, "nsent", nsent)
+
 		if len(cases) == firstSubSendCase {
 			break
 		}
@@ -179,13 +196,20 @@ func (f *Feed) Send(value interface{}) (nsent int) {
 			cases = cases.deactivate(chosen)
 			nsent++
 		}
+		log.Info("Insert blocks: MoveTxsToProcessing 999", "cond", chosen == 0, "nsent", nsent)
 	}
 
 	// Forget about the sent value and hand off the send lock.
 	for i := firstSubSendCase; i < len(f.sendCases); i++ {
 		f.sendCases[i].Send = reflect.Value{}
 	}
+
+	log.Info("Insert blocks: MoveTxsToProcessing 999_0", "nsent", nsent)
+
 	f.sendLock <- struct{}{}
+
+	log.Info("Insert blocks: MoveTxsToProcessing 999_1", "nsent", nsent)
+
 	return nsent
 }
 
