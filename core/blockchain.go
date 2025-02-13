@@ -489,11 +489,12 @@ func (bc *BlockChain) loadLastState() error {
 		}
 	}
 
-	//load dag part of chain
-	if err := bc.hc.loadTips(); err != nil {
-		log.Warn("State loading", "err", err)
-		bc.ResetTips()
-	}
+	////load dag part of chain
+	//if err := bc.hc.loadTips(); err != nil {
+	//	log.Warn("State loading", "err", err)
+	//	bc.ResetTips()
+	//}
+	bc.ResetTips()
 	tips := bc.GetTips()
 	if len(tips) == 0 {
 		bc.ResetTips()
