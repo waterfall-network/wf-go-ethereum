@@ -185,15 +185,20 @@ func (f *Feed) Send(value interface{}) (nsent int) {
 		}
 		// Select on all the receivers, waiting for them to unblock.
 		chosen, recv, _ := reflect.Select(cases)
+		log.Info("Insert blocks: MoveTxsToProcessing 888_000", "cond", chosen == 0, "nsent", nsent)
 		if chosen == 0 /* <-f.removeSub */ {
 			index := f.sendCases.find(recv.Interface())
+			log.Info("Insert blocks: MoveTxsToProcessing 888_1111", "cond", chosen == 0, "nsent", nsent)
 			f.sendCases = f.sendCases.delete(index)
+			log.Info("Insert blocks: MoveTxsToProcessing 888_2222", "cond", index >= 0 && index < len(cases), "nsent", nsent)
 			if index >= 0 && index < len(cases) {
 				// Shrink 'cases' too because the removed case was still active.
 				cases = f.sendCases[:len(cases)-1]
 			}
+			log.Info("Insert blocks: MoveTxsToProcessing 888_333", "nsent", nsent)
 		} else {
 			cases = cases.deactivate(chosen)
+			log.Info("Insert blocks: MoveTxsToProcessing 888_4444", "nsent", nsent)
 			nsent++
 		}
 		log.Info("Insert blocks: MoveTxsToProcessing 999", "cond", chosen == 0, "nsent", nsent)
