@@ -489,11 +489,12 @@ func (bc *BlockChain) loadLastState() error {
 		}
 	}
 
-	//load dag part of chain
-	if err := bc.hc.loadTips(); err != nil {
-		log.Warn("State loading", "err", err)
-		bc.ResetTips()
-	}
+	////load dag part of chain
+	//if err := bc.hc.loadTips(); err != nil {
+	//	log.Warn("State loading", "err", err)
+	//	bc.ResetTips()
+	//}
+	bc.ResetTips()
 	tips := bc.GetTips()
 	if len(tips) == 0 {
 		bc.ResetTips()
@@ -3393,6 +3394,7 @@ func (bc *BlockChain) insertBlocks(chain types.Blocks, validate bool, op string)
 		bc.AddTips(dagBlock)
 		bc.RemoveTips(dagBlock.OrderedAncestorsHashes)
 		bc.WriteCurrentTips()
+		log.Info("Insert blocks: MoveTxsToProcessing", "op", op, "slot", block.Slot(), "Hash", block.Hash().Hex())
 		bc.MoveTxsToProcessing(block)
 
 		log.Info("Insert blocks: success", "op", op, "slot", block.Slot(), "height", block.Height(), "hash", block.Hash().Hex())
