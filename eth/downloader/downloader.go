@@ -1861,7 +1861,7 @@ func (d *Downloader) syncBySpines(p *peerConnection, baseSpine, terminalSpine co
 		// filter existed blocks
 		dag = make(common.HashArray, 0, len(remoteHashes))
 		dagBlocks := d.blockchain.GetBlocksByHashes(remoteHashes)
-		for h, _ := range dagBlocks {
+		for h := range dagBlocks {
 			if dagBlocks[h] != nil &&
 				dagBlocks[h].Header() != nil &&
 				dagBlocks[h].Body().CalculateHash() == dagBlocks[h].BodyHash() {
@@ -1947,7 +1947,7 @@ func (d *Downloader) syncBySlots(p *peerConnection, from, to uint64) error {
 	// filter existed blocks
 	dag := make(common.HashArray, 0, len(remoteHashes))
 	dagBlocks := d.blockchain.GetBlocksByHashes(remoteHashes)
-	for h, _ := range dagBlocks {
+	for h := range dagBlocks {
 		if dagBlocks[h] != nil &&
 			dagBlocks[h].Header() != nil &&
 			dagBlocks[h].Body().CalculateHash() == dagBlocks[h].BodyHash() {
