@@ -46,6 +46,18 @@ func (bc *BlockChain) GetInsertDelayedHashes() common.HashArray {
 	return res
 }
 
+// GetInsertDelayedParents retrieves the parent hashes of blocks delayed to insert to chain after insert parents.
+func (bc *BlockChain) GetInsertDelayedParents() common.HashArray {
+	res := make(common.HashArray, 0, uint64(len(bc.insBlockCache))*bc.Config().ValidatorsPerSlot)
+	for _, b := range bc.insBlockCache {
+		if b != nil {
+			res = append(res, b.ParentHashes()...)
+		}
+	}
+	res.Deduplicate()
+	return res
+}
+
 // GetLastFinalizedBlock retrieves the current Last Finalized block of the canonical chain. The
 // block is retrieved from the blockchain's internal cache.
 func (bc *BlockChain) GetLastFinalizedBlock() *types.Block {

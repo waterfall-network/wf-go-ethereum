@@ -390,8 +390,14 @@ func (d *Downloader) SyncUnloadedParents(id string, hashes common.HashArray) err
 	defer d.syncByHashesLock.Unlock()
 
 	unloaded := make(common.HashArray, 0, len(hashes))
+	dagBlocks := d.blockchain.GetBlocksByHashes(hashes)
 	for _, h := range hashes {
-		if d.blockchain.GetHeaderByHash(h) == nil {
+		if dagBlocks[h] != nil &&
+			dagBlocks[h].Header() != nil &&
+			dagBlocks[h].Body().CalculateHash() == dagBlocks[h].BodyHash() {
+			continue
+		}
+		if h != (common.Hash{}) {
 			unloaded = append(unloaded, h)
 		}
 	}
@@ -633,7 +639,12 @@ func (d *Downloader) syncWithPeerUnknownDagBlocks(p *peerConnection, dag common.
 	dagBlocks := d.blockchain.GetBlocksByHashes(remoteHashes)
 	dag = make(common.HashArray, 0, len(remoteHashes))
 	for _, h := range remoteHashes {
-		if dagBlocks[h] == nil && h != (common.Hash{}) {
+		if dagBlocks[h] != nil &&
+			dagBlocks[h].Header() != nil &&
+			dagBlocks[h].Body().CalculateHash() == dagBlocks[h].BodyHash() {
+			continue
+		}
+		if h != (common.Hash{}) {
 			dag = append(dag, h)
 		}
 	}
@@ -724,7 +735,12 @@ func (d *Downloader) syncWithPeerUnknownBlocksWithParents(p *peerConnection, has
 	dagBlocks := d.blockchain.GetBlocksByHashes(diffHashes)
 	reqHashes := make(common.HashArray, 0, len(diffHashes))
 	for _, h := range diffHashes {
-		if dagBlocks[h] == nil && h != (common.Hash{}) {
+		if dagBlocks[h] != nil &&
+			dagBlocks[h].Header() != nil &&
+			dagBlocks[h].Body().CalculateHash() == dagBlocks[h].BodyHash() {
+			continue
+		}
+		if h != (common.Hash{}) {
 			reqHashes = append(reqHashes, h)
 		}
 	}
@@ -1845,8 +1861,13 @@ func (d *Downloader) syncBySpines(p *peerConnection, baseSpine, terminalSpine co
 		// filter existed blocks
 		dag = make(common.HashArray, 0, len(remoteHashes))
 		dagBlocks := d.blockchain.GetBlocksByHashes(remoteHashes)
-		for h, b := range dagBlocks {
-			if b == nil && h != (common.Hash{}) {
+		for h := range dagBlocks {
+			if dagBlocks[h] != nil &&
+				dagBlocks[h].Header() != nil &&
+				dagBlocks[h].Body().CalculateHash() == dagBlocks[h].BodyHash() {
+				continue
+			}
+			if h != (common.Hash{}) {
 				dag = append(dag, h)
 			}
 		}
@@ -1926,8 +1947,13 @@ func (d *Downloader) syncBySlots(p *peerConnection, from, to uint64) error {
 	// filter existed blocks
 	dag := make(common.HashArray, 0, len(remoteHashes))
 	dagBlocks := d.blockchain.GetBlocksByHashes(remoteHashes)
-	for h, b := range dagBlocks {
-		if b == nil && h != (common.Hash{}) {
+	for h := range dagBlocks {
+		if dagBlocks[h] != nil &&
+			dagBlocks[h].Header() != nil &&
+			dagBlocks[h].Body().CalculateHash() == dagBlocks[h].BodyHash() {
+			continue
+		}
+		if h != (common.Hash{}) {
 			dag = append(dag, h)
 		}
 	}

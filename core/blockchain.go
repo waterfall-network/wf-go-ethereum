@@ -311,6 +311,16 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 		log.Info("Save genesis hash", "hash", bc.genesisBlock.Hash(), "fn", "NewBlockChain")
 	}
 
+	// set slotInfo on startup
+	if err = bc.SetSlotInfo(&types.SlotInfo{
+		GenesisTime:    bc.Genesis().Time(),
+		SecondsPerSlot: chainConfig.SecondsPerSlot,
+		SlotsPerEpoch:  chainConfig.SlotsPerEpoch,
+	}); err != nil {
+		return nil, err
+	}
+	log.Info("Loaded SlotInfo", "info", bc.GetSlotInfo())
+
 	var nilBlock = bc.genesisBlock
 	bc.lastFinalizedBlock.Store(nilBlock)
 	bc.lastFinalizedFastBlock.Store(nilBlock)
@@ -489,12 +499,11 @@ func (bc *BlockChain) loadLastState() error {
 		}
 	}
 
-	////load dag part of chain
-	//if err := bc.hc.loadTips(); err != nil {
-	//	log.Warn("State loading", "err", err)
-	//	bc.ResetTips()
-	//}
-	bc.ResetTips()
+	//load dag part of chain
+	if err := bc.hc.loadTips(); err != nil {
+		log.Warn("State loading", "err", err)
+		bc.ResetTips()
+	}
 	tips := bc.GetTips()
 	if len(tips) == 0 {
 		bc.ResetTips()
