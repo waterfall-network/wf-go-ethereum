@@ -185,16 +185,6 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 		return nil, err
 	}
 
-	// set slotInfo on startup
-	if err := eth.blockchain.SetSlotInfo(&types.SlotInfo{
-		GenesisTime:    eth.blockchain.Genesis().Time(),
-		SecondsPerSlot: chainConfig.SecondsPerSlot,
-		SlotsPerEpoch:  chainConfig.SlotsPerEpoch,
-	}); err != nil {
-		return nil, err
-	}
-	log.Info("Loaded SlotInfo", "info", eth.blockchain.GetSlotInfo())
-
 	currentEraNumber := rawdb.ReadCurrentEra(chainDb)
 	if eraInfo := rawdb.ReadEra(chainDb, currentEraNumber); eraInfo != nil {
 		eth.blockchain.SetNewEraInfo(eraInfo)
