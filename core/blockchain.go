@@ -755,6 +755,51 @@ func (bc *BlockChain) AppendNotProcessedValidatorSyncData(valSyncData []*types.V
 	}
 }
 
+func (bc *BlockChain) CleanInvalidNotProcessedValidatorSync(validator func(bc *BlockChain, stateHash common.Hash, slot uint64, valSyncOp *types.ValidatorSync) (bool, error)) {
+	var isUpdated bool
+	currOps := bc.GetNotProcessedValidatorSyncData()
+	head := bc.GetLastFinalizedHeader()
+
+	defer func(ts time.Time, itemsCount int) {
+		log.Info("^^^^^^^^^^^^ TIME",
+			"elapsed", common.PrettyDuration(time.Since(ts)),
+			"fn:", "CleanInvalidNotProcessedValidatorSync",
+			"items", itemsCount,
+			"currSlot", bc.GetSlotInfo().CurrentSlot(),
+		)
+	}(time.Now(), len(currOps))
+
+	for k, op := range currOps {
+		isValid, err := validator(bc, head.CpHash, head.Slot, op)
+		if isValid {
+			continue
+		}
+		delete(bc.notProcValSyncOps, k)
+		isUpdated = true
+
+		log.Warn("Clean not proc val sync op",
+			"OpType", op.OpType,
+			"ProcEpoch", op.ProcEpoch,
+			"Index", op.Index,
+			"InitTxHash", op.InitTxHash.Hex(),
+			"Amount", op.Amount.String(),
+			"Balance", op.Balance.String(),
+			"TxHash", fmt.Sprintf("%#x", op.TxHash),
+			"creator", fmt.Sprintf("%#x", op.Creator),
+			"err", err.Error(),
+			"headSlot", head.Slot,
+			"headNr", head.Nr(),
+			"head", fmt.Sprintf("%#x", head.Hash()),
+			"headCpNr", fmt.Sprintf("%d", head.CpNumber),
+			"headCp", fmt.Sprintf("%#x", head.CpHash),
+		)
+	}
+
+	if isUpdated {
+		rawdb.WriteNotProcessedValidatorKeys(bc.db, bc.notProcValSyncOps)
+	}
+}
+
 // GetNotProcessedValidatorSyncData get current not processed validator sync data.
 func (bc *BlockChain) GetNotProcessedValidatorSyncData() map[common.Hash]*types.ValidatorSync {
 	if bc.notProcValSyncOps == nil {

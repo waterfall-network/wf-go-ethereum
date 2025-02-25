@@ -134,6 +134,11 @@ type MockblockChain struct {
 	recorder *MockblockChainMockRecorder
 }
 
+func (m *MockblockChain) CleanInvalidNotProcessedValidatorSync(validator func(bc *core.BlockChain, stateHash common.Hash, slot uint64, valSyncOp *types.ValidatorSync) (bool, error)) {
+	//TODO implement me
+	panic("implement me")
+}
+
 // MockblockChainMockRecorder is the mock recorder for MockblockChain.
 type MockblockChainMockRecorder struct {
 	mock *MockblockChain
