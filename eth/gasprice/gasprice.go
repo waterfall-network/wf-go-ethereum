@@ -70,6 +70,7 @@ type OracleBackend interface {
 	GetLastCoordinatedCheckpoint() *types.Checkpoint
 	GetEpoch(epoch uint64) common.Hash
 	EpochToEra(uint64) *era.Era
+	UnlockVerifiers(accounts []common.Address) error
 }
 
 // Oracle recommends gas prices based on the content of recent

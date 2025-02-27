@@ -64,6 +64,9 @@ var DefaultConfig = Config{
 		MaxPeers:   50,
 		NAT:        nat.Any(),
 	},
+	VerifiersKeystore: &VerifiersKeystoreConfig{
+		UnlockAllVerifiers: false,
+	},
 }
 
 // DefaultDataDir is the default data directory to use for the databases and other

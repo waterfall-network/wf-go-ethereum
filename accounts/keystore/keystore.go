@@ -499,11 +499,11 @@ func (ks *KeyStore) ImportPreSaleKey(keyJSON []byte, passphrase string) (account
 }
 
 // IsUnlocked checks if an account is unlocked.
-func (ks *KeyStore) IsUnlocked(a accounts.Account) bool {
+func (ks *KeyStore) IsUnlocked(address common.Address) bool {
 	ks.mu.RLock()
 	defer ks.mu.RUnlock()
 
-	_, found := ks.unlocked[a.Address]
+	_, found := ks.unlocked[address]
 	return found
 }
 

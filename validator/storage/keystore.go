@@ -1,18 +1,4 @@
-// Copyright 2024   Blue Wave Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//     http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
-package creator
+package storage
 
 import (
 	"fmt"
@@ -25,11 +11,94 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/console/prompt"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/log"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/node"
 )
+
+type VerifiersKeystore interface {
+	UnlockAccounts(accounts []common.Address) error
+	IsAddressUnlocked(address common.Address) bool
+	UnlockAllAccounts()
+}
+
+type verifiersKeystore struct {
+	keystore *keystore.KeyStore
+	cfg      *node.VerifiersKeystoreConfig
+}
+
+func NewKeystore(cfg *node.VerifiersKeystoreConfig) VerifiersKeystore {
+	keyStoreDir, err := cfg.KeyDir()
+	if err != nil {
+		return nil
+	}
+
+	return &verifiersKeystore{
+		keystore: keystore.NewKeyStore(keyStoreDir, keystore.StandardScryptN, keystore.StandardScryptP),
+		cfg:      cfg,
+	}
+}
+
+// UnlockAccounts unlocks a specified accounts list.
+func (k *verifiersKeystore) UnlockAccounts(accounts []common.Address) error {
+	passwords, err := k.getPasswords()
+	if err != nil {
+		return err
+	}
+	keystoreAccounts := k.keystore.Accounts()
+
+	for _, account := range accounts {
+		// Find the position of the target account.
+		position := findAccountPosition(keystoreAccounts, account.String())
+		if position < 0 {
+			continue
+		}
+
+		err = k.unlockAccount(account.String(), position, passwords)
+		if err != nil {
+			log.Error("unlock account failed", "error", err, "account", account.String())
+		}
+	}
+
+	return nil
+}
+
+func (k *verifiersKeystore) UnlockAllAccounts() {
+	passwords, err := k.getPasswords()
+	if err != nil {
+		return
+	}
+	keystoreAccounts := k.keystore.Accounts()
+
+	for _, account := range keystoreAccounts {
+		// Find the position of the target account.
+		position := findAccountPosition(keystoreAccounts, account.Address.String())
+		if position < 0 {
+			continue
+		}
+
+		err = k.unlockAccount(account.Address.String(), position, passwords)
+		if err != nil {
+			log.Error("unlock account failed", "error", err, "account", account.Address.String())
+		}
+	}
+}
+
+func (k *verifiersKeystore) IsAddressUnlocked(address common.Address) bool {
+	return k.keystore.IsUnlocked(address)
+}
+
+// getPasswords returns a list of passwords from the password directory.
+func (k *verifiersKeystore) getPasswords() ([]string, error) {
+	dir, err := k.cfg.PasswordsDir()
+	if err != nil {
+		return nil, err
+	}
+
+	return makePasswordList(dir)
+}
 
 // MakeAddress converts an account specified directly as a hex encoded string or
 // a key index in the key store to an internal account representation.
-func MakeAddress(ks *keystore.KeyStore, account string) (accounts.Account, error) {
+func (k *verifiersKeystore) makeAddress(account string) (accounts.Account, error) {
 	// If the specified account is a valid address, return it
 	if common.IsHexAddress(account) {
 		return accounts.Account{Address: common.HexToAddress(account)}, nil
@@ -45,7 +114,7 @@ func MakeAddress(ks *keystore.KeyStore, account string) (accounts.Account, error
 	log.Warn("Please use explicit addresses! (can search via `geth account list`)")
 	log.Warn("-------------------------------------------------------------------")
 
-	accs := ks.Accounts()
+	accs := k.keystore.Accounts()
 	if len(accs) <= index {
 		return accounts.Account{}, fmt.Errorf("index %d higher than number of accounts %d", index, len(accs))
 	}
@@ -98,23 +167,29 @@ func findAccountPosition(accounts []accounts.Account, targetAddress string) int 
 }
 
 // tries unlocking the specified account a few times.
-func unlockAccount(ks *keystore.KeyStore, address string, pos int, passwords []string) error {
-	account, err := MakeAddress(ks, address)
+func (k *verifiersKeystore) unlockAccount(address string, pos int, passwords []string) error {
+	account, err := k.makeAddress(address)
 	if err != nil {
 		log.Error("Could not list accounts", "error", err)
 		return err
 	}
 
-	for trials := 0; trials < 3; trials++ {
-		password := getPassPhraseWithList(false, pos, passwords)
-		err = ks.Unlock(account, password)
-		if err != nil {
-			log.Warn("Failed to unlock account", "account", address, "error", err)
-			return err
-		}
+	if k.keystore.IsUnlocked(account.Address) {
+		return nil
 	}
 
-	log.Info("Unlocked account", "address", account.Address.Hex())
+	for trials := 0; trials < 3; trials++ {
+		password := getPassPhraseWithList(false, pos, passwords)
+		err = k.keystore.Unlock(account, password)
+		if err != nil {
+			log.Warn("Failed to unlock account, try again", "account", address, "error", err)
+			continue
+		}
+
+		log.Info("Unlocked account", "address", account.Address.Hex())
+
+		return nil
+	}
 
 	return nil
 }

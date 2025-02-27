@@ -30,6 +30,7 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/eth/downloader"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/ethdb"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/event"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/node"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/tests/testutils"
 )
@@ -149,7 +150,7 @@ func newTestHandlerWithBlocks(blocks int) *testHandler {
 		Validators: depositData,
 	}).MustCommit(db)
 
-	chain, _ := core.NewBlockChain(db, nil, params.TestChainConfig, vm.Config{}, nil)
+	chain, _ := core.NewBlockChain(db, nil, params.TestChainConfig, vm.Config{}, nil, &node.VerifiersKeystoreConfig{})
 
 	bs, _ := core.GenerateChain(params.TestChainConfig, chain.Genesis(), db, blocks, nil)
 	if _, err := chain.InsertChain(bs); err != nil {

@@ -61,6 +61,7 @@ type Blockchain interface {
 	GetEpoch(epoch uint64) common.Hash
 	EpochToEra(uint64) *era.Era
 	GetEraInfo() *era.EraInfo
+	UnlockVerifiers(accounts []common.Address) error
 }
 
 // PublicValidatorAPI provides an API to access validator functions.

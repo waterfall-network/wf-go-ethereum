@@ -187,6 +187,7 @@ func TestGetShuffledValidators(t *testing.T) {
 		Root:   common.Hash{},
 	})
 	bc.EXPECT().GetEpoch(gomock.AssignableToTypeOf(uint64(0))).AnyTimes().Return(common.Hash{0x11})
+	bc.EXPECT().UnlockVerifiers(gomock.AssignableToTypeOf([]common.Address{})).AnyTimes().Return(nil)
 
 	store := NewStorage(testmodels.TestChainConfig)
 	store.SetValidatorsList(stateDb, testmodels.InputValidators)

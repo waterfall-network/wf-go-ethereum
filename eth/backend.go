@@ -180,7 +180,8 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 			Preimages:           config.Preimages,
 		}
 	)
-	eth.blockchain, err = core.NewBlockChain(chainDb, cacheConfig, chainConfig, vmConfig, &config.TxLookupLimit)
+
+	eth.blockchain, err = core.NewBlockChain(chainDb, cacheConfig, chainConfig, vmConfig, &config.TxLookupLimit, stack.Config().VerifiersKeystore)
 	if err != nil {
 		return nil, err
 	}

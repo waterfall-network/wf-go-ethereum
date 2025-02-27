@@ -533,41 +533,29 @@ func (c *Creator) createNewBlock(coinbase common.Address, creators []common.Addr
 	syncData := validatorsync.GetPendingValidatorSyncData(c.bc)
 	if len(syncData) > 0 || len(pendingTxs) > 0 || needEmptyBlock {
 		startTime := time.Now()
-		ks, err := c.getKeystore(c.backend.AccountManager())
-		if err != nil {
-			log.Error("Failed to fetch keystore", "error", err)
-			return
-		}
-		log.Info("BLOCK CREATION TIME",
-			"elapsed", common.PrettyDuration(time.Since(startTime)),
-			"func:", "getKeyStore",
-			"slot", header.Slot,
-		)
 
-		acc := accounts.Account{Address: coinbase}
-		start = time.Now()
-		ok := ks.IsUnlocked(acc)
+		ok := c.bc.IsAddressUnlocked(coinbase)
 		log.Info("BLOCK CREATION TIME",
 			"elapsed", common.PrettyDuration(time.Since(startTime)),
 			"func:", "IsUnlocked",
-			"account", acc.Address.Hex(),
+			"account", coinbase.Hex(),
 			"slot", header.Slot,
 		)
 		if !ok {
 			startTime = time.Now()
-			if err := c.unlockAccount(ks, acc.Address.String()); err != nil {
-				log.Warn("Creator: unlock account failed",
+			if err := c.bc.UnlockVerifiers([]common.Address{coinbase}); err != nil {
+				log.Warn("Creator: unlock verifier failed",
 					"error", err,
 					"elapsed", common.PrettyDuration(time.Since(startTime)),
 					"slot", header.Slot,
-					"addr", acc.Address.String())
+					"addr", coinbase.String())
 				return
 			}
 
 			log.Info("BLOCK CREATION TIME",
 				"elapsed", common.PrettyDuration(time.Since(startTime)),
 				"func:", "unlockAccount",
-				"address", acc.Address.Hex(),
+				"address", coinbase.Hex(),
 				"slot", header.Slot,
 			)
 		}
@@ -972,39 +960,6 @@ func (c *Creator) SetNodeCreators(accounts []common.Address) {
 	for _, account := range accounts {
 		c.nodeCreators[account] = struct{}{}
 	}
-}
-
-// unlockAccount unlocks a specified account.
-func (c *Creator) unlockAccount(ks *keystore.KeyStore, targetAddress string) error {
-	passwords, err := c.getPasswords()
-	if err != nil {
-		return err
-	}
-	keystoreAccounts := ks.Accounts()
-
-	// Find the position of the target account.
-	position := findAccountPosition(keystoreAccounts, targetAddress)
-
-	// Unlock the account.log.Warn("Referring to accounts by order in the keystore folder is dangerous!")
-	return unlockAccount(ks, targetAddress, position, passwords)
-}
-
-// getPasswords returns a list of passwords from the password directory.
-func (c *Creator) getPasswords() ([]string, error) {
-	return makePasswordList(c.config.PasswordDir)
-}
-
-// getKeystore retrieves and set cache the encrypted keystore from the account manager.
-func (c *Creator) getKeystore(am *accounts.Manager) (*keystore.KeyStore, error) {
-	if c.current.keystore != nil {
-		return c.current.keystore, nil
-	}
-	if ks := am.Backends(keystore.KeyStoreType); len(ks) > 0 {
-		c.current.keystore = ks[0].(*keystore.KeyStore)
-		return ks[0].(*keystore.KeyStore), nil
-	}
-
-	return nil, errors.New("local keystore not used")
 }
 
 func (c *Creator) signBlockHeader(h *types.Header) (*types.Header, error) {

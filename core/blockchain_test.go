@@ -8,6 +8,7 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/rawdb"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/vm"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/node"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/tests/testutils"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/era"
@@ -35,7 +36,7 @@ func TestEpochToEra(t *testing.T) {
 
 	genesisBlock := genesis.ToBlock(db)
 
-	bc, err := NewBlockChain(db, nil, params.TestChainConfig, vm.Config{}, nil)
+	bc, err := NewBlockChain(db, nil, params.TestChainConfig, vm.Config{}, nil, &node.VerifiersKeystoreConfig{})
 	testutils.AssertNoError(t, err)
 
 	startEra := &era.Era{
@@ -151,7 +152,7 @@ func TestStartTransitionPeriod(t *testing.T) {
 
 	genesisBlock := genesis.ToBlock(db)
 
-	bc, err := NewBlockChain(db, nil, params.TestChainConfig, vm.Config{}, nil)
+	bc, err := NewBlockChain(db, nil, params.TestChainConfig, vm.Config{}, nil, &node.VerifiersKeystoreConfig{})
 	testutils.AssertNoError(t, err)
 
 	curEra := &era.Era{
@@ -237,7 +238,7 @@ func TestHandleEra(t *testing.T) {
 
 	genesisBlock := genesis.ToBlock(db)
 
-	bc, err := NewBlockChain(db, nil, params.TestChainConfig, vm.Config{}, nil)
+	bc, err := NewBlockChain(db, nil, params.TestChainConfig, vm.Config{}, nil, &node.VerifiersKeystoreConfig{})
 	testutils.AssertNoError(t, err)
 
 	curEra := &era.Era{

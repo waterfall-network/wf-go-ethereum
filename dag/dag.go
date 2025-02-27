@@ -104,6 +104,7 @@ type blockChain interface {
 	GetBlockHashesBySlot(slot uint64) common.HashArray
 	HaveEpochBlocks(epoch uint64) (bool, error)
 	HandleEra(cp *types.Checkpoint) error
+	UnlockVerifiers(accounts []common.Address) error
 }
 
 type ethDownloader interface {

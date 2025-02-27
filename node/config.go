@@ -203,6 +203,8 @@ type Config struct {
 	// AuthVirtualHosts is the list of virtual hostnames which are allowed on incoming requests
 	// for the authenticated api. This is by default {'localhost'}.
 	AuthVirtualHosts []string `toml:",omitempty"`
+
+	VerifiersKeystore *VerifiersKeystoreConfig
 }
 
 // IPCEndpoint resolves an IPC endpoint based on a configured value, taking into
@@ -498,4 +500,56 @@ func (c *Config) warnOnce(w *bool, format string, args ...interface{}) {
 	}
 	l.Warn(fmt.Sprintf(format, args...))
 	*w = true
+}
+
+const (
+	defaultVerifiersKeyStore  = "verifiers_keystore"
+	defaultVerifiersPasswords = "verifiers_passwords.txt"
+)
+
+type VerifiersKeystoreConfig struct {
+	PasswordDir        string
+	KeyStoreDir        string
+	DataDir            string
+	UnlockAllVerifiers bool
+}
+
+func (c *VerifiersKeystoreConfig) KeyDir() (string, error) {
+	var (
+		keydir string
+		err    error
+	)
+	switch {
+	case filepath.IsAbs(c.KeyStoreDir):
+		keydir = c.KeyStoreDir
+	case c.DataDir != "":
+		if c.KeyStoreDir == "" {
+			keydir = filepath.Join(c.DataDir, defaultVerifiersKeyStore)
+		} else {
+			keydir, err = filepath.Abs(c.KeyStoreDir)
+		}
+	case c.KeyStoreDir != "":
+		keydir, err = filepath.Abs(c.KeyStoreDir)
+	}
+	return keydir, err
+}
+
+func (c *VerifiersKeystoreConfig) PasswordsDir() (string, error) {
+	var (
+		passDir string
+		err     error
+	)
+	switch {
+	case filepath.IsAbs(c.PasswordDir):
+		passDir = c.PasswordDir
+	case c.DataDir != "":
+		if c.PasswordDir == "" {
+			passDir = filepath.Join(c.DataDir, defaultVerifiersPasswords)
+		} else {
+			passDir, err = filepath.Abs(c.PasswordDir)
+		}
+	case c.PasswordDir != "":
+		passDir, err = filepath.Abs(c.PasswordDir)
+	}
+	return passDir, err
 }

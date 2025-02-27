@@ -28,15 +28,15 @@ import (
 	"testing"
 	"time"
 
-	"gitlab.waterfall.network/waterfall/protocol/gwat/ethdb"
-
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/rawdb"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/state"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/vm"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/crypto"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/ethdb"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/event"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/node"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/tests/testutils"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/trie"
@@ -112,7 +112,7 @@ func defaultTestBC(addr common.Address) *BlockChain {
 	rawdb.WriteEra(database, genesisEra.Number, genesisEra)
 	rawdb.WriteCurrentEra(database, genesisEra.Number)
 	// i.o. ethash.NewFaker()
-	bc, _ := NewBlockChain(database, nil, genesis.Config, vm.Config{}, nil)
+	bc, _ := NewBlockChain(database, nil, genesis.Config, vm.Config{}, nil, &node.VerifiersKeystoreConfig{})
 
 	return bc
 }
@@ -158,6 +158,11 @@ type testBlockChain struct {
 	moveToProcessingCh chan *types.Transaction
 	removeTxFromPoolCh chan *types.Transaction
 	genesisBlock       *types.Block
+}
+
+func (bc *testBlockChain) UnlockVerifiers(accounts []common.Address) error {
+	//TODO implement me
+	panic("implement me")
 }
 
 func (bc *testBlockChain) GetLastCoordinatedCheckpoint() *types.Checkpoint {

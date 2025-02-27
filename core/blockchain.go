@@ -46,6 +46,7 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/internal/syncx"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/log"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/metrics"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/node"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/token"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/trie"
@@ -231,7 +232,8 @@ type BlockChain struct {
 	checkpointCache       *lru.Cache
 	checkpointSyncCache   *types.Checkpoint
 
-	validatorStorage valStore.Storage
+	validatorStorage  valStore.Storage
+	verifiersKeyStore valStore.VerifiersKeystore
 
 	insBlockCache []*types.Block // Cache for blocks to insert late
 
@@ -252,7 +254,14 @@ type BlockChain struct {
 // NewBlockChain returns a fully initialised block chain using information
 // available in the database. It initialises the default Ethereum Validator and
 // Processor.
-func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig, vmConfig vm.Config, txLookupLimit *uint64) (*BlockChain, error) {
+func NewBlockChain(
+	db ethdb.Database,
+	cacheConfig *CacheConfig,
+	chainConfig *params.ChainConfig,
+	vmConfig vm.Config,
+	txLookupLimit *uint64,
+	keyStoreCfg *node.VerifiersKeystoreConfig,
+) (*BlockChain, error) {
 	if cacheConfig == nil {
 		cacheConfig = defaultCacheConfig
 	}
@@ -290,7 +299,13 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 		vmConfig:              vmConfig,
 		syncProvider:          nil,
 		validatorStorage:      valStore.NewStorage(chainConfig),
+		verifiersKeyStore:     valStore.NewKeystore(keyStoreCfg),
 	}
+
+	if keyStoreCfg.UnlockAllVerifiers {
+		bc.verifiersKeyStore.UnlockAllAccounts()
+	}
+
 	bc.validator = NewBlockValidator(chainConfig, bc)
 	bc.prefetcher = newStatePrefetcher(chainConfig, bc)
 	bc.processor = NewStateProcessor(chainConfig, bc)
@@ -5625,4 +5640,12 @@ func (bc *BlockChain) HandleEra(cp *types.Checkpoint) error {
 		return bc.StartTransitionPeriod(cp, spineRoot, spineHash)
 	}
 	return nil
+}
+
+func (bc *BlockChain) UnlockVerifiers(accounts []common.Address) error {
+	return bc.verifiersKeyStore.UnlockAccounts(accounts)
+}
+
+func (bc *BlockChain) IsAddressUnlocked(address common.Address) bool {
+	return bc.verifiersKeyStore.IsAddressUnlocked(address)
 }
