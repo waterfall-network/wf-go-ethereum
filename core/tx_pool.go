@@ -181,7 +181,7 @@ type blockChain interface {
 	GetLastCoordinatedCheckpoint() *types.Checkpoint
 	GetEpoch(epoch uint64) common.Hash
 	EpochToEra(uint64) *era.Era
-	UnlockVerifiers(accounts []common.Address) error
+	UnlockVerifiers(accounts [][]common.Address) error
 }
 
 // TxPoolConfig are the configuration parameters of the transaction pool.

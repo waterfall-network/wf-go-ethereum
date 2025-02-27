@@ -51,7 +51,7 @@ type EthAPIBackend struct {
 	gpo                 *gasprice.Oracle
 }
 
-func (b *EthAPIBackend) UnlockVerifiers(accounts []common.Address) error {
+func (b *EthAPIBackend) UnlockVerifiers(accounts [][]common.Address) error {
 	return b.eth.BlockChain().UnlockVerifiers(accounts)
 }
 

@@ -543,7 +543,7 @@ func (c *Creator) createNewBlock(coinbase common.Address, creators []common.Addr
 		)
 		if !ok {
 			startTime = time.Now()
-			if err := c.bc.UnlockVerifiers([]common.Address{coinbase}); err != nil {
+			if err := c.bc.UnlockVerifiers([][]common.Address{{coinbase}}); err != nil {
 				log.Warn("Creator: unlock verifier failed",
 					"error", err,
 					"elapsed", common.PrettyDuration(time.Since(startTime)),

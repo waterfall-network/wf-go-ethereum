@@ -39,7 +39,7 @@ type blockchain interface {
 	GetLastCoordinatedCheckpoint() *types.Checkpoint
 	GetEpoch(epoch uint64) common.Hash
 	EpochToEra(uint64) *era.Era
-	UnlockVerifiers(accounts []common.Address) error
+	UnlockVerifiers(accounts [][]common.Address) error
 }
 
 type Storage interface {
@@ -257,13 +257,6 @@ func (s *storage) GetCreatorsBySlot(bc blockchain, filter ...uint64) ([]common.A
 		return nil, err
 	}
 
-	go func() {
-		err = bc.UnlockVerifiers(shuffledValidators)
-		if err != nil {
-			log.Error("unlock verifiers error", "err", err)
-		}
-	}()
-
 	shuffledValidatorsBySlots := breakByValidatorsBySlotCount(shuffledValidators, s.config.ValidatorsPerSlot, s.config.SlotsPerEpoch)
 
 	if uint64(len(shuffledValidatorsBySlots)) < s.config.SlotsPerEpoch {
@@ -276,6 +269,13 @@ func (s *storage) GetCreatorsBySlot(bc blockchain, filter ...uint64) ([]common.A
 			shuffledValidatorsBySlots = append(shuffledValidatorsBySlots, breakByValidatorsBySlotCount(shuffledValidators, s.config.ValidatorsPerSlot, s.config.SlotsPerEpoch)...)
 		}
 	}
+
+	go func() {
+		err = bc.UnlockVerifiers(shuffledValidatorsBySlots)
+		if err != nil {
+			log.Error("unlock verifiers error", "err", err)
+		}
+	}()
 
 	err = s.validatorsCache.addShuffledValidators(shuffledValidatorsBySlots, params[0:1])
 	if err != nil {

@@ -160,7 +160,7 @@ type testBlockChain struct {
 	genesisBlock       *types.Block
 }
 
-func (bc *testBlockChain) UnlockVerifiers(accounts []common.Address) error {
+func (bc *testBlockChain) UnlockVerifiers(accounts [][]common.Address) error {
 	//TODO implement me
 	panic("implement me")
 }

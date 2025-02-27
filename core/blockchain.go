@@ -5642,7 +5642,7 @@ func (bc *BlockChain) HandleEra(cp *types.Checkpoint) error {
 	return nil
 }
 
-func (bc *BlockChain) UnlockVerifiers(accounts []common.Address) error {
+func (bc *BlockChain) UnlockVerifiers(accounts [][]common.Address) error {
 	return bc.verifiersKeyStore.UnlockAccounts(accounts)
 }
 

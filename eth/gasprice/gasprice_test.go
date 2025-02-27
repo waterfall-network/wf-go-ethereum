@@ -46,7 +46,7 @@ type testBackend struct {
 	pending bool // pending block available
 }
 
-func (b *testBackend) UnlockVerifiers(accounts []common.Address) error {
+func (b *testBackend) UnlockVerifiers(accounts [][]common.Address) error {
 	return b.chain.UnlockVerifiers(accounts)
 }
 

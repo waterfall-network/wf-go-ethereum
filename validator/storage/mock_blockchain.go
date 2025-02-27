@@ -125,7 +125,7 @@ func (mr *MockblockchainMockRecorder) StateAt(root interface{}) *gomock.Call {
 }
 
 // UnlockVerifiers mocks base method.
-func (m *Mockblockchain) UnlockVerifiers(accounts []common.Address) error {
+func (m *Mockblockchain) UnlockVerifiers(accounts [][]common.Address) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UnlockVerifiers", accounts)
 	ret0, _ := ret[0].(error)

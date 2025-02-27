@@ -15,7 +15,7 @@ import (
 )
 
 type VerifiersKeystore interface {
-	UnlockAccounts(accounts []common.Address) error
+	UnlockAccounts(accounts [][]common.Address) error
 	IsAddressUnlocked(address common.Address) bool
 	UnlockAllAccounts()
 }
@@ -38,23 +38,25 @@ func NewKeystore(cfg *node.VerifiersKeystoreConfig) VerifiersKeystore {
 }
 
 // UnlockAccounts unlocks a specified accounts list.
-func (k *verifiersKeystore) UnlockAccounts(accounts []common.Address) error {
+func (k *verifiersKeystore) UnlockAccounts(accounts [][]common.Address) error {
 	passwords, err := k.getPasswords()
 	if err != nil {
 		return err
 	}
 	keystoreAccounts := k.keystore.Accounts()
 
-	for _, account := range accounts {
-		// Find the position of the target account.
-		position := findAccountPosition(keystoreAccounts, account.String())
-		if position < 0 {
-			continue
-		}
+	for _, slotAccount := range accounts {
+		for _, account := range slotAccount {
+			// Find the position of the target account.
+			position := findAccountPosition(keystoreAccounts, account.String())
+			if position < 0 {
+				continue
+			}
 
-		err = k.unlockAccount(account.String(), position, passwords)
-		if err != nil {
-			log.Error("unlock account failed", "error", err, "account", account.String())
+			err = k.unlockAccount(account.String(), position, passwords)
+			if err != nil {
+				log.Error("unlock account failed", "error", err, "account", account.String())
+			}
 		}
 	}
 
