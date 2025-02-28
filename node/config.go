@@ -508,10 +508,35 @@ const (
 )
 
 type VerifiersKeystoreConfig struct {
-	PasswordDir        string
-	KeyStoreDir        string
-	DataDir            string
-	UnlockAllVerifiers bool
+	PasswordFile         string
+	KeyStoreDir          string
+	DataDir              string
+	UnlockAllVerifiers   bool
+	OriginalPasswordFile string
+	OriginalKeyStoreDir  string
+}
+
+func isDirEmptyOrMissing(path string) bool {
+	if path == "" {
+		return true
+	}
+	files, err := os.ReadDir(path)
+	if err != nil {
+		return true
+	}
+
+	return len(files) == 0
+}
+
+func isFileEmptyOrMissing(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil || info.IsDir() {
+		return true
+	}
+	if info.Size() == 0 {
+		return true
+	}
+	return false
 }
 
 func (c *VerifiersKeystoreConfig) KeyDir() (string, error) {
@@ -519,6 +544,7 @@ func (c *VerifiersKeystoreConfig) KeyDir() (string, error) {
 		keydir string
 		err    error
 	)
+
 	switch {
 	case filepath.IsAbs(c.KeyStoreDir):
 		keydir = c.KeyStoreDir
@@ -531,25 +557,36 @@ func (c *VerifiersKeystoreConfig) KeyDir() (string, error) {
 	case c.KeyStoreDir != "":
 		keydir, err = filepath.Abs(c.KeyStoreDir)
 	}
+
+	if isDirEmptyOrMissing(keydir) && c.OriginalKeyStoreDir != "" {
+		return c.OriginalKeyStoreDir, nil
+	}
+
 	return keydir, err
 }
 
-func (c *VerifiersKeystoreConfig) PasswordsDir() (string, error) {
+func (c *VerifiersKeystoreConfig) PasswordsFilePath() (string, error) {
 	var (
-		passDir string
-		err     error
+		passFile string
+		err      error
 	)
+
 	switch {
-	case filepath.IsAbs(c.PasswordDir):
-		passDir = c.PasswordDir
+	case filepath.IsAbs(c.PasswordFile):
+		passFile = c.PasswordFile
 	case c.DataDir != "":
-		if c.PasswordDir == "" {
-			passDir = filepath.Join(c.DataDir, defaultVerifiersPasswords)
+		if c.PasswordFile == "" {
+			passFile = filepath.Join(c.DataDir, defaultVerifiersPasswords)
 		} else {
-			passDir, err = filepath.Abs(c.PasswordDir)
+			passFile, err = filepath.Abs(c.PasswordFile)
 		}
-	case c.PasswordDir != "":
-		passDir, err = filepath.Abs(c.PasswordDir)
+	case c.PasswordFile != "":
+		passFile, err = filepath.Abs(c.PasswordFile)
 	}
-	return passDir, err
+
+	if isFileEmptyOrMissing(passFile) && c.OriginalPasswordFile != "" {
+		return c.OriginalPasswordFile, nil
+	}
+
+	return passFile, err
 }

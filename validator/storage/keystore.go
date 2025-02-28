@@ -90,7 +90,7 @@ func (k *verifiersKeystore) IsAddressUnlocked(address common.Address) bool {
 
 // getPasswords returns a list of passwords from the password directory.
 func (k *verifiersKeystore) getPasswords() ([]string, error) {
-	dir, err := k.cfg.PasswordsDir()
+	dir, err := k.cfg.PasswordsFilePath()
 	if err != nil {
 		return nil, err
 	}
