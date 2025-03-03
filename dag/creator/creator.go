@@ -534,7 +534,7 @@ func (c *Creator) createNewBlock(coinbase common.Address, creators []common.Addr
 	if len(syncData) > 0 || len(pendingTxs) > 0 || needEmptyBlock {
 		startTime := time.Now()
 
-		ok := c.bc.IsAddressUnlocked(coinbase)
+		ok := c.bc.IsVerifierUnlocked(coinbase)
 		log.Info("BLOCK CREATION TIME",
 			"elapsed", common.PrettyDuration(time.Since(startTime)),
 			"func:", "IsUnlocked",

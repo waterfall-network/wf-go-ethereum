@@ -5646,6 +5646,6 @@ func (bc *BlockChain) UnlockVerifiers(accounts [][]common.Address) error {
 	return bc.verifiersKeyStore.UnlockAccounts(accounts)
 }
 
-func (bc *BlockChain) IsAddressUnlocked(address common.Address) bool {
-	return bc.verifiersKeyStore.IsAddressUnlocked(address)
+func (bc *BlockChain) IsVerifierUnlocked(verifierAddress common.Address) bool {
+	return bc.verifiersKeyStore.IsVerifierUnlocked(verifierAddress)
 }
