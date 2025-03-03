@@ -1,6 +1,7 @@
 package core
 
 import (
+	"gitlab.waterfall.network/waterfall/protocol/gwat/node"
 	"math/big"
 	"strconv"
 	"testing"
@@ -32,7 +33,7 @@ func initValSyncOpChain(t *testing.T) (bc *BlockChain) {
 
 	genesis.MustCommit(db)
 
-	bc, err := NewBlockChain(db, nil, params.TestChainConfig, vm.Config{}, nil)
+	bc, err := NewBlockChain(db, nil, params.TestChainConfig, vm.Config{}, nil, &node.VerifiersKeystoreConfig{})
 	testutils.AssertNoError(t, err)
 	return bc
 }
