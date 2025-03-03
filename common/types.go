@@ -213,9 +213,9 @@ func HashArrayFromBytes(data []byte) HashArray {
 // ToBytes encodes the HashArray structure
 // to byte representation.
 func (ha HashArray) ToBytes() []byte {
-	res := []byte{}
+	res := make([]byte, len(ha)*HashLength)
 	for i := 0; i < len(ha); i++ {
-		res = append(res, ha[i].Bytes()...)
+		copy(res[i*HashLength:(i+1)*HashLength], ha[i][:])
 	}
 	return res
 }

@@ -42,6 +42,7 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/era"
 	valStore "gitlab.waterfall.network/waterfall/protocol/gwat/validator/storage"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/validatorsync"
 )
 
 var (
@@ -104,6 +105,8 @@ type blockChain interface {
 	GetBlockHashesBySlot(slot uint64) common.HashArray
 	HaveEpochBlocks(epoch uint64) (bool, error)
 	HandleEra(cp *types.Checkpoint) error
+
+	CleanInvalidNotProcessedValidatorSync(validator func(bc *core.BlockChain, stateHash common.Hash, slot uint64, valSyncOp *types.ValidatorSync) (bool, error))
 	UnlockVerifiers(accounts [][]common.Address) error
 }
 
@@ -715,6 +718,8 @@ func (d *Dag) workLoop() {
 	secPerSlot := d.bc.GetSlotInfo().SecondsPerSlot
 	genesisTime := time.Unix(int64(d.bc.GetSlotInfo().GenesisTime), 0)
 	slotTicker := slotticker.NewSlotTicker(genesisTime, secPerSlot)
+	// clean invalid not processed val sync pool
+	d.bc.CleanInvalidNotProcessedValidatorSync(validatorsync.ValidateCreateTxValidatorSyncOp)
 
 	for {
 		select {
@@ -814,6 +819,11 @@ func (d *Dag) work(slot uint64, slotCreators []common.Address) {
 	}
 
 	d.saveCheckpoint(d.bc.GetLastCoordinatedCheckpoint())
+
+	if d.bc.GetSlotInfo().CurrentSlot() == slot && slot%d.bc.Config().SlotsPerEpoch == d.bc.Config().SlotsPerEpoch/2 {
+		// clean invalid not processed val sync pool
+		d.bc.CleanInvalidNotProcessedValidatorSync(validatorsync.ValidateCreateTxValidatorSyncOp)
+	}
 }
 
 // getLastFinalizeApiSlot returns the slot of last HandleFinalize api call.

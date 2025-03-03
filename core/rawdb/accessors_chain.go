@@ -1007,18 +1007,17 @@ func ReadNotProcessedValidatorSyncOps(db ethdb.KeyValueReader) []*types.Validato
 	return res
 }
 
-// WriteNotProcessedValidatorSyncOps stores the not processed validator sync operations.
-func WriteNotProcessedValidatorSyncOps(db ethdb.KeyValueWriter, valSyncOps []*types.ValidatorSync) {
+// WriteNotProcessedValidatorKeys stores the not processed validator sync operations keys.
+func WriteNotProcessedValidatorKeys(db ethdb.KeyValueWriter, valSyncOps map[common.Hash]*types.ValidatorSync) {
 	keyLen := len(validatorSyncKey(common.Hash{}))
 	dataLen := keyLen * len(valSyncOps)
 	data := make([]byte, 0, dataLen)
 	for _, vs := range valSyncOps {
 		key := validatorSyncKey(vs.InitTxHash)
-		WriteValidatorSync(db, vs)
 		data = append(data, key...)
 	}
 	if err := db.Put(valSyncNotProcKey, data); err != nil {
-		log.Crit("Failed to store the not processed validator sync operations", "err", err)
+		log.Crit("Failed to store the not processed validator sync operations keys", "err", err)
 	}
 }
 
