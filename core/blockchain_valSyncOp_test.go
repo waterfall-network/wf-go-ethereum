@@ -1,7 +1,6 @@
 package core
 
 import (
-	"gitlab.waterfall.network/waterfall/protocol/gwat/node"
 	"math/big"
 	"strconv"
 	"testing"
@@ -10,6 +9,7 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/rawdb"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/vm"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/node"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/tests/testutils"
 )
