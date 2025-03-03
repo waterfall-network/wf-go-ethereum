@@ -712,18 +712,8 @@ func (bc *BlockChain) SetValidatorSyncData(validatorSync *types.ValidatorSync) {
 	bc.valSyncCache.Add(key, validatorSync)
 	rawdb.WriteValidatorSync(bc.db, validatorSync)
 	if validatorSync.TxHash != nil && bc.notProcValSyncOps[key] != nil {
-		notProcValSyncOps := map[common.Hash]*types.ValidatorSync{}
-		for k, vs := range bc.notProcValSyncOps {
-			if k != key {
-				notProcValSyncOps[k] = vs
-			}
-		}
-		bc.notProcValSyncOps = notProcValSyncOps
-		vsArr := make([]*types.ValidatorSync, 0, len(bc.notProcValSyncOps))
-		for _, vs := range bc.notProcValSyncOps {
-			vsArr = append(vsArr, vs)
-		}
-		rawdb.WriteNotProcessedValidatorSyncOps(bc.db, vsArr)
+		delete(bc.notProcValSyncOps, key)
+		rawdb.WriteNotProcessedValidatorKeys(bc.db, bc.notProcValSyncOps)
 	}
 }
 
@@ -731,7 +721,7 @@ func (bc *BlockChain) SetValidatorSyncData(validatorSync *types.ValidatorSync) {
 // skips currently existed items
 func (bc *BlockChain) AppendNotProcessedValidatorSyncData(valSyncData []*types.ValidatorSync) {
 	currOps := bc.GetNotProcessedValidatorSyncData()
-	isUpdated := false
+	var batch ethdb.Batch
 	valSyncDataKeys := map[common.Hash]interface{}{}
 	for _, vs := range valSyncData {
 		valSyncDataKeys[vs.Key()] = struct{}{}
@@ -740,24 +730,73 @@ func (bc *BlockChain) AppendNotProcessedValidatorSyncData(valSyncData []*types.V
 			savedValSync := bc.GetValidatorSyncData(vs.InitTxHash)
 			if savedValSync == nil || (savedValSync.ProcEpoch > vs.ProcEpoch && savedValSync.TxHash != nil) {
 				bc.notProcValSyncOps[vs.Key()] = vs
-				isUpdated = true
+				if batch == nil {
+					batch = bc.db.NewBatch()
+				}
+				rawdb.WriteValidatorSync(batch, vs)
 			}
 		}
 	}
-	// rm handled operations
+	// rm handled operations & collect keys
 	for k, vs := range bc.notProcValSyncOps {
 		if vs.TxHash != nil && valSyncDataKeys[vs.Key()] == nil {
 			delete(bc.notProcValSyncOps, k)
-			isUpdated = true
+			if batch == nil {
+				batch = bc.db.NewBatch()
+			}
 		}
 	}
 
-	if isUpdated {
-		vsArr := make([]*types.ValidatorSync, 0, len(bc.notProcValSyncOps))
-		for _, vs := range bc.notProcValSyncOps {
-			vsArr = append(vsArr, vs)
+	if batch != nil {
+		rawdb.WriteNotProcessedValidatorKeys(batch, bc.notProcValSyncOps)
+		if err := batch.Write(); err != nil {
+			log.Crit("AppendNotProcessedValidatorSyncData: failed write batch to db", "err", err)
 		}
-		rawdb.WriteNotProcessedValidatorSyncOps(bc.db, vsArr)
+	}
+}
+
+func (bc *BlockChain) CleanInvalidNotProcessedValidatorSync(validator func(bc *BlockChain, stateHash common.Hash, slot uint64, valSyncOp *types.ValidatorSync) (bool, error)) {
+	var isUpdated bool
+	currOps := bc.GetNotProcessedValidatorSyncData()
+	head := bc.GetLastFinalizedHeader()
+
+	defer func(ts time.Time, itemsCount int) {
+		log.Info("^^^^^^^^^^^^ TIME",
+			"elapsed", common.PrettyDuration(time.Since(ts)),
+			"fn:", "CleanInvalidNotProcessedValidatorSync",
+			"items", itemsCount,
+			"currSlot", bc.GetSlotInfo().CurrentSlot(),
+		)
+	}(time.Now(), len(currOps))
+
+	for k, op := range currOps {
+		isValid, err := validator(bc, head.CpHash, head.Slot, op)
+		if isValid {
+			continue
+		}
+		delete(bc.notProcValSyncOps, k)
+		isUpdated = true
+
+		log.Warn("Clean not proc val sync op",
+			"OpType", op.OpType,
+			"ProcEpoch", op.ProcEpoch,
+			"Index", op.Index,
+			"InitTxHash", op.InitTxHash.Hex(),
+			"Amount", op.Amount.String(),
+			"Balance", op.Balance.String(),
+			"TxHash", fmt.Sprintf("%#x", op.TxHash),
+			"creator", fmt.Sprintf("%#x", op.Creator),
+			"err", err.Error(),
+			"headSlot", head.Slot,
+			"headNr", head.Nr(),
+			"head", fmt.Sprintf("%#x", head.Hash()),
+			"headCpNr", fmt.Sprintf("%d", head.CpNumber),
+			"headCp", fmt.Sprintf("%#x", head.CpHash),
+		)
+	}
+
+	if isUpdated {
+		rawdb.WriteNotProcessedValidatorKeys(bc.db, bc.notProcValSyncOps)
 	}
 }
 
