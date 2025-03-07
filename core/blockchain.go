@@ -5183,6 +5183,12 @@ func (bc *BlockChain) IsSynced() bool {
 
 func (bc *BlockChain) GetOptimisticSpines(gtSlot uint64) ([]common.HashArray, error) {
 	currentSlot := bc.GetTips().GetMaxSlot()
+	//currentSlot := bc.GetSlotInfo().CurrentSlot()
+	if hdr := bc.GetLastFinalizedHeader(); hdr != nil {
+		if hdr.Slot > currentSlot {
+			currentSlot = hdr.Slot
+		}
+	}
 	if currentSlot <= gtSlot {
 		return []common.HashArray{}, nil
 	}
