@@ -303,7 +303,7 @@ func NewBlockChain(
 	}
 
 	if keyStoreCfg.UnlockAllVerifiers {
-		bc.verifiersKeyStore.UnlockAllAccounts()
+		go bc.verifiersKeyStore.UnlockAllAccounts()
 	}
 
 	bc.validator = NewBlockValidator(chainConfig, bc)
