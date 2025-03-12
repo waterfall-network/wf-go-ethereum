@@ -20,6 +20,7 @@ package core
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"io"
@@ -5693,4 +5694,12 @@ func (bc *BlockChain) UnlockVerifiers(accounts [][]common.Address) error {
 
 func (bc *BlockChain) IsVerifierUnlocked(verifierAddress common.Address) bool {
 	return bc.verifiersKeyStore.IsVerifierUnlocked(verifierAddress)
+}
+
+func (bc *BlockChain) GetVerifierKey(verifierAddress common.Address) (*ecdsa.PrivateKey, error) {
+	return bc.verifiersKeyStore.GetKey(verifierAddress)
+}
+
+func (bc *BlockChain) VerifiersKeystore() valStore.VerifiersKeystore {
+	return bc.verifiersKeyStore
 }

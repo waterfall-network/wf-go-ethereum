@@ -15,7 +15,10 @@
 package storage
 
 import (
+	"crypto/ecdsa"
 	"fmt"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
+	"math/big"
 	"os"
 	"strconv"
 	"strings"
@@ -32,6 +35,8 @@ type VerifiersKeystore interface {
 	UnlockAccounts(accounts [][]common.Address) error
 	IsVerifierUnlocked(address common.Address) bool
 	UnlockAllAccounts()
+	GetKey(verifier common.Address) (*ecdsa.PrivateKey, error)
+	SignTx(a accounts.Account, tx *types.Transaction, chainID *big.Int) (*types.Transaction, error)
 }
 
 type verifiersKeystore struct {
@@ -100,6 +105,14 @@ func (k *verifiersKeystore) UnlockAllAccounts() {
 
 func (k *verifiersKeystore) IsVerifierUnlocked(verifierAddress common.Address) bool {
 	return k.keystore.IsUnlocked(verifierAddress)
+}
+
+func (k *verifiersKeystore) GetKey(verifier common.Address) (*ecdsa.PrivateKey, error) {
+	return k.keystore.GetKey(verifier)
+}
+
+func (k *verifiersKeystore) SignTx(a accounts.Account, tx *types.Transaction, chainID *big.Int) (*types.Transaction, error) {
+	return k.keystore.SignTx(a, tx, chainID)
 }
 
 // getPasswords returns a list of passwords from the password directory.

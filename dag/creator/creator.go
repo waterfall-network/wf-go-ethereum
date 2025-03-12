@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"gitlab.waterfall.network/waterfall/protocol/gwat/accounts"
-	"gitlab.waterfall.network/waterfall/protocol/gwat/accounts/keystore"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common/hexutil"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/consensus/misc"
@@ -65,8 +64,7 @@ type Config struct {
 
 // environment is the Creator's current environment and holds all of the current state information.
 type environment struct {
-	signer   types.Signer
-	keystore *keystore.KeyStore
+	signer types.Signer
 
 	gasPool *core.GasPool // available gas used to pack transactions
 
@@ -931,7 +929,7 @@ func (c *Creator) processValidatorTxs(syncData map[common.Hash]*types.ValidatorS
 	nonce := c.backend.TxPool().Nonce(header.Coinbase)
 	for _, validatorSync := range syncData {
 		if validatorSync.ProcEpoch <= c.bc.GetSlotInfo().SlotToEpoch(c.bc.GetSlotInfo().CurrentSlot()) {
-			valSyncTx, err := validatorsync.CreateValidatorSyncTx(c.backend, header.CpHash, header.Coinbase, header.Slot, validatorSync, nonce, c.current.keystore)
+			valSyncTx, err := validatorsync.CreateValidatorSyncTx(c.backend, header.CpHash, header.Coinbase, header.Slot, validatorSync, nonce)
 			if err != nil {
 				log.Error("failed to create validator sync tx",
 					"error", err,
@@ -969,7 +967,7 @@ func (c *Creator) SetNodeCreators(accounts []common.Address) {
 }
 
 func (c *Creator) signBlockHeader(h *types.Header) (*types.Header, error) {
-	key, err := c.current.keystore.GetKey(h.Coinbase)
+	key, err := c.bc.GetVerifierKey(h.Coinbase)
 	if err != nil {
 		return nil, err
 	}
