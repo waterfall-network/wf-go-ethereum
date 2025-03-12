@@ -17,7 +17,6 @@ package storage
 import (
 	"crypto/ecdsa"
 	"fmt"
-	"gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
 	"math/big"
 	"os"
 	"strconv"
@@ -27,6 +26,7 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/accounts/keystore"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/console/prompt"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/log"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/node"
 )
