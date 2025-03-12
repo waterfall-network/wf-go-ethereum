@@ -50,16 +50,17 @@ type Backend interface {
 
 // Config is the configuration parameters of block creation.
 type Config struct {
-	Etherbase   common.Address `toml:",omitempty"` // Public address for block creation rewards (default = first account)
-	PasswordDir string         // Keystore password directory
-	Notify      []string       `toml:",omitempty"` // HTTP URL list to be notified of new work packages (only useful in ethash).
-	NotifyFull  bool           `toml:",omitempty"` // Notify with pending block headers instead of work packages
-	ExtraData   hexutil.Bytes  `toml:",omitempty"` // Block extra data set by the miner
-	GasFloor    uint64         // Target gas floor for mined blocks.
-	GasCeil     uint64         // Target gas ceiling for mined blocks.
-	GasPrice    *big.Int       // Minimum gas price for mining a transaction
-	Recommit    time.Duration  // The time interval for creator to re-create block creation work.
-	Noverify    bool           // Disable remote block creation solution verification(only useful in ethash).
+	Etherbase     common.Address `toml:",omitempty"` // Public address for block creation rewards (default = first account)
+	PasswordDir   string         // Keystore password directory
+	Notify        []string       `toml:",omitempty"` // HTTP URL list to be notified of new work packages (only useful in ethash).
+	NotifyFull    bool           `toml:",omitempty"` // Notify with pending block headers instead of work packages
+	ExtraData     hexutil.Bytes  `toml:",omitempty"` // Block extra data set by the miner
+	GasFloor      uint64         // Target gas floor for mined blocks.
+	GasCeil       uint64         // Target gas ceiling for mined blocks.
+	GasLimitForce bool           // Target gas ceiling for mined blocks.
+	GasPrice      *big.Int       // Minimum gas price for mining a transaction
+	Recommit      time.Duration  // The time interval for creator to re-create block creation work.
+	Noverify      bool           // Disable remote block creation solution verification(only useful in ethash).
 }
 
 // environment is the Creator's current environment and holds all of the current state information.
@@ -385,12 +386,17 @@ func (c *Creator) prepareBlockHeader(assigned *Assignment, tipsBlocks types.Bloc
 		return nil, err
 	}
 
+	gasLimit := c.config.GasCeil
+	if !c.config.GasLimitForce {
+		gasLimit = core.CalcGasLimit(tipsBlocks.AvgGasLimit(), c.config.GasCeil)
+	}
+
 	header := &types.Header{
 		ParentHashes: parentHashes,
 		Slot:         assigned.Slot,
 		Era:          era,
 		Height:       newHeight,
-		GasLimit:     core.CalcGasLimit(tipsBlocks.AvgGasLimit(), c.config.GasCeil),
+		GasLimit:     gasLimit,
 		Time:         uint64(blockTime.Unix()),
 		Extra:        extra,
 		// Checkpoint spine block
@@ -514,7 +520,7 @@ func (c *Creator) reorgTips(slot uint64, tips types.Tips) (types.BlockMap, error
 func (c *Creator) createNewBlock(coinbase common.Address, creators []common.Address, header *types.Header, wg *sync.WaitGroup, needEmptyBlock, isHibernateMode bool) {
 	start := time.Now()
 
-	log.Info("Try to create new block", "slot", header.Slot, "coinbase", coinbase.Hex())
+	log.Info("Try to create new block", "slot", header.Slot, "coinbase", coinbase.Hex(), "gasLimit", header.GasLimit, "gasLimitForce", c.config.GasLimitForce)
 	defer wg.Done()
 
 	if coinbase == (common.Address{}) {
