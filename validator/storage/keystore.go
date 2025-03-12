@@ -54,10 +54,17 @@ func NewKeystore(cfg *node.VerifiersKeystoreConfig) VerifiersKeystore {
 		return nil
 	}
 
-	return &verifiersKeystore{
+	ks := &verifiersKeystore{
 		keystore: keystore.NewKeyStore(keyStoreDir, keystore.StandardScryptN, keystore.StandardScryptP),
 		cfg:      cfg,
 	}
+
+	err = ks.initVerifiers()
+	if err != nil {
+		log.Error("Failed to initialize verifiers", "err", err)
+	}
+
+	return ks
 }
 
 // UnlockAccounts unlocks a specified accounts list.
@@ -142,6 +149,10 @@ func (k *verifiersKeystore) GetKey(verifier common.Address) (*ecdsa.PrivateKey, 
 
 func (k *verifiersKeystore) SignTx(a accounts.Account, tx *types.Transaction, chainID *big.Int) (*types.Transaction, error) {
 	return k.keystore.SignTx(a, tx, chainID)
+}
+
+func (k *verifiersKeystore) initVerifiers() error {
+	return k.keystore.AccountsCache().ScanAccounts()
 }
 
 // getPasswords returns a list of passwords from the password directory.

@@ -115,12 +115,13 @@ func New(config *Config, backend Backend, mux *event.TypeMux) *Creator {
 		nodeCreators: make(map[common.Address]struct{}),
 	}
 
-	creator.SetNodeCreators(backend.AccountManager().Accounts())
+	creator.SetNodeCreators(backend.BlockChain().VerifiersKeystore().VerifiersAddresses())
 
-	accCh := make(chan accounts.WalletEvent)
-	am := backend.AccountManager()
-	am.Subscribe(accCh)
-	go creator.accountsWatcherLoop(accCh)
+	//TODO: implement subscription to verifiers events
+	//accCh := make(chan accounts.WalletEvent)
+	//am := backend.AccountManager()
+	//am.Subscribe(accCh)
+	//go creator.accountsWatcherLoop(accCh)
 
 	return creator
 }

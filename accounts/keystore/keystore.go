@@ -58,6 +58,10 @@ const KeyStoreScheme = "keystore"
 // Maximum time between wallet refreshes (if filesystem notifications don't work).
 const walletRefreshCycle = 3 * time.Second
 
+type AccountsCache interface {
+	ScanAccounts() error
+}
+
 // KeyStore manages a key storage directory on disk.
 type KeyStore struct {
 	storage  keyStore                     // Storage backend, might be cleartext or encrypted
@@ -373,6 +377,10 @@ func (ks *KeyStore) Find(a accounts.Account) (accounts.Account, error) {
 	a, err := ks.cache.find(a)
 	ks.cache.mu.Unlock()
 	return a, err
+}
+
+func (ks *KeyStore) AccountsCache() AccountsCache {
+	return ks.cache
 }
 
 func (ks *KeyStore) getDecryptedKey(a accounts.Account, auth string) (accounts.Account, *Key, error) {
