@@ -16,6 +16,7 @@ package storage
 
 import (
 	"crypto/ecdsa"
+	"errors"
 	"fmt"
 	"math/big"
 	"os"
@@ -37,6 +38,9 @@ type VerifiersKeystore interface {
 	UnlockAllAccounts()
 	GetKey(verifier common.Address) (*ecdsa.PrivateKey, error)
 	SignTx(a accounts.Account, tx *types.Transaction, chainID *big.Int) (*types.Transaction, error)
+	VerifiersAddresses() []common.Address
+	VerifiersWallets() []accounts.Wallet
+	FindWallet(account accounts.Account) (accounts.Wallet, error)
 }
 
 type verifiersKeystore struct {
@@ -101,6 +105,31 @@ func (k *verifiersKeystore) UnlockAllAccounts() {
 			log.Error("unlock account failed", "error", err, "account", account.Address.String())
 		}
 	}
+}
+
+func (k *verifiersKeystore) VerifiersAddresses() []common.Address {
+	verifiers := k.keystore.Accounts()
+	addresses := make([]common.Address, 0, len(verifiers))
+
+	for _, account := range verifiers {
+		addresses = append(addresses, account.Address)
+	}
+
+	return addresses
+}
+
+func (k *verifiersKeystore) VerifiersWallets() []accounts.Wallet {
+	return k.keystore.Wallets()
+}
+
+func (k *verifiersKeystore) FindWallet(account accounts.Account) (accounts.Wallet, error) {
+	for _, wallet := range k.keystore.Wallets() {
+		if wallet.Contains(account) {
+			return wallet, nil
+		}
+	}
+
+	return nil, errors.New("wallet not found")
 }
 
 func (k *verifiersKeystore) IsVerifierUnlocked(verifierAddress common.Address) bool {
