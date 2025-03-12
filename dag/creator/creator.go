@@ -126,6 +126,7 @@ func New(config *Config, backend Backend, mux *event.TypeMux) *Creator {
 	return creator
 }
 
+//nolint:unused
 func (c *Creator) accountsWatcherLoop(eventCh chan accounts.WalletEvent) {
 	for event := range eventCh {
 		c.SetNodeCreators(c.backend.AccountManager().Accounts())
