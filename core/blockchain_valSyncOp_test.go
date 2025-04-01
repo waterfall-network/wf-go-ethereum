@@ -9,6 +9,7 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/rawdb"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/vm"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/node"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/tests/testutils"
 )
@@ -32,7 +33,7 @@ func initValSyncOpChain(t *testing.T) (bc *BlockChain) {
 
 	genesis.MustCommit(db)
 
-	bc, err := NewBlockChain(db, nil, params.TestChainConfig, vm.Config{}, nil)
+	bc, err := NewBlockChain(db, nil, params.TestChainConfig, vm.Config{}, nil, &node.VerifiersKeystoreConfig{})
 	testutils.AssertNoError(t, err)
 	return bc
 }

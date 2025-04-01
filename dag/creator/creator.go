@@ -24,7 +24,6 @@ import (
 	"time"
 
 	"gitlab.waterfall.network/waterfall/protocol/gwat/accounts"
-	"gitlab.waterfall.network/waterfall/protocol/gwat/accounts/keystore"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common/hexutil"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/consensus/misc"
@@ -65,8 +64,7 @@ type Config struct {
 
 // environment is the Creator's current environment and holds all of the current state information.
 type environment struct {
-	signer   types.Signer
-	keystore *keystore.KeyStore
+	signer types.Signer
 
 	gasPool *core.GasPool // available gas used to pack transactions
 
@@ -117,16 +115,18 @@ func New(config *Config, backend Backend, mux *event.TypeMux) *Creator {
 		nodeCreators: make(map[common.Address]struct{}),
 	}
 
-	creator.SetNodeCreators(backend.AccountManager().Accounts())
+	creator.SetNodeCreators(backend.BlockChain().VerifiersKeystore().VerifiersAddresses())
 
-	accCh := make(chan accounts.WalletEvent)
-	am := backend.AccountManager()
-	am.Subscribe(accCh)
-	go creator.accountsWatcherLoop(accCh)
+	//TODO: implement subscription to verifiers events
+	//accCh := make(chan accounts.WalletEvent)
+	//am := backend.AccountManager()
+	//am.Subscribe(accCh)
+	//go creator.accountsWatcherLoop(accCh)
 
 	return creator
 }
 
+//nolint:unused
 func (c *Creator) accountsWatcherLoop(eventCh chan accounts.WalletEvent) {
 	for event := range eventCh {
 		c.SetNodeCreators(c.backend.AccountManager().Accounts())
@@ -539,41 +539,29 @@ func (c *Creator) createNewBlock(coinbase common.Address, creators []common.Addr
 	syncData := validatorsync.GetPendingValidatorSyncData(c.bc)
 	if len(syncData) > 0 || len(pendingTxs) > 0 || needEmptyBlock {
 		startTime := time.Now()
-		ks, err := c.getKeystore(c.backend.AccountManager())
-		if err != nil {
-			log.Error("Failed to fetch keystore", "error", err)
-			return
-		}
-		log.Info("BLOCK CREATION TIME",
-			"elapsed", common.PrettyDuration(time.Since(startTime)),
-			"func:", "getKeyStore",
-			"slot", header.Slot,
-		)
 
-		acc := accounts.Account{Address: coinbase}
-		start = time.Now()
-		ok := ks.IsUnlocked(acc)
+		ok := c.bc.IsVerifierUnlocked(coinbase)
 		log.Info("BLOCK CREATION TIME",
 			"elapsed", common.PrettyDuration(time.Since(startTime)),
 			"func:", "IsUnlocked",
-			"account", acc.Address.Hex(),
+			"account", coinbase.Hex(),
 			"slot", header.Slot,
 		)
 		if !ok {
 			startTime = time.Now()
-			if err := c.unlockAccount(ks, acc.Address.String()); err != nil {
-				log.Warn("Creator: unlock account failed",
+			if err := c.bc.UnlockVerifiers([][]common.Address{{coinbase}}); err != nil {
+				log.Warn("Creator: unlock verifier failed",
 					"error", err,
 					"elapsed", common.PrettyDuration(time.Since(startTime)),
 					"slot", header.Slot,
-					"addr", acc.Address.String())
+					"addr", coinbase.String())
 				return
 			}
 
 			log.Info("BLOCK CREATION TIME",
 				"elapsed", common.PrettyDuration(time.Since(startTime)),
 				"func:", "unlockAccount",
-				"address", acc.Address.Hex(),
+				"address", coinbase.Hex(),
 				"slot", header.Slot,
 			)
 		}
@@ -943,7 +931,7 @@ func (c *Creator) processValidatorTxs(syncData map[common.Hash]*types.ValidatorS
 	nonce := c.backend.TxPool().Nonce(header.Coinbase)
 	for _, validatorSync := range syncData {
 		if validatorSync.ProcEpoch <= c.bc.GetSlotInfo().SlotToEpoch(c.bc.GetSlotInfo().CurrentSlot()) {
-			valSyncTx, err := validatorsync.CreateValidatorSyncTx(c.backend, header.CpHash, header.Coinbase, header.Slot, validatorSync, nonce, c.current.keystore)
+			valSyncTx, err := validatorsync.CreateValidatorSyncTx(c.backend, header.CpHash, header.Coinbase, header.Slot, validatorSync, nonce)
 			if err != nil {
 				log.Error("failed to create validator sync tx",
 					"error", err,
@@ -980,41 +968,8 @@ func (c *Creator) SetNodeCreators(accounts []common.Address) {
 	}
 }
 
-// unlockAccount unlocks a specified account.
-func (c *Creator) unlockAccount(ks *keystore.KeyStore, targetAddress string) error {
-	passwords, err := c.getPasswords()
-	if err != nil {
-		return err
-	}
-	keystoreAccounts := ks.Accounts()
-
-	// Find the position of the target account.
-	position := findAccountPosition(keystoreAccounts, targetAddress)
-
-	// Unlock the account.log.Warn("Referring to accounts by order in the keystore folder is dangerous!")
-	return unlockAccount(ks, targetAddress, position, passwords)
-}
-
-// getPasswords returns a list of passwords from the password directory.
-func (c *Creator) getPasswords() ([]string, error) {
-	return makePasswordList(c.config.PasswordDir)
-}
-
-// getKeystore retrieves and set cache the encrypted keystore from the account manager.
-func (c *Creator) getKeystore(am *accounts.Manager) (*keystore.KeyStore, error) {
-	if c.current.keystore != nil {
-		return c.current.keystore, nil
-	}
-	if ks := am.Backends(keystore.KeyStoreType); len(ks) > 0 {
-		c.current.keystore = ks[0].(*keystore.KeyStore)
-		return ks[0].(*keystore.KeyStore), nil
-	}
-
-	return nil, errors.New("local keystore not used")
-}
-
 func (c *Creator) signBlockHeader(h *types.Header) (*types.Header, error) {
-	key, err := c.current.keystore.GetKey(h.Coinbase)
+	key, err := c.bc.GetVerifierKey(h.Coinbase)
 	if err != nil {
 		return nil, err
 	}

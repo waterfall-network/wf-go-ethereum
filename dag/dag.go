@@ -107,6 +107,7 @@ type blockChain interface {
 	HandleEra(cp *types.Checkpoint) error
 
 	CleanInvalidNotProcessedValidatorSync(validator func(bc *core.BlockChain, stateHash common.Hash, slot uint64, valSyncOp *types.ValidatorSync) (bool, error))
+	UnlockVerifiers(accounts [][]common.Address) error
 }
 
 type ethDownloader interface {

@@ -119,6 +119,18 @@ var (
 		Name:  "keystore",
 		Usage: "Directory for the keystore (default = inside the datadir)",
 	}
+	UnlockVerifiersFlag = cli.BoolFlag{
+		Name:  "unlock-verifiers",
+		Usage: "Unlock all verifiers from keystore",
+	}
+	VerifiersKeystoreFlag = cli.StringFlag{
+		Name:  "verifiers-keystore",
+		Usage: "Directory for the verifiers keystore (default = inside the datadir)",
+	}
+	VerifiersPasswordsFlag = cli.StringFlag{
+		Name:  "verifiers-passwords",
+		Usage: "Password file to use for non-interactive password input",
+	}
 	USBFlag = cli.BoolFlag{
 		Name:  "usb",
 		Usage: "Enable monitoring and management of USB hardware wallets",
@@ -1767,7 +1779,7 @@ func MakeChain(ctx *cli.Context, stack *node.Node) (chain *core.BlockChain, chai
 
 	// TODO(rjl493456442) disable snapshot generation/wiping if the chain is read only.
 	// Disable transaction indexing/unindexing by default.
-	chain, err = core.NewBlockChain(chainDb, cache, config, vmcfg, nil)
+	chain, err = core.NewBlockChain(chainDb, cache, config, vmcfg, nil, &node.VerifiersKeystoreConfig{})
 	if err != nil {
 		Fatalf("Can't create BlockChain: %v", err)
 	}

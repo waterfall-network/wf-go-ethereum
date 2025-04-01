@@ -51,6 +51,9 @@ var AppHelpFlagGroups = []flags.FlagGroup{
 			utils.IdentityFlag,
 			utils.LightKDFFlag,
 			utils.WhitelistFlag,
+			utils.UnlockVerifiersFlag,
+			utils.VerifiersKeystoreFlag,
+			utils.VerifiersPasswordsFlag,
 		},
 	},
 	{

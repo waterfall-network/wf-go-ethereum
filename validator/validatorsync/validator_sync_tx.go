@@ -24,7 +24,6 @@ import (
 	"math/big"
 
 	"gitlab.waterfall.network/waterfall/protocol/gwat/accounts"
-	"gitlab.waterfall.network/waterfall/protocol/gwat/accounts/keystore"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
@@ -49,7 +48,6 @@ func CreateValidatorSyncTx(
 	slot uint64,
 	valSyncOp *types.ValidatorSync,
 	nonce uint64,
-	ks *keystore.KeyStore,
 ) (*types.Transaction, error) {
 	bc := backend.BlockChain()
 	_, err := ValidateCreateTxValidatorSyncOp(bc, stateBlockHash, slot, valSyncOp)
@@ -113,7 +111,7 @@ func CreateValidatorSyncTx(
 	}
 	tx := types.NewTx(txData)
 
-	signed, err := signTx(backend, from, tx, ks)
+	signed, err := signTx(backend, from, tx)
 	if err != nil {
 		return nil, err
 	}
@@ -216,9 +214,11 @@ func getValSyncTxData(valSyncOp types.ValidatorSync, withdrawal *common.Address,
 }
 
 // sign is a helper function that signs a transaction with the private key of the given address.
-func signTx(backend Backend, addr common.Address, tx *types.Transaction, ks *keystore.KeyStore) (*types.Transaction, error) {
+func signTx(backend Backend, addr common.Address, tx *types.Transaction) (*types.Transaction, error) {
 	// Look up the wallet containing the requested signer
 	account := accounts.Account{Address: addr}
+
+	ks := backend.BlockChain().VerifiersKeystore()
 
 	return ks.SignTx(account, tx, (backend.BlockChain()).Config().ChainID)
 }

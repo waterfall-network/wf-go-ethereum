@@ -30,6 +30,7 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/vm"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/ethdb"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/log"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/node"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/tests/testutils"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/trie"
@@ -82,7 +83,7 @@ func (b *BlockGen) AddTx(tx *types.Transaction) {
 		SnapshotLimit:     0,
 		TrieDirtyDisabled: true, // Archive mode
 	}
-	bc, err := NewBlockChain(b.db, cacheConfig, b.config, vm.Config{}, nil)
+	bc, err := NewBlockChain(b.db, cacheConfig, b.config, vm.Config{}, nil, &node.VerifiersKeystoreConfig{})
 	if err != nil {
 		log.Crit("Failed to create blockchain", "err", err)
 	}
