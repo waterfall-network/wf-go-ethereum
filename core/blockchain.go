@@ -101,7 +101,7 @@ var (
 )
 
 const (
-	valSyncCacheLimit          = 128
+	valSyncCacheLimit          = 2048
 	bodyCacheLimit             = 256
 	blockCacheLimit            = 256
 	receiptsCacheLimit         = 32
@@ -712,7 +712,7 @@ func (bc *BlockChain) GetValidatorSyncData(initTxHash common.Hash) *types.Valida
 	}
 	vs := rawdb.ReadValidatorSync(bc.db, initTxHash)
 	if vs == nil {
-		log.Error("Validator sync tx handling: db not found", "hash", initTxHash.Hex())
+		//log.Error("Validator sync tx handling: db not found", "hash", initTxHash.Hex())
 		return nil
 	}
 	// Cache the found data for next time and return
