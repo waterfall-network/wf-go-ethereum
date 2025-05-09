@@ -5116,16 +5116,16 @@ func (bc *BlockChain) handleBlockValidatorSyncReceipts(block *types.Block, recei
 			continue
 		}
 
-		log.Info("Validator sync tx receipts (start)",
-			"tx.Hash", tx.Hash().Hex(),
-			"rc.Hash", receipt.TxHash.Hex(),
-			"conditionHash", tx.Hash() == receipt.TxHash,
-			"tx.To", tx.To().Hex(),
-			"ValidatorsStateAddress", bc.Config().ValidatorsStateAddress.Hex(),
-			"condIsValSync", bytes.Equal(tx.To().Bytes(), bc.Config().ValidatorsStateAddress.Bytes()),
-			"rc.Status", receipt.Status,
-			"conditionStatus", receipt.Status != types.ReceiptStatusSuccessful,
-		)
+		//log.Info("Validator sync tx receipts (start)",
+		//	"tx.Hash", tx.Hash().Hex(),
+		//	"rc.Hash", receipt.TxHash.Hex(),
+		//	"conditionHash", tx.Hash() == receipt.TxHash,
+		//	"tx.To", tx.To().Hex(),
+		//	"ValidatorsStateAddress", bc.Config().ValidatorsStateAddress.Hex(),
+		//	"condIsValSync", bytes.Equal(tx.To().Bytes(), bc.Config().ValidatorsStateAddress.Bytes()),
+		//	"rc.Status", receipt.Status,
+		//	"conditionStatus", receipt.Status != types.ReceiptStatusSuccessful,
+		//)
 
 		op, err := validatorOp.DecodeBytes(tx.Data())
 		if err != nil {

@@ -1122,7 +1122,7 @@ func ReadEra(db ethdb.KeyValueReader, number uint64) *era.Era {
 	key := eraKey(number)
 	encoded, err := db.Get(key)
 	if err != nil {
-		log.Warn("Failed to read era", "err", err, "number", number)
+		//log.Warn("Failed to read era", "err", err, "number", number)
 		return nil
 	}
 
