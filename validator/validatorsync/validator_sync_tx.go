@@ -29,6 +29,7 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/log"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/era"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/operation"
 )
 
@@ -155,21 +156,25 @@ func ValidateCreateTxValidatorSyncOp(bc *core.BlockChain, stateBlockHash common.
 			return false, fmt.Errorf("validator sync operation failed: validator already deactivated")
 		}
 
-		procEra := bc.EpochToEra(valSyncOp.ProcEpoch)
-		isLowExitEpoch := validator.GetActivationEra() >= procEra.Number
-		if bc.Config().IsForkSlotValSyncProc(slot) {
-			procEpoch := bc.GetSlotInfo().SlotToEpoch(slot)
-			procEra = bc.EpochToEra(procEpoch)
-			isLowExitEpoch = validator.GetActivationEra() > procEra.Number
+		isLowExitEpoch := validator.GetActivationEra() >= bc.GetEraInfo().Number()
+		if isLowExitEpoch {
+			var procEra *era.Era
+			if bc.Config().IsForkSlotValSyncProc(slot) {
+				procEpoch := bc.GetSlotInfo().SlotToEpoch(slot)
+				procEra = bc.EpochToEra(procEpoch)
+				isLowExitEpoch = validator.GetActivationEra() > procEra.Number
+			} else {
+				procEra = bc.EpochToEra(valSyncOp.ProcEpoch)
+				isLowExitEpoch = validator.GetActivationEra() >= procEra.Number
+			}
+			log.Info("Create validator sync tx: exit: is low epoch",
+				"cond", validator.GetActivationEra() > procEra.Number,
+				"procEra", procEra,
+				"valActivationEra", validator.GetActivationEra(),
+				"IsForkSlotValSyncProc", bc.Config().IsForkSlotValSyncProc(slot),
+				"slot", slot,
+			)
 		}
-
-		log.Info("Create validator sync tx: exit: is low epoch",
-			"cond", validator.GetActivationEra() > procEra.Number,
-			"procEra", procEra,
-			"valActivationEra", validator.GetActivationEra(),
-			"IsForkSlotValSyncProc", bc.Config().IsForkSlotValSyncProc(slot),
-			"slot", slot,
-		)
 
 		if isLowExitEpoch {
 			return false, fmt.Errorf("validator sync operation failed: exit epoch is too low")
@@ -231,40 +236,40 @@ func GetPendingValidatorSyncData(bc *core.BlockChain) map[common.Hash]*types.Val
 	valSyncOps := bc.GetNotProcessedValidatorSyncData()
 	vsPending := make(map[common.Hash]*types.ValidatorSync, len(valSyncOps))
 	for k, vs := range valSyncOps {
-		log.Info("=== ValidatorSync: GetPendingValidatorSyncData ===",
-			"slot", si.CurrentSlot(),
-			"Index", vs.Index,
-			"ProcEpoch", vs.ProcEpoch,
-			"OpType", vs.OpType,
-			"Amount", vs.Amount.String(),
-			"Balance", vs.Balance.String(),
-			"TxHash", fmt.Sprintf("%#x", vs.TxHash),
-			"InitTxHash", vs.InitTxHash.Hex(),
-			"Creator", vs.Creator.Hex(),
-		)
+		//log.Info("=== ValidatorSync: GetPendingValidatorSyncData ===",
+		//	"slot", si.CurrentSlot(),
+		//	"Index", vs.Index,
+		//	"ProcEpoch", vs.ProcEpoch,
+		//	"OpType", vs.OpType,
+		//	"Amount", vs.Amount.String(),
+		//	"Balance", vs.Balance.String(),
+		//	"TxHash", fmt.Sprintf("%#x", vs.TxHash),
+		//	"InitTxHash", vs.InitTxHash.Hex(),
+		//	"Creator", vs.Creator.Hex(),
+		//)
 
 		if vs.TxHash != nil {
 			continue
 		}
 		saved := bc.GetValidatorSyncData(vs.InitTxHash)
-		if saved != nil {
-			log.Info("=== ValidatorSync: GetPendingValidatorSyncData === saved",
-				"slot", si.CurrentSlot(),
-				"Index", saved.Index,
-				"ProcEpoch", saved.ProcEpoch,
-				"OpType", saved.OpType,
-				"Amount", saved.Amount.String(),
-				"Balance", saved.Balance.String(),
-				"TxHash", fmt.Sprintf("%#x", saved.TxHash),
-				"InitTxHash", saved.InitTxHash.Hex(),
-				"Creator", saved.Creator.Hex(),
-			)
-		} else {
-			log.Info("=== ValidatorSync: GetPendingValidatorSyncData === saved nill",
-				"slot", si.CurrentSlot(),
-				"InitTxHash", vs.InitTxHash.Hex(),
-			)
-		}
+		//if saved != nil {
+		//	log.Info("=== ValidatorSync: GetPendingValidatorSyncData === saved",
+		//		"slot", si.CurrentSlot(),
+		//		"Index", saved.Index,
+		//		"ProcEpoch", saved.ProcEpoch,
+		//		"OpType", saved.OpType,
+		//		"Amount", saved.Amount.String(),
+		//		"Balance", saved.Balance.String(),
+		//		"TxHash", fmt.Sprintf("%#x", saved.TxHash),
+		//		"InitTxHash", saved.InitTxHash.Hex(),
+		//		"Creator", saved.Creator.Hex(),
+		//	)
+		//} else {
+		//	log.Info("=== ValidatorSync: GetPendingValidatorSyncData === saved nill",
+		//		"slot", si.CurrentSlot(),
+		//		"InitTxHash", vs.InitTxHash.Hex(),
+		//	)
+		//}
 
 		if saved != nil && saved.TxHash != nil {
 			continue

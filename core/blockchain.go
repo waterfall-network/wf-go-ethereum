@@ -101,7 +101,7 @@ var (
 )
 
 const (
-	valSyncCacheLimit          = 128
+	valSyncCacheLimit          = 2048
 	bodyCacheLimit             = 256
 	blockCacheLimit            = 256
 	receiptsCacheLimit         = 32
@@ -712,7 +712,7 @@ func (bc *BlockChain) GetValidatorSyncData(initTxHash common.Hash) *types.Valida
 	}
 	vs := rawdb.ReadValidatorSync(bc.db, initTxHash)
 	if vs == nil {
-		log.Error("Validator sync tx handling: db not found", "hash", initTxHash.Hex())
+		//log.Error("Validator sync tx handling: db not found", "hash", initTxHash.Hex())
 		return nil
 	}
 	// Cache the found data for next time and return
@@ -5116,16 +5116,16 @@ func (bc *BlockChain) handleBlockValidatorSyncReceipts(block *types.Block, recei
 			continue
 		}
 
-		log.Info("Validator sync tx receipts (start)",
-			"tx.Hash", tx.Hash().Hex(),
-			"rc.Hash", receipt.TxHash.Hex(),
-			"conditionHash", tx.Hash() == receipt.TxHash,
-			"tx.To", tx.To().Hex(),
-			"ValidatorsStateAddress", bc.Config().ValidatorsStateAddress.Hex(),
-			"condIsValSync", bytes.Equal(tx.To().Bytes(), bc.Config().ValidatorsStateAddress.Bytes()),
-			"rc.Status", receipt.Status,
-			"conditionStatus", receipt.Status != types.ReceiptStatusSuccessful,
-		)
+		//log.Info("Validator sync tx receipts (start)",
+		//	"tx.Hash", tx.Hash().Hex(),
+		//	"rc.Hash", receipt.TxHash.Hex(),
+		//	"conditionHash", tx.Hash() == receipt.TxHash,
+		//	"tx.To", tx.To().Hex(),
+		//	"ValidatorsStateAddress", bc.Config().ValidatorsStateAddress.Hex(),
+		//	"condIsValSync", bytes.Equal(tx.To().Bytes(), bc.Config().ValidatorsStateAddress.Bytes()),
+		//	"rc.Status", receipt.Status,
+		//	"conditionStatus", receipt.Status != types.ReceiptStatusSuccessful,
+		//)
 
 		op, err := validatorOp.DecodeBytes(tx.Data())
 		if err != nil {
