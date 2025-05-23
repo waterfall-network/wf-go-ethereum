@@ -867,11 +867,30 @@ func (hc *HeaderChain) CollectAncestorsAftCpByTips(parents common.HashArray, cpH
 	for _, parentHash := range parents {
 		bdag := hc.GetBlockDag(parentHash)
 		if bdag == nil {
-			log.Warn("Collect ancestors by tips: block dag not found", "parent", parentHash.Hex())
-			unloaded = append(unloaded, parentHash)
-		} else {
-			tips.Add(bdag)
+			tHeader := hc.GetHeaderByHash(parentHash)
+			if tHeader == nil {
+				log.Warn("Collect ancestors by tips: block dag not found 000", "parent", parentHash.Hex())
+				unloaded = append(unloaded, parentHash)
+				continue
+			}
+			cpHeader := hc.GetHeaderByHash(tHeader.CpHash)
+			if cpHeader == nil {
+				log.Warn("Collect ancestors by tips: block dag not found 111", "parent", parentHash.Hex(), "tHeader.CpHash", tHeader.CpHash.Hex())
+				unloaded = append(unloaded, parentHash)
+				continue
+			}
+			_, bdAncestors, _, _ := hc.CollectAncestorsAftCpByParents(tHeader.ParentHashes, cpHeader)
+			delete(bdAncestors, cpHeader.Hash())
+			bdag = &types.BlockDAG{
+				Hash:                   tHeader.Hash(),
+				Height:                 tHeader.Height,
+				Slot:                   tHeader.Slot,
+				CpHash:                 tHeader.CpHash,
+				CpHeight:               cpHeader.Height,
+				OrderedAncestorsHashes: bdAncestors.Hashes(),
+			}
 		}
+		tips.Add(bdag)
 	}
 	// check isCpAncestor
 	for _, tip := range tips {

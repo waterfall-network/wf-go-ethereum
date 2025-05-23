@@ -2438,6 +2438,7 @@ func (bc *BlockChain) VerifyBlock(block *types.Block) (bool, error) {
 		"hash", block.Hash(),
 		"ancestors", len(ancestors),
 		"cpCpAncestors", len(cpCpAncestors),
+		"height", block.Height(),
 	)
 	timeTrack = time.Now()
 
@@ -2541,6 +2542,18 @@ func (bc *BlockChain) verifyBlockUsedGas(block *types.Block) bool {
 func (bc *BlockChain) verifyBlockHeight(block *types.Block, ancestorsCount int) bool {
 	cpHeader := bc.GetHeader(block.CpHash())
 	calcHeight := bc.calcBlockHeight(cpHeader.Height, ancestorsCount)
+
+	//todo rm
+	log.Warn("Block verification: block invalid height",
+		"calcHeight", calcHeight,
+		"height", block.Height(),
+		"hash", block.Hash().Hex(),
+		"cpHeight", cpHeader.Height,
+	)
+	if true {
+		return false
+	}
+
 	if block.Height() != calcHeight {
 		log.Warn("Block verification: block invalid height",
 			"calcHeight", calcHeight,
