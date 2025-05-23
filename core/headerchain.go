@@ -889,6 +889,7 @@ func (hc *HeaderChain) CollectAncestorsAftCpByTips(parents common.HashArray, cpH
 				CpHeight:               cpHeader.Height,
 				OrderedAncestorsHashes: bdAncestors.Hashes(),
 			}
+			log.Warn("Collect ancestors by tips: block dag not found (created new) 222", "parent", parentHash.Hex())
 		}
 		tips.Add(bdag)
 	}
