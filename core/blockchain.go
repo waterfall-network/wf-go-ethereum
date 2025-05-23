@@ -2438,6 +2438,7 @@ func (bc *BlockChain) VerifyBlock(block *types.Block) (bool, error) {
 		"hash", block.Hash(),
 		"ancestors", len(ancestors),
 		"cpCpAncestors", len(cpCpAncestors),
+		"height", block.Height(),
 	)
 	timeTrack = time.Now()
 
