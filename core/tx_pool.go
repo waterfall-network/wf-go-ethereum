@@ -529,9 +529,6 @@ func (pool *TxPool) loop() {
 					)
 				}(time.Now())
 
-				pool.mu.Lock()
-				defer pool.mu.Unlock()
-
 				pool.cancelProcessingBlockTxs(txs)
 				//	todo run reorg ?
 			}()
@@ -1642,6 +1639,7 @@ func (pool *TxPool) moveToProcessingAccelerated(txs *types.BlockTransactions) {
 }
 
 func (pool *TxPool) cancelProcessingBlockTxs(txs *types.BlockTransactions) {
+	pool.mu.Lock()
 	transactions := txs.Transactions
 	blockHash := txs.BlockHash
 	dirty := newAccountSet(pool.signer)
@@ -1658,6 +1656,7 @@ func (pool *TxPool) cancelProcessingBlockTxs(txs *types.BlockTransactions) {
 		if pAddr := types.SenderFromCache(pool.signer, btx); pAddr == nil {
 			sndr, err := types.Sender(pool.signer, poolTx) // already validated during insertion
 			if err != nil {
+				pool.mu.Unlock()
 				log.Error("TxPool: cancel processing: get sender failed",
 					"txHash", txHash.Hex(),
 					"blHash", blockHash.Hex(),
@@ -1694,6 +1693,8 @@ func (pool *TxPool) cancelProcessingBlockTxs(txs *types.BlockTransactions) {
 			dirty.add(addr)
 		}
 	}
+	pool.mu.Unlock()
+
 	done := pool.requestPromoteExecutables(dirty)
 	<-done
 }
