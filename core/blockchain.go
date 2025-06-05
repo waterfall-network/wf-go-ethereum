@@ -357,6 +357,11 @@ func NewBlockChain(
 		}
 	}
 
+	err = resetBadChainSequences(bc)
+	if err != nil {
+		log.Crit("Node initializing: reset bad chainSequences failed", "err", err)
+	}
+
 	lastCP := bc.GetLastCoordinatedCheckpoint()
 	if lastCP == nil {
 		lfb := bc.GetLastFinalizedBlock()
