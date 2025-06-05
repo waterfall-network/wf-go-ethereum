@@ -23,7 +23,7 @@ func (bc *BlockChain) FixValidatorSyncOpProcessing(processor *validator.Processo
 	if isApplied {
 		return true, ret, err
 	}
-	return true, ret, err
+	return false, ret, err
 }
 
 func isMainnet(bc *BlockChain) bool {
