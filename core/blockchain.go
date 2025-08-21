@@ -4050,7 +4050,6 @@ func (bc *BlockChain) CommitBlockTransactions(block *types.Block, statedb *state
 		"txs", len(block.Transactions()),
 		"hash", block.Hash(),
 	)
-	timeTrack = time.Now()
 
 	return statedb, receipts, rlogs, *gasUsed
 }
