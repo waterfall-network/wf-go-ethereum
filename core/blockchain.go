@@ -272,9 +272,15 @@ func NewBlockChain(
 	bodyRLPCache, _ := lru.New(bodyCacheLimit)
 	receiptsCache, _ := lru.New(receiptsCacheLimit)
 	//blockCache, _ := lru.New(blockCacheLimit)
-	blockCacheLimitCalc, _ := commonMath.Uint64ToInt(4 * chainConfig.SlotsPerEpoch * chainConfig.ValidatorsPerSlot)
+	blockCacheLimitCalc, _ := commonMath.Uint64ToInt(4 * chainConfig.SlotsPerEpoch * chainConfig.GetValidatorsPerSlot(chainConfig.ForkSlotUpValsPerSlot))
 	blockCache, _ := lru.New(blockCacheLimitCalc)
-	log.Info("blockCacheLimitCalc", "blockCacheLimitCalc", blockCacheLimitCalc, "SlotsPerEpoch", chainConfig.SlotsPerEpoch, "ValidatorsPerSlot", chainConfig.ValidatorsPerSlot)
+	log.Info("blockCacheLimitCalc",
+		"blockCacheLimitCalc", blockCacheLimitCalc,
+		"SlotsPerEpoch", chainConfig.SlotsPerEpoch,
+		"ValidatorsPerSlot", chainConfig.ValidatorsPerSlot,
+		"UpValidatorsPerSlot", chainConfig.UpValidatorsPerSlot,
+		"ForkSlotUpValsPerSlot", chainConfig.ForkSlotUpValsPerSlot,
+	)
 	txLookupCache, _ := lru.New(txLookupCacheLimit)
 	invBlocksCache, _ := lru.New(invBlocksCacheLimit)
 	optimisticSpinesCache, _ := lru.New(optimisticSpinesCacheLimit)
@@ -4615,7 +4621,7 @@ func (bc *BlockChain) InsertHeaderChain(chain []*types.Header) (int, error) {
 // GetDagHashes retrieves all non finalized block's hashes
 func (bc *BlockChain) GetDagHashes() *common.HashArray {
 	tips := *bc.hc.GetTips()
-	aproxLen := len(tips) * int(bc.Config().SlotsPerEpoch) * int(bc.Config().ValidatorsPerSlot)
+	aproxLen := len(tips) * int(bc.Config().SlotsPerEpoch) * int(bc.Config().GetValidatorsPerSlot(bc.Config().ForkSlotUpValsPerSlot))
 	ancHashes := make(common.HashArray, 0, aproxLen)
 	tipsHashes := make(common.HashArray, 0, len(tips))
 
@@ -5276,7 +5282,7 @@ func (bc *BlockChain) GetOptimisticSpines(gtSlot uint64) ([]common.HashArray, er
 	for slot := gtSlot + 1; slot <= currentSlot; slot++ {
 		slotSpines := bc.GetOptimisticSpinesFromCache(slot)
 		if slotSpines == nil {
-			slotBlocks := make(types.Headers, 0, bc.Config().ValidatorsPerSlot)
+			slotBlocks := make(types.Headers, 0, bc.Config().GetValidatorsPerSlot(bc.Config().ForkSlotUpValsPerSlot))
 			slotBlocksHashes := rawdb.ReadSlotBlocksHashes(bc.Database(), slot)
 			for _, hash := range slotBlocksHashes {
 				block := bc.GetHeader(hash)
@@ -5400,7 +5406,7 @@ func (bc *BlockChain) HaveEpochBlocks(epoch uint64) (bool, error) {
 }
 
 func (bc *BlockChain) VerifyBlockBaseFee(header *types.Header) bool {
-	creatorsPerSlotCount := bc.Config().ValidatorsPerSlot
+	creatorsPerSlotCount := bc.Config().GetValidatorsPerSlot(header.Slot)
 	if creatorsPerSlot, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, header.Slot); err == nil {
 		creatorsPerSlotCount = uint64(len(creatorsPerSlot))
 	}

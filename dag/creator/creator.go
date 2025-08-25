@@ -410,7 +410,7 @@ func (c *Creator) prepareBlockHeader(assigned *Assignment, tipsBlocks types.Bloc
 	}
 
 	// Get active validators number
-	creatorsPerSlotCount := c.bc.Config().ValidatorsPerSlot
+	creatorsPerSlotCount := c.bc.Config().GetValidatorsPerSlot(assigned.Slot)
 	if creatorsPerSlot, err := c.bc.ValidatorStorage().GetCreatorsBySlot(c.bc, header.Slot); err == nil {
 		creatorsPerSlotCount = uint64(len(creatorsPerSlot))
 	}

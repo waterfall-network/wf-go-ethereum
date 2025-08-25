@@ -162,7 +162,7 @@ func (s *PublicTxPoolAPI) Content() map[string]map[string]map[string]interface{}
 	pending, queue, processing := s.b.TxPoolContent()
 	curHeader := s.b.GetLastFinalizedHeader()
 	bc := s.b.BlockChain()
-	creatorsPerSlotCount := bc.Config().ValidatorsPerSlot
+	creatorsPerSlotCount := bc.Config().GetValidatorsPerSlot(curHeader.Slot)
 	if creatorsPerSlot, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, curHeader.Slot); err == nil {
 		creatorsPerSlotCount = uint64(len(creatorsPerSlot))
 	}
@@ -204,7 +204,7 @@ func (s *PublicTxPoolAPI) ContentFrom(addr common.Address) map[string]map[string
 	pending, queue, processing := s.b.TxPoolContentFrom(addr)
 	curHeader := s.b.GetLastFinalizedHeader()
 	bc := s.b.BlockChain()
-	creatorsPerSlotCount := bc.Config().ValidatorsPerSlot
+	creatorsPerSlotCount := bc.Config().GetValidatorsPerSlot(curHeader.Slot)
 	if creatorsPerSlot, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, curHeader.Slot); err == nil {
 		creatorsPerSlotCount = uint64(len(creatorsPerSlot))
 	}
@@ -1827,7 +1827,7 @@ func (s *PublicTransactionPoolAPI) GetTransactionByHash(ctx context.Context, has
 	if tx := s.b.GetPoolTransaction(hash); tx != nil {
 		curHeader := s.b.GetLastFinalizedHeader()
 		bc := s.b.BlockChain()
-		creatorsPerSlotCount := bc.Config().ValidatorsPerSlot
+		creatorsPerSlotCount := bc.Config().GetValidatorsPerSlot(curHeader.Slot)
 		if creatorsPerSlot, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, curHeader.Slot); err == nil {
 			creatorsPerSlotCount = uint64(len(creatorsPerSlot))
 		}
@@ -2106,7 +2106,7 @@ func (s *PublicTransactionPoolAPI) PendingTransactions() ([]*RPCTransaction, err
 	curHeader := s.b.GetLastFinalizedHeader()
 	transactions := make([]*RPCTransaction, 0, len(pending))
 	bc := s.b.BlockChain()
-	creatorsPerSlotCount := bc.Config().ValidatorsPerSlot
+	creatorsPerSlotCount := bc.Config().GetValidatorsPerSlot(curHeader.Slot)
 	if creatorsPerSlot, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, curHeader.Slot); err == nil {
 		creatorsPerSlotCount = uint64(len(creatorsPerSlot))
 	}

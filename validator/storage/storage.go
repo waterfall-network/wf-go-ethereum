@@ -257,7 +257,7 @@ func (s *storage) GetCreatorsBySlot(bc blockchain, filter ...uint64) ([]common.A
 		return nil, err
 	}
 
-	shuffledValidatorsBySlots := breakByValidatorsBySlotCount(shuffledValidators, s.config.ValidatorsPerSlot, s.config.SlotsPerEpoch)
+	shuffledValidatorsBySlots := breakByValidatorsBySlotCount(shuffledValidators, s.config.GetValidatorsPerSlot(slot), s.config.SlotsPerEpoch)
 
 	if uint64(len(shuffledValidatorsBySlots)) < s.config.SlotsPerEpoch {
 		for uint64(len(shuffledValidatorsBySlots)) < s.config.SlotsPerEpoch {
@@ -266,7 +266,7 @@ func (s *storage) GetCreatorsBySlot(bc blockchain, filter ...uint64) ([]common.A
 				return nil, err
 			}
 
-			shuffledValidatorsBySlots = append(shuffledValidatorsBySlots, breakByValidatorsBySlotCount(shuffledValidators, s.config.ValidatorsPerSlot, s.config.SlotsPerEpoch)...)
+			shuffledValidatorsBySlots = append(shuffledValidatorsBySlots, breakByValidatorsBySlotCount(shuffledValidators, s.config.GetValidatorsPerSlot(slot), s.config.SlotsPerEpoch)...)
 		}
 	}
 

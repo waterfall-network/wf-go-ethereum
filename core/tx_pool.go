@@ -1914,7 +1914,7 @@ func (pool *TxPool) runReorg(done chan struct{}, reset *txpoolResetRequest, dirt
 			if err == nil {
 				pendingBaseFee := misc.CalcSlotBaseFee(
 					pool.chainconfig,
-					pool.chainconfig.ValidatorsPerSlot,
+					pool.chainconfig.GetValidatorsPerSlot(reset.newHead.Slot),
 					validatorsCount,
 					pool.chain.Genesis().GasLimit(),
 					reset.newHead.Slot,

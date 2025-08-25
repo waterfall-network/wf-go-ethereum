@@ -75,6 +75,8 @@ var (
 		ForkSlotValOpTracking:  216000,
 		ForkSlotReduceBaseFee:  216000,
 		ForkSlotValSyncProc:    math.MaxUint64,
+		ForkSlotUpValsPerSlot:  math.MaxUint64,
+		UpValidatorsPerSlot:    25,
 		StartEpochsPerEra:      0,
 	}
 
@@ -117,6 +119,8 @@ var (
 		ForkSlotValOpTracking:  math.MaxUint64,
 		ForkSlotReduceBaseFee:  math.MaxUint64,
 		ForkSlotValSyncProc:    math.MaxUint64,
+		ForkSlotUpValsPerSlot:  math.MaxUint64,
+		UpValidatorsPerSlot:    5,
 		StartEpochsPerEra:      math.MaxUint64,
 		AcceptCpRootOnFinEpoch: testnet8AcceptCpRootOnFinEpoch,
 	}
@@ -164,6 +168,8 @@ var (
 		ForkSlotValOpTracking:  0,
 		ForkSlotReduceBaseFee:  0,
 		ForkSlotValSyncProc:    math.MaxUint64,
+		ForkSlotUpValsPerSlot:  math.MaxUint64,
+		UpValidatorsPerSlot:    6,
 		StartEpochsPerEra:      0,
 	}
 
@@ -184,6 +190,8 @@ var (
 		ForkSlotValOpTracking:  0,
 		ForkSlotReduceBaseFee:  0,
 		ForkSlotValSyncProc:    math.MaxUint64,
+		ForkSlotUpValsPerSlot:  math.MaxUint64,
+		UpValidatorsPerSlot:    6,
 		StartEpochsPerEra:      0,
 	}
 )
@@ -260,6 +268,8 @@ type ChainConfig struct {
 	ForkSlotValOpTracking uint64 `json:"forkSlotValOpTracking,omitempty"`
 	ForkSlotReduceBaseFee uint64 `json:"forkSlotReduceBaseFee,omitempty"`
 	ForkSlotValSyncProc   uint64 `json:"forkSlotValSyncProc,omitempty"`
+	ForkSlotUpValsPerSlot uint64 `json:"forkSlotUpValsPerSlot,omitempty"`
+	UpValidatorsPerSlot   uint64 `json:"upValidatorsPerSlot,omitempty"`
 	// Fork eras
 	StartEpochsPerEra uint64 `json:"startEpochsPerEra"`
 
@@ -288,8 +298,9 @@ func (c *CliqueConfig) String() string {
 // String implements the fmt.Stringer interface.
 func (c *ChainConfig) String() string {
 	return fmt.Sprintf("{ChainID: %v, SecondsPerSlot: %v, SlotsPerEpoch: %v, EpochsPerEra: %v, TransitionPeriod: %v, "+
-		"ValidatorsPerSlot %v, ValidatorsStateAddress %v, EffectiveBalance: %v, ValidatorOpExpireSlots: %v, ForkSlotSubNet1: %v, ForkSlotDelegate: %v, "+
-		"ForkSlotPrefixFin: %v, ForkSlotShanghai: %v, ForkSlotValOpTracking: %v, ForkSlotReduceBaseFee: %v, ForkSlotValSyncProc: %v, StartEpochsPerEra: %v, AcceptCpRootOnFinEpoch: %v}",
+		"ValidatorsPerSlot %v, ValidatorsStateAddress %v, EffectiveBalance: %v, ValidatorOpExpireSlots: %v, ForkSlotSubNet1: %v, "+
+		"ForkSlotDelegate: %v, ForkSlotPrefixFin: %v, ForkSlotShanghai: %v, ForkSlotValOpTracking: %v, ForkSlotReduceBaseFee: %v, "+
+		"ForkSlotValSyncProc: %v, StartEpochsPerEra: %v, AcceptCpRootOnFinEpoch: %v, ForkSlotUpValsPerSlot %v, UpValidatorsPerSlot %v}",
 		c.ChainID,
 		c.SecondsPerSlot,
 		c.SlotsPerEpoch,
@@ -308,6 +319,8 @@ func (c *ChainConfig) String() string {
 		c.ForkSlotValSyncProc,
 		c.StartEpochsPerEra,
 		c.AcceptCpRootOnFinEpoch,
+		c.ForkSlotUpValsPerSlot,
+		c.UpValidatorsPerSlot,
 	)
 }
 
@@ -339,6 +352,19 @@ func (c *ChainConfig) IsForkSlotReduceBaseFee(slot uint64) bool {
 // IsForkSlotValSyncProc returns true if provided slot greater or equal of the fork slot ForkSlotValSyncProc.
 func (c *ChainConfig) IsForkSlotValSyncProc(slot uint64) bool {
 	return slot >= c.ForkSlotValSyncProc
+}
+
+// IsForkSlotUpValsPerSlot returns true if provided slot greater or equal of the fork slot ForkSlotUpValsPerSlot.
+func (c *ChainConfig) IsForkSlotUpValsPerSlot(slot uint64) bool {
+	return slot >= c.ForkSlotUpValsPerSlot
+}
+
+// IsForkSlotUpValsPerSlot returns true if provided slot greater or equal of the fork slot ForkSlotUpValsPerSlot.
+func (c *ChainConfig) GetValidatorsPerSlot(slot uint64) uint64 {
+	if c.IsForkSlotUpValsPerSlot(slot) && c.UpValidatorsPerSlot > 0 {
+		return c.UpValidatorsPerSlot
+	}
+	return c.ValidatorsPerSlot
 }
 
 // CheckConfigForkOrder checks that we don't "skip" any forks, geth isn't pluggable enough
@@ -473,6 +499,8 @@ func OverrideTestnet5(conf *ChainConfig) *ChainConfig {
 	conf.ForkSlotValSyncProc = 1024
 	//conf.StartEpochsPerEra = 0
 	//conf.AcceptCpRootOnFinEpoch = nil
+	conf.ForkSlotUpValsPerSlot = 512
+	conf.UpValidatorsPerSlot = 6
 
 	return conf
 }
@@ -496,6 +524,10 @@ func OverrideTestnet9(conf *ChainConfig) *ChainConfig {
 	conf.ForkSlotValOpTracking = 0
 	conf.ForkSlotReduceBaseFee = 0
 	conf.ForkSlotValSyncProc = math.MaxUint64
+
+	conf.ForkSlotUpValsPerSlot = math.MaxUint64
+	conf.UpValidatorsPerSlot = 25
+
 	conf.StartEpochsPerEra = 0
 	//conf.AcceptCpRootOnFinEpoch = nil
 
