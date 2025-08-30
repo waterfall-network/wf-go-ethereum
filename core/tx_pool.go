@@ -215,10 +215,10 @@ var DefaultTxPoolConfig = TxPoolConfig{
 
 	//AccountSlots: 16,
 	//GlobalSlots:  4096 + 1024, // urgent + floating queue capacity with 4:1 ratio
-	AccountSlots: 720_000,
-	GlobalSlots:  720_000,
-	AccountQueue: 720_000,
-	GlobalQueue:  720_000,
+	AccountSlots: 1_048_576,
+	GlobalSlots:  1_048_576,
+	AccountQueue: 1_048_576,
+	GlobalQueue:  1_048_576,
 	//AccountSlots: 30_000,
 	//GlobalSlots:  240_000,
 	//AccountQueue: 64,

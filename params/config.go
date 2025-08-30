@@ -525,7 +525,8 @@ func OverrideTestnet9(conf *ChainConfig) *ChainConfig {
 	conf.ForkSlotReduceBaseFee = 0
 	conf.ForkSlotValSyncProc = math.MaxUint64
 
-	conf.ForkSlotUpValsPerSlot = math.MaxUint64
+	//'2025-09-01T07:44:54.000Z'
+	conf.ForkSlotUpValsPerSlot = 5_854_720
 	conf.UpValidatorsPerSlot = 25
 
 	conf.StartEpochsPerEra = 0
