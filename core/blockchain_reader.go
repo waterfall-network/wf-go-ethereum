@@ -48,7 +48,7 @@ func (bc *BlockChain) GetInsertDelayedHashes() common.HashArray {
 
 // GetInsertDelayedParents retrieves the parent hashes of blocks delayed to insert to chain after insert parents.
 func (bc *BlockChain) GetInsertDelayedParents() common.HashArray {
-	res := make(common.HashArray, 0, uint64(len(bc.insBlockCache))*bc.Config().ValidatorsPerSlot)
+	res := make(common.HashArray, 0, uint64(len(bc.insBlockCache))*bc.Config().GetValidatorsPerSlot(bc.Config().ForkSlotUpValsPerSlot))
 	for _, b := range bc.insBlockCache {
 		if b != nil {
 			res = append(res, b.ParentHashes()...)

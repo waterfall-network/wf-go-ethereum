@@ -333,7 +333,7 @@ func makeHeader(config *params.ChainConfig, parent *types.Block, state *state.St
 		CpBaseFee:    parent.CpBaseFee(),
 	}
 	// This base fee calculation is for testing
-	header.BaseFee = misc.CalcSlotBaseFee(config, config.ValidatorsPerSlot, 64, 105000000, header.Slot)
+	header.BaseFee = misc.CalcSlotBaseFee(config, config.GetValidatorsPerSlot(header.Slot), 64, 105000000, header.Slot)
 
 	return header
 }

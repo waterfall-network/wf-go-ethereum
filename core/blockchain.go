@@ -33,6 +33,7 @@ import (
 
 	lru "github.com/hashicorp/golang-lru"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
+	commonMath "gitlab.waterfall.network/waterfall/protocol/gwat/common/math"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common/mclock"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common/prque"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/consensus"
@@ -270,7 +271,16 @@ func NewBlockChain(
 	bodyCache, _ := lru.New(bodyCacheLimit)
 	bodyRLPCache, _ := lru.New(bodyCacheLimit)
 	receiptsCache, _ := lru.New(receiptsCacheLimit)
-	blockCache, _ := lru.New(blockCacheLimit)
+	//blockCache, _ := lru.New(blockCacheLimit)
+	blockCacheLimitCalc, _ := commonMath.Uint64ToInt(4 * chainConfig.SlotsPerEpoch * chainConfig.GetValidatorsPerSlot(chainConfig.ForkSlotUpValsPerSlot))
+	blockCache, _ := lru.New(blockCacheLimitCalc)
+	log.Info("blockCacheLimitCalc",
+		"blockCacheLimitCalc", blockCacheLimitCalc,
+		"SlotsPerEpoch", chainConfig.SlotsPerEpoch,
+		"ValidatorsPerSlot", chainConfig.ValidatorsPerSlot,
+		"UpValidatorsPerSlot", chainConfig.UpValidatorsPerSlot,
+		"ForkSlotUpValsPerSlot", chainConfig.ForkSlotUpValsPerSlot,
+	)
 	txLookupCache, _ := lru.New(txLookupCacheLimit)
 	invBlocksCache, _ := lru.New(invBlocksCacheLimit)
 	optimisticSpinesCache, _ := lru.New(optimisticSpinesCacheLimit)
@@ -3136,10 +3146,6 @@ func (bc *BlockChain) insertBlocks(chain types.Blocks, validate bool, op string)
 		return 0, nil
 	}
 
-	//todo check is cacher required
-	//// Start a parallel signature recovery (signer will fluke on fork transition, minimal perf loss)
-	//senderCacher.recoverFromBlocks(types.MakeSigner(bc.chainConfig), chain)
-
 	var (
 		stats     = insertStats{startTime: mclock.Now()}
 		lastCanon *types.Block
@@ -3467,6 +3473,8 @@ func (bc *BlockChain) insertBlocks(chain types.Blocks, validate bool, op string)
 		log.Info("Insert blocks: MoveTxsToProcessing", "op", op, "slot", block.Slot(), "Hash", block.Hash().Hex())
 		bc.MoveTxsToProcessing(block)
 
+		bc.blockCache.Add(block.Hash(), block)
+
 		log.Info("Insert blocks: success", "op", op, "slot", block.Slot(), "height", block.Height(), "hash", block.Hash().Hex())
 	}
 
@@ -3541,8 +3549,19 @@ func (bc *BlockChain) UpdateFinalizingState(block *types.Block, stateBlock *type
 	header.Root = statedb.IntermediateRoot(true)
 	//set updated header
 	block.SetHeader(header)
+
+	timeTrack := time.Now()
+
 	//update receipts data
 	block.SetReceipt(receipts, trie.NewStackTrie(nil))
+
+	log.Info("TIME TOTAL >>> UPS:000",
+		" elapsed", common.PrettyDuration(time.Since(timeTrack)),
+		" fn:", "UpdateFinalizingState:SetReceipt",
+		"txs", len(block.Transactions()),
+		"hash", block.Hash(),
+	)
+	timeTrack = time.Now()
 
 	//update cashes
 	hash := block.Hash()
@@ -3568,6 +3587,15 @@ func (bc *BlockChain) UpdateFinalizingState(block *types.Block, stateBlock *type
 		log.Warn("Red block insertion to chain while propagate", "nr", block.Nr(), "height", block.Height(), "slot", block.Slot(), "hash", block.Hash().Hex(), "err", err)
 		return err
 	}
+
+	log.Info("TIME TOTAL >>> UPS:111",
+		" elapsed", common.PrettyDuration(time.Since(timeTrack)),
+		" fn:", "UpdateFinalizingState:SetReceipt",
+		"txs", len(block.Transactions()),
+		"hash", block.Hash(),
+	)
+	timeTrack = time.Now()
+
 	procTime := time.Since(start)
 
 	// Update the metrics touched during block validation
@@ -3583,6 +3611,14 @@ func (bc *BlockChain) UpdateFinalizingState(block *types.Block, stateBlock *type
 	if err != nil {
 		return err
 	}
+
+	log.Info("TIME TOTAL >>> UPS:222",
+		" elapsed", common.PrettyDuration(time.Since(timeTrack)),
+		" fn:", "UpdateFinalizingState:SetReceipt",
+		"txs", len(block.Transactions()),
+		"hash", block.Hash(),
+	)
+
 	// Update the metrics touched during block commit
 	accountCommitTimer.Update(statedb.AccountCommits)   // Account commits are complete, we can mark them
 	storageCommitTimer.Update(statedb.StorageCommits)   // Storage commits are complete, we can mark them
@@ -3987,13 +4023,39 @@ func (bc *BlockChain) CommitBlockTransactions(block *types.Block, statedb *state
 		}
 	}
 
+	timeTrack := time.Now()
+
 	rawdb.WriteReceipts(bc.db, block.Hash(), receipts)
+
+	log.Info("TIME TOTAL >>> 111",
+		" elapsed", common.PrettyDuration(time.Since(timeTrack)),
+		" fn:", "CommitBlockTransactions",
+		"txs", len(block.Transactions()),
+		"hash", block.Hash(),
+	)
+	timeTrack = time.Now()
+
 	bc.handleBlockValidatorSyncReceipts(block, receipts)
+
+	log.Info("TIME TOTAL >>> 222",
+		" elapsed", common.PrettyDuration(time.Since(timeTrack)),
+		" fn:", "CommitBlockTransactions",
+		"txs", len(block.Transactions()),
+		"hash", block.Hash(),
+	)
+	timeTrack = time.Now()
 
 	bc.chainFeed.Send(ChainEvent{Block: block, Hash: block.Hash(), Logs: rlogs})
 	if len(rlogs) > 0 {
 		bc.logsFeed.Send(rlogs)
 	}
+
+	log.Info("TIME TOTAL >>> 333",
+		" elapsed", common.PrettyDuration(time.Since(timeTrack)),
+		" fn:", "CommitBlockTransactions",
+		"txs", len(block.Transactions()),
+		"hash", block.Hash(),
+	)
 
 	return statedb, receipts, rlogs, *gasUsed
 }
@@ -4559,7 +4621,7 @@ func (bc *BlockChain) InsertHeaderChain(chain []*types.Header) (int, error) {
 // GetDagHashes retrieves all non finalized block's hashes
 func (bc *BlockChain) GetDagHashes() *common.HashArray {
 	tips := *bc.hc.GetTips()
-	aproxLen := len(tips) * int(bc.Config().SlotsPerEpoch) * int(bc.Config().ValidatorsPerSlot)
+	aproxLen := len(tips) * int(bc.Config().SlotsPerEpoch) * int(bc.Config().GetValidatorsPerSlot(bc.Config().ForkSlotUpValsPerSlot))
 	ancHashes := make(common.HashArray, 0, aproxLen)
 	tipsHashes := make(common.HashArray, 0, len(tips))
 
@@ -5220,7 +5282,7 @@ func (bc *BlockChain) GetOptimisticSpines(gtSlot uint64) ([]common.HashArray, er
 	for slot := gtSlot + 1; slot <= currentSlot; slot++ {
 		slotSpines := bc.GetOptimisticSpinesFromCache(slot)
 		if slotSpines == nil {
-			slotBlocks := make(types.Headers, 0, bc.Config().ValidatorsPerSlot)
+			slotBlocks := make(types.Headers, 0, bc.Config().GetValidatorsPerSlot(bc.Config().ForkSlotUpValsPerSlot))
 			slotBlocksHashes := rawdb.ReadSlotBlocksHashes(bc.Database(), slot)
 			for _, hash := range slotBlocksHashes {
 				block := bc.GetHeader(hash)
@@ -5344,7 +5406,7 @@ func (bc *BlockChain) HaveEpochBlocks(epoch uint64) (bool, error) {
 }
 
 func (bc *BlockChain) VerifyBlockBaseFee(header *types.Header) bool {
-	creatorsPerSlotCount := bc.Config().ValidatorsPerSlot
+	creatorsPerSlotCount := bc.Config().GetValidatorsPerSlot(header.Slot)
 	if creatorsPerSlot, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, header.Slot); err == nil {
 		creatorsPerSlotCount = uint64(len(creatorsPerSlot))
 	}

@@ -1005,7 +1005,7 @@ func (d *Downloader) deliver(destCh chan dataPack, packet dataPack, inMeter, dro
 // nolint:unused // todo: check
 func (d *Downloader) fetchDagHashesBySlots(p *peerConnection, from, to uint64) (dag common.HashArray, err error) {
 	//slots limit 1024
-	slotsLimit := eth.LimitDagHashes / d.lightchain.Config().ValidatorsPerSlot
+	slotsLimit := eth.LimitDagHashes / d.lightchain.Config().GetValidatorsPerSlot(to)
 	if to-from > slotsLimit {
 		return nil, errDataSizeLimitExceeded
 	}
@@ -2200,7 +2200,7 @@ func (d *Downloader) multiPeerGetHashes(p *peerConnection, baseSpine common.Hash
 	)
 
 	for from := baseHeader.Slot; from <= si.CurrentSlot(); {
-		to := from + d.slotRangeLimit()
+		to := from + d.slotRangeLimit(from)
 		log.Info("Sync head peer: hashes by slots",
 			"from", from,
 			"to", to,
@@ -2264,7 +2264,7 @@ func (d *Downloader) multiSyncBySlots(p *peerConnection, from, to uint64) error 
 // fetchDagHashes retrieves the dag chain hashes beginning from finalized block (excluded from response).
 func (d *Downloader) multiFetchDagHashesBySlots(p *peerConnection, from, to uint64) (dag common.HashArray, err error) {
 	//slots limit 1024
-	slotsLimit := eth.LimitDagHashes / d.lightchain.Config().ValidatorsPerSlot
+	slotsLimit := eth.LimitDagHashes / d.lightchain.Config().GetValidatorsPerSlot(to)
 	if to-from > slotsLimit {
 		return nil, errDataSizeLimitExceeded
 	}
@@ -2369,8 +2369,8 @@ func (d *Downloader) multiPeerReset() {
 }
 
 // slotStep calculates max slots numbers for sync request ramge.
-func (d *Downloader) slotRangeLimit() uint64 {
-	return eth.LimitDagHashes / d.lightchain.Config().ValidatorsPerSlot
+func (d *Downloader) slotRangeLimit(slot uint64) uint64 {
+	return eth.LimitDagHashes / d.lightchain.Config().GetValidatorsPerSlot(slot)
 }
 
 func (d *Downloader) setPeerSync(peerId string) {
