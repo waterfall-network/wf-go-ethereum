@@ -15,7 +15,6 @@
 package testmodels
 
 import (
-	"math"
 	"math/big"
 
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
@@ -68,7 +67,7 @@ func init() {
 		ForkSlotShanghai:       0,
 		ForkSlotValOpTracking:  100,
 		ForkSlotValSyncProc:    100,
-		ForkSlotUpValsPerSlot:  math.MaxUint64,
+		ForkSlotUpValsPerSlot:  0,
 		UpValidatorsPerSlot:    2,
 		StartEpochsPerEra:      0,
 		EffectiveBalance:       big.NewInt(3200),

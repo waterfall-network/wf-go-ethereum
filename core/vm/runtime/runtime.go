@@ -67,7 +67,7 @@ func setDefaults(cfg *Config) {
 			ForkSlotValOpTracking:  0,
 			ForkSlotReduceBaseFee:  0,
 			ForkSlotValSyncProc:    0,
-			ForkSlotUpValsPerSlot:  math.MaxUint64,
+			ForkSlotUpValsPerSlot:  6_336_000,
 			ValidatorsPerSlot:      25,
 			StartEpochsPerEra:      0,
 		}
