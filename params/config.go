@@ -75,7 +75,7 @@ var (
 		ForkSlotValOpTracking:  216000,
 		ForkSlotReduceBaseFee:  216000,
 		ForkSlotValSyncProc:    math.MaxUint64,
-		ForkSlotUpValsPerSlot:  math.MaxUint64,
+		ForkSlotUpValsPerSlot:  6_336_000,
 		UpValidatorsPerSlot:    25,
 		StartEpochsPerEra:      0,
 	}
