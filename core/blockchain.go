@@ -4915,10 +4915,9 @@ func (bc *BlockChain) DagMuUnlock() {
 func (bc *BlockChain) EnterNextEra(nextEraEpochFrom uint64, root, blockHash common.Hash) (*era.Era, error) {
 	nextEra := rawdb.ReadEra(bc.db, bc.eraInfo.Number()+1)
 
-	// todo check nextEra.Root != root (in fork)
-	if nextEra != nil {
+	if nextEra != nil && nextEra.Root == root && nextEra.BlockHash == blockHash {
 		rawdb.WriteCurrentEra(bc.db, nextEra.Number)
-		log.Info("######### if nextEra != nil EnterNextEra",
+		log.Info("EnterNextEra 000",
 			"num", nextEra.Number,
 			"begin", nextEra.From,
 			"end", nextEra.To,
@@ -4929,6 +4928,8 @@ func (bc *BlockChain) EnterNextEra(nextEraEpochFrom uint64, root, blockHash comm
 		bc.SetNewEraInfo(nextEra)
 		return nextEra, nil
 	}
+
+	isNextEraExist := nextEra != nil
 
 	transitionSlot, err := bc.GetSlotInfo().SlotOfEpochStart(nextEraEpochFrom - bc.Config().TransitionPeriod)
 	if err != nil {
@@ -4943,7 +4944,7 @@ func (bc *BlockChain) EnterNextEra(nextEraEpochFrom uint64, root, blockHash comm
 	nextEra = era.NextEra(bc, root, blockHash, validatorsCount)
 	rawdb.WriteEra(bc.db, nextEra.Number, nextEra)
 	rawdb.WriteCurrentEra(bc.db, nextEra.Number)
-	log.Info("######### if nextEra == nil EnterNextEra",
+	log.Info("EnterNextEra 111",
 		"num", nextEra.Number,
 		"begin", nextEra.From,
 		"end", nextEra.To,
@@ -4951,6 +4952,7 @@ func (bc *BlockChain) EnterNextEra(nextEraEpochFrom uint64, root, blockHash comm
 		"currSlot", bc.GetSlotInfo().CurrentSlot(),
 		"currEpoch", bc.GetSlotInfo().SlotToEpoch(bc.GetSlotInfo().CurrentSlot()),
 		"validators", validatorsCount,
+		"updateExistedEra", isNextEraExist,
 	)
 	bc.SetNewEraInfo(nextEra)
 	return nextEra, nil
@@ -4958,7 +4960,7 @@ func (bc *BlockChain) EnterNextEra(nextEraEpochFrom uint64, root, blockHash comm
 
 func (bc *BlockChain) StartTransitionPeriod(cp *types.Checkpoint, spineRoot, spineHash common.Hash) error {
 	nextEra := rawdb.ReadEra(bc.db, bc.eraInfo.Number()+1)
-	if nextEra == nil {
+	if nextEra == nil || nextEra.Root != spineRoot || nextEra.BlockHash != spineHash {
 		log.Info("GetValidators StartTransitionPeriod", "slot", bc.GetSlotInfo().CurrentSlot(),
 			"curEpoch", bc.GetSlotInfo().SlotToEpoch(bc.GetSlotInfo().CurrentSlot()),
 			"curEra", bc.GetEraInfo().GetEra().Number,
@@ -4968,6 +4970,7 @@ func (bc *BlockChain) StartTransitionPeriod(cp *types.Checkpoint, spineRoot, spi
 			"nextEraFirstSlot", bc.GetEraInfo().NextEraFirstSlot(bc),
 			"spineRoot", spineRoot.Hex(),
 			"spineHash", spineHash.Hex(),
+			"updateExistedEra", nextEra != nil,
 		)
 
 		if int64(cp.FinEpoch)-int64(bc.Config().TransitionPeriod) < 0 {
