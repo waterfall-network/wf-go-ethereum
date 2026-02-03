@@ -76,7 +76,8 @@ func fixMainnet0_FixValidatorSyncOpProcessing(bc *BlockChain, p *validator.Proce
 
 	//Hard fix bad checkpoint state (mainntet block nr=3343671)
 	blkCtx := p.GetBlockContext()
-	if blkCtx.BlockNumber.Uint64() == targetBlockNr && blkCtx.BlockHash == targetBlockHash {
+	if blkCtx.BlockNumber.Uint64() == targetBlockNr && blkCtx.BlockHash == targetBlockHash && to == *bc.chainConfig.ValidatorsStateAddress {
+		//apply to validator op txs only
 		log.Warn("Hard fix mainnet 0: process tx",
 			"blkNr", blkCtx.BlockNumber,
 			"blkHash", blkCtx.BlockHash.Hex(),
@@ -119,13 +120,14 @@ func fixMainnet1_FixValidatorSyncOpProcessing(bc *BlockChain, p *validator.Proce
 
 	//Hard fix bad checkpoint state (mainntet block nr=3343937)
 	blkCtx := p.GetBlockContext()
-	if blkCtx.BlockNumber.Uint64() == targetBlockNr && blkCtx.BlockHash == targetBlockHash {
+	if blkCtx.BlockNumber.Uint64() == targetBlockNr && blkCtx.BlockHash == targetBlockHash && to == *bc.chainConfig.ValidatorsStateAddress {
+		//apply to validator op txs only
 		log.Warn("Hard fix mainnet 1: process tx",
 			"blkNr", blkCtx.BlockNumber,
 			"blkHash", blkCtx.BlockHash.Hex(),
 			"txHash", txHash.Hex(),
 		)
-		return true, nil, validator.ErrNoSavedValSyncOp
+		return true, nil, validator.ErrTxNF
 	}
 	return false, nil, nil
 }
@@ -162,13 +164,14 @@ func fixMainnet2_FixValidatorSyncOpProcessing(bc *BlockChain, p *validator.Proce
 
 	//Hard fix bad checkpoint state (mainntet block nr=3344099)
 	blkCtx := p.GetBlockContext()
-	if blkCtx.BlockNumber.Uint64() == targetBlockNr && blkCtx.BlockHash == targetBlockHash {
+	if blkCtx.BlockNumber.Uint64() == targetBlockNr && blkCtx.BlockHash == targetBlockHash && to == *bc.chainConfig.ValidatorsStateAddress {
+		//apply to validator op txs only
 		log.Warn("Hard fix mainnet 2: process tx",
 			"blkNr", blkCtx.BlockNumber,
 			"blkHash", blkCtx.BlockHash.Hex(),
 			"txHash", txHash.Hex(),
 		)
-		return true, nil, validator.ErrNoSavedValSyncOp
+		return true, nil, validator.ErrTxNF
 	}
 	return false, nil, nil
 }
