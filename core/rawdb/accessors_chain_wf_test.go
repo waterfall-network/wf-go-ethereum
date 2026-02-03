@@ -255,9 +255,12 @@ func TestNotProcessedValidatorSyncWf(t *testing.T) {
 	}
 	src_3.Amount.SetString("32789456000000", 10)
 
-	valSyncOps := []*types.ValidatorSync{src_1, src_2, src_3}
-
-	WriteNotProcessedValidatorSyncOps(db, valSyncOps)
+	valSyncOps := map[common.Hash]*types.ValidatorSync{
+		src_1.InitTxHash: src_1,
+		src_2.InitTxHash: src_2,
+		src_3.InitTxHash: src_3,
+	}
+	WriteNotProcessedValidatorKeys(db, valSyncOps)
 	if entry := ReadNotProcessedValidatorSyncOps(db); reflect.DeepEqual(entry, valSyncOps) {
 		t.Fatalf("ValidatorSync W-R failed:  %#v != %#v", entry, valSyncOps)
 	}

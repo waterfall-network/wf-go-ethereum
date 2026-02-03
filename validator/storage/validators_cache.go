@@ -40,10 +40,10 @@ type ValidatorsCache struct {
 	shuffledValidatorsCache       map[uint64][][]common.Address            // epoch/array of validators arrays (slot is the index in array)
 	shuffledSubnetValidatorsCache map[uint64]map[uint64][][]common.Address // epoch/subnet/array of validators arrays (slot is the index in array)
 
-	allMu            *sync.Mutex
-	subnetMu         *sync.Mutex
-	shuffledMu       *sync.Mutex
-	shuffledSubnetMu *sync.Mutex
+	allMu            *sync.RWMutex
+	subnetMu         *sync.RWMutex
+	shuffledMu       *sync.RWMutex
+	shuffledSubnetMu *sync.RWMutex
 }
 
 func NewCache() *ValidatorsCache {
@@ -52,10 +52,10 @@ func NewCache() *ValidatorsCache {
 		subnetValidatorsCache:         make(map[uint64]map[uint64][]common.Address),
 		shuffledValidatorsCache:       make(map[uint64][][]common.Address),
 		shuffledSubnetValidatorsCache: make(map[uint64]map[uint64][][]common.Address),
-		allMu:                         new(sync.Mutex),
-		subnetMu:                      new(sync.Mutex),
-		shuffledMu:                    new(sync.Mutex),
-		shuffledSubnetMu:              new(sync.Mutex),
+		allMu:                         new(sync.RWMutex),
+		subnetMu:                      new(sync.RWMutex),
+		shuffledMu:                    new(sync.RWMutex),
+		shuffledSubnetMu:              new(sync.RWMutex),
 	}
 }
 
@@ -78,8 +78,8 @@ func (c *ValidatorsCache) addAllActiveValidatorsByEra(era uint64, validatorsList
 }
 
 func (c *ValidatorsCache) getAllActiveValidatorsByEra(era uint64) []common.Address {
-	c.allMu.Lock()
-	defer c.allMu.Unlock()
+	c.allMu.RLock()
+	defer c.allMu.RUnlock()
 
 	validators, ok := c.allActiveValidatorsCache[era]
 	if !ok || validators == nil {
@@ -107,8 +107,8 @@ func (c *ValidatorsCache) addSubnetValidators(epoch, subnet uint64, validators [
 
 //nolint:unused // subnets support
 func (c *ValidatorsCache) getSubnetValidators(epoch, subnet uint64) ([]common.Address, error) {
-	c.subnetMu.Lock()
-	defer c.subnetMu.Unlock()
+	c.subnetMu.RLock()
+	defer c.subnetMu.RUnlock()
 
 	epochValidators, ok := c.subnetValidatorsCache[epoch]
 	if !ok {
@@ -201,8 +201,8 @@ func (c *ValidatorsCache) addShuffledValidators(shuffledValidators [][]common.Ad
 // getShuffledValidators return shuffled validators addresses from cache.
 // Input parameters are array of uint64 (epoch, slot, subnet). Sequence is required!!!
 func (c *ValidatorsCache) getShuffledValidators(filter []uint64) ([]common.Address, error) {
-	c.shuffledMu.Lock()
-	defer c.shuffledMu.Unlock()
+	c.shuffledMu.RLock()
+	defer c.shuffledMu.RUnlock()
 
 	var epoch, slot, subnet uint64
 

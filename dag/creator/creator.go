@@ -12,6 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+// Package creator is responsible for creating blocks in the blockchain.
 package creator
 
 import (
@@ -23,7 +24,6 @@ import (
 	"time"
 
 	"gitlab.waterfall.network/waterfall/protocol/gwat/accounts"
-	"gitlab.waterfall.network/waterfall/protocol/gwat/accounts/keystore"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common/hexutil"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/consensus/misc"
@@ -49,22 +49,22 @@ type Backend interface {
 
 // Config is the configuration parameters of block creation.
 type Config struct {
-	Etherbase   common.Address `toml:",omitempty"` // Public address for block creation rewards (default = first account)
-	PasswordDir string         // Keystore password directory
-	Notify      []string       `toml:",omitempty"` // HTTP URL list to be notified of new work packages (only useful in ethash).
-	NotifyFull  bool           `toml:",omitempty"` // Notify with pending block headers instead of work packages
-	ExtraData   hexutil.Bytes  `toml:",omitempty"` // Block extra data set by the miner
-	GasFloor    uint64         // Target gas floor for mined blocks.
-	GasCeil     uint64         // Target gas ceiling for mined blocks.
-	GasPrice    *big.Int       // Minimum gas price for mining a transaction
-	Recommit    time.Duration  // The time interval for creator to re-create block creation work.
-	Noverify    bool           // Disable remote block creation solution verification(only useful in ethash).
+	Etherbase     common.Address `toml:",omitempty"` // Public address for block creation rewards (default = first account)
+	PasswordDir   string         // Keystore password directory
+	Notify        []string       `toml:",omitempty"` // HTTP URL list to be notified of new work packages (only useful in ethash).
+	NotifyFull    bool           `toml:",omitempty"` // Notify with pending block headers instead of work packages
+	ExtraData     hexutil.Bytes  `toml:",omitempty"` // Block extra data set by the miner
+	GasFloor      uint64         // Target gas floor for mined blocks.
+	GasCeil       uint64         // Target gas ceiling for mined blocks.
+	GasLimitForce bool           // Target gas ceiling for mined blocks.
+	GasPrice      *big.Int       // Minimum gas price for mining a transaction
+	Recommit      time.Duration  // The time interval for creator to re-create block creation work.
+	Noverify      bool           // Disable remote block creation solution verification(only useful in ethash).
 }
 
 // environment is the Creator's current environment and holds all of the current state information.
 type environment struct {
-	signer   types.Signer
-	keystore *keystore.KeyStore
+	signer types.Signer
 
 	gasPool *core.GasPool // available gas used to pack transactions
 
@@ -115,16 +115,18 @@ func New(config *Config, backend Backend, mux *event.TypeMux) *Creator {
 		nodeCreators: make(map[common.Address]struct{}),
 	}
 
-	creator.SetNodeCreators(backend.AccountManager().Accounts())
+	creator.SetNodeCreators(backend.BlockChain().VerifiersKeystore().VerifiersAddresses())
 
-	accCh := make(chan accounts.WalletEvent)
-	am := backend.AccountManager()
-	am.Subscribe(accCh)
-	go creator.accountsWatcherLoop(accCh)
+	//TODO: implement subscription to verifiers events
+	//accCh := make(chan accounts.WalletEvent)
+	//am := backend.AccountManager()
+	//am.Subscribe(accCh)
+	//go creator.accountsWatcherLoop(accCh)
 
 	return creator
 }
 
+//nolint:unused
 func (c *Creator) accountsWatcherLoop(eventCh chan accounts.WalletEvent) {
 	for event := range eventCh {
 		c.SetNodeCreators(c.backend.AccountManager().Accounts())
@@ -384,12 +386,17 @@ func (c *Creator) prepareBlockHeader(assigned *Assignment, tipsBlocks types.Bloc
 		return nil, err
 	}
 
+	gasLimit := c.config.GasCeil
+	if !c.config.GasLimitForce {
+		gasLimit = core.CalcGasLimit(tipsBlocks.AvgGasLimit(), c.config.GasCeil)
+	}
+
 	header := &types.Header{
 		ParentHashes: parentHashes,
 		Slot:         assigned.Slot,
 		Era:          era,
 		Height:       newHeight,
-		GasLimit:     core.CalcGasLimit(tipsBlocks.AvgGasLimit(), c.config.GasCeil),
+		GasLimit:     gasLimit,
 		Time:         uint64(blockTime.Unix()),
 		Extra:        extra,
 		// Checkpoint spine block
@@ -403,7 +410,7 @@ func (c *Creator) prepareBlockHeader(assigned *Assignment, tipsBlocks types.Bloc
 	}
 
 	// Get active validators number
-	creatorsPerSlotCount := c.bc.Config().ValidatorsPerSlot
+	creatorsPerSlotCount := c.bc.Config().GetValidatorsPerSlot(assigned.Slot)
 	if creatorsPerSlot, err := c.bc.ValidatorStorage().GetCreatorsBySlot(c.bc, header.Slot); err == nil {
 		creatorsPerSlotCount = uint64(len(creatorsPerSlot))
 	}
@@ -513,7 +520,7 @@ func (c *Creator) reorgTips(slot uint64, tips types.Tips) (types.BlockMap, error
 func (c *Creator) createNewBlock(coinbase common.Address, creators []common.Address, header *types.Header, wg *sync.WaitGroup, needEmptyBlock, isHibernateMode bool) {
 	start := time.Now()
 
-	log.Info("Try to create new block", "slot", header.Slot, "coinbase", coinbase.Hex())
+	log.Info("Try to create new block", "slot", header.Slot, "coinbase", coinbase.Hex(), "gasLimit", header.GasLimit, "gasLimitForce", c.config.GasLimitForce)
 	defer wg.Done()
 
 	if coinbase == (common.Address{}) {
@@ -532,41 +539,29 @@ func (c *Creator) createNewBlock(coinbase common.Address, creators []common.Addr
 	syncData := validatorsync.GetPendingValidatorSyncData(c.bc)
 	if len(syncData) > 0 || len(pendingTxs) > 0 || needEmptyBlock {
 		startTime := time.Now()
-		ks, err := c.getKeystore(c.backend.AccountManager())
-		if err != nil {
-			log.Error("Failed to fetch keystore", "error", err)
-			return
-		}
-		log.Info("BLOCK CREATION TIME",
-			"elapsed", common.PrettyDuration(time.Since(startTime)),
-			"func:", "getKeyStore",
-			"slot", header.Slot,
-		)
 
-		acc := accounts.Account{Address: coinbase}
-		start = time.Now()
-		ok := ks.IsUnlocked(acc)
+		ok := c.bc.IsVerifierUnlocked(coinbase)
 		log.Info("BLOCK CREATION TIME",
 			"elapsed", common.PrettyDuration(time.Since(startTime)),
 			"func:", "IsUnlocked",
-			"account", acc.Address.Hex(),
+			"account", coinbase.Hex(),
 			"slot", header.Slot,
 		)
 		if !ok {
 			startTime = time.Now()
-			if err := c.unlockAccount(ks, acc.Address.String()); err != nil {
-				log.Warn("Creator: unlock account failed",
+			if err := c.bc.UnlockVerifiers([][]common.Address{{coinbase}}); err != nil {
+				log.Warn("Creator: unlock verifier failed",
 					"error", err,
 					"elapsed", common.PrettyDuration(time.Since(startTime)),
 					"slot", header.Slot,
-					"addr", acc.Address.String())
+					"addr", coinbase.String())
 				return
 			}
 
 			log.Info("BLOCK CREATION TIME",
 				"elapsed", common.PrettyDuration(time.Since(startTime)),
 				"func:", "unlockAccount",
-				"address", acc.Address.Hex(),
+				"address", coinbase.Hex(),
 				"slot", header.Slot,
 			)
 		}
@@ -936,7 +931,7 @@ func (c *Creator) processValidatorTxs(syncData map[common.Hash]*types.ValidatorS
 	nonce := c.backend.TxPool().Nonce(header.Coinbase)
 	for _, validatorSync := range syncData {
 		if validatorSync.ProcEpoch <= c.bc.GetSlotInfo().SlotToEpoch(c.bc.GetSlotInfo().CurrentSlot()) {
-			valSyncTx, err := validatorsync.CreateValidatorSyncTx(c.backend, header.CpHash, header.Coinbase, header.Slot, validatorSync, nonce, c.current.keystore)
+			valSyncTx, err := validatorsync.CreateValidatorSyncTx(c.backend, header.CpHash, header.Coinbase, header.Slot, validatorSync, nonce)
 			if err != nil {
 				log.Error("failed to create validator sync tx",
 					"error", err,
@@ -973,41 +968,8 @@ func (c *Creator) SetNodeCreators(accounts []common.Address) {
 	}
 }
 
-// unlockAccount unlocks a specified account.
-func (c *Creator) unlockAccount(ks *keystore.KeyStore, targetAddress string) error {
-	passwords, err := c.getPasswords()
-	if err != nil {
-		return err
-	}
-	keystoreAccounts := ks.Accounts()
-
-	// Find the position of the target account.
-	position := findAccountPosition(keystoreAccounts, targetAddress)
-
-	// Unlock the account.log.Warn("Referring to accounts by order in the keystore folder is dangerous!")
-	return unlockAccount(ks, targetAddress, position, passwords)
-}
-
-// getPasswords returns a list of passwords from the password directory.
-func (c *Creator) getPasswords() ([]string, error) {
-	return makePasswordList(c.config.PasswordDir)
-}
-
-// getKeystore retrieves and set cache the encrypted keystore from the account manager.
-func (c *Creator) getKeystore(am *accounts.Manager) (*keystore.KeyStore, error) {
-	if c.current.keystore != nil {
-		return c.current.keystore, nil
-	}
-	if ks := am.Backends(keystore.KeyStoreType); len(ks) > 0 {
-		c.current.keystore = ks[0].(*keystore.KeyStore)
-		return ks[0].(*keystore.KeyStore), nil
-	}
-
-	return nil, errors.New("local keystore not used")
-}
-
 func (c *Creator) signBlockHeader(h *types.Header) (*types.Header, error) {
-	key, err := c.current.keystore.GetKey(h.Coinbase)
+	key, err := c.bc.GetVerifierKey(h.Coinbase)
 	if err != nil {
 		return nil, err
 	}

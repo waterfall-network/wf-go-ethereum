@@ -12,6 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+/*
+Package validator implements and processes Waterfall validator operations and
+handles functionalities such as validator creation, management, and state updates.
+*/
 package validator
 
 import (
@@ -57,6 +61,7 @@ type Blockchain interface {
 	GetEpoch(epoch uint64) common.Hash
 	EpochToEra(uint64) *era.Era
 	GetEraInfo() *era.EraInfo
+	UnlockVerifiers(accounts [][]common.Address) error
 }
 
 // PublicValidatorAPI provides an API to access validator functions.

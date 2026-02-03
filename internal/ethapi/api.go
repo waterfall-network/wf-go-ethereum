@@ -162,7 +162,7 @@ func (s *PublicTxPoolAPI) Content() map[string]map[string]map[string]interface{}
 	pending, queue, processing := s.b.TxPoolContent()
 	curHeader := s.b.GetLastFinalizedHeader()
 	bc := s.b.BlockChain()
-	creatorsPerSlotCount := bc.Config().ValidatorsPerSlot
+	creatorsPerSlotCount := bc.Config().GetValidatorsPerSlot(curHeader.Slot)
 	if creatorsPerSlot, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, curHeader.Slot); err == nil {
 		creatorsPerSlotCount = uint64(len(creatorsPerSlot))
 	}
@@ -204,7 +204,7 @@ func (s *PublicTxPoolAPI) ContentFrom(addr common.Address) map[string]map[string
 	pending, queue, processing := s.b.TxPoolContentFrom(addr)
 	curHeader := s.b.GetLastFinalizedHeader()
 	bc := s.b.BlockChain()
-	creatorsPerSlotCount := bc.Config().ValidatorsPerSlot
+	creatorsPerSlotCount := bc.Config().GetValidatorsPerSlot(curHeader.Slot)
 	if creatorsPerSlot, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, curHeader.Slot); err == nil {
 		creatorsPerSlotCount = uint64(len(creatorsPerSlot))
 	}
@@ -1363,6 +1363,7 @@ func RPCMarshalHeader(head *types.Header) map[string]interface{} {
 		"size":             hexutil.Uint64(head.Size()),
 		"bodyRoot":         head.BodyHash,
 		"difficulty":       new(big.Int),
+		"sha3Uncles":       types.CalcUncleHash(head),
 	}
 
 	if len(head.ParentHashes) > 0 {
@@ -1826,7 +1827,7 @@ func (s *PublicTransactionPoolAPI) GetTransactionByHash(ctx context.Context, has
 	if tx := s.b.GetPoolTransaction(hash); tx != nil {
 		curHeader := s.b.GetLastFinalizedHeader()
 		bc := s.b.BlockChain()
-		creatorsPerSlotCount := bc.Config().ValidatorsPerSlot
+		creatorsPerSlotCount := bc.Config().GetValidatorsPerSlot(curHeader.Slot)
 		if creatorsPerSlot, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, curHeader.Slot); err == nil {
 			creatorsPerSlotCount = uint64(len(creatorsPerSlot))
 		}
@@ -2105,7 +2106,7 @@ func (s *PublicTransactionPoolAPI) PendingTransactions() ([]*RPCTransaction, err
 	curHeader := s.b.GetLastFinalizedHeader()
 	transactions := make([]*RPCTransaction, 0, len(pending))
 	bc := s.b.BlockChain()
-	creatorsPerSlotCount := bc.Config().ValidatorsPerSlot
+	creatorsPerSlotCount := bc.Config().GetValidatorsPerSlot(curHeader.Slot)
 	if creatorsPerSlot, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, curHeader.Slot); err == nil {
 		creatorsPerSlotCount = uint64(len(creatorsPerSlot))
 	}
@@ -2344,6 +2345,11 @@ func (api *PublicDagAPI) ValidateSpines(ctx context.Context, data common.HashArr
 // ValidateFinalization validate given spines sequence of finalization.
 func (api *PublicDagAPI) ValidateFinalization(ctx context.Context, data common.HashArray) (bool, error) {
 	return api.b.Dag().HandleValidateFinalization(data)
+}
+
+// SyncSpines synchronize spines chain.
+func (api *PublicDagAPI) SyncSpines(ctx context.Context, data common.HashArray) (bool, error) {
+	return api.b.Dag().HandleSyncSpines(data)
 }
 
 // SyncSlotInfo sync slot info.

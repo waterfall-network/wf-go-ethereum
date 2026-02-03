@@ -51,6 +51,9 @@ var AppHelpFlagGroups = []flags.FlagGroup{
 			utils.IdentityFlag,
 			utils.LightKDFFlag,
 			utils.WhitelistFlag,
+			utils.UnlockVerifiersFlag,
+			utils.VerifiersKeystoreFlag,
+			utils.VerifiersPasswordsFlag,
 		},
 	},
 	{
@@ -165,11 +168,12 @@ var AppHelpFlagGroups = []flags.FlagGroup{
 	{
 		Name: "MINER",
 		Flags: []cli.Flag{
+			utils.MinerEnabledFlag,
 			utils.MinerThreadsFlag,
 			utils.MinerNotifyFlag,
 			utils.MinerNotifyFullFlag,
 			utils.MinerGasPriceFlag,
-			utils.MinerGasLimitFlag,
+			utils.MinerGasLimitForceFlag,
 			utils.MinerExtraDataFlag,
 			utils.MinerRecommitIntervalFlag,
 			utils.MinerNoVerifyFlag,

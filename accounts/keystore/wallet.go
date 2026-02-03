@@ -19,10 +19,10 @@ package keystore
 import (
 	"math/big"
 
-	ethereum "gitlab.waterfall.network/waterfall/protocol/gwat"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/accounts"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/crypto"
+	ethereum "gitlab.waterfall.network/waterfall/protocol/gwat/interfaces"
 )
 
 // keystoreWallet implements the accounts.Wallet interface for the original

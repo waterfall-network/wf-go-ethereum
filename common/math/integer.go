@@ -17,7 +17,9 @@
 package math
 
 import (
+	"errors"
 	"fmt"
+	"math"
 	"math/bits"
 	"strconv"
 )
@@ -95,4 +97,11 @@ func SafeAdd(x, y uint64) (uint64, bool) {
 func SafeMul(x, y uint64) (uint64, bool) {
 	hi, lo := bits.Mul64(x, y)
 	return lo, hi != 0
+}
+
+func Uint64ToInt(u uint64) (int, error) {
+	if u > uint64(math.MaxInt) {
+		return 0, errors.New("uint64 value too large for int")
+	}
+	return int(u), nil
 }

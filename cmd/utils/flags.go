@@ -119,6 +119,18 @@ var (
 		Name:  "keystore",
 		Usage: "Directory for the keystore (default = inside the datadir)",
 	}
+	UnlockVerifiersFlag = cli.BoolFlag{
+		Name:  "unlock-verifiers",
+		Usage: "Unlock all verifiers from keystore",
+	}
+	VerifiersKeystoreFlag = cli.StringFlag{
+		Name:  "verifiers-keystore",
+		Usage: "Directory for the verifiers keystore (default = inside the datadir)",
+	}
+	VerifiersPasswordsFlag = cli.StringFlag{
+		Name:  "verifiers-passwords",
+		Usage: "Password file to use for non-interactive password input",
+	}
 	USBFlag = cli.BoolFlag{
 		Name:  "usb",
 		Usage: "Enable monitoring and management of USB hardware wallets",
@@ -380,6 +392,10 @@ var (
 		Usage: "Enable recording the SHA3/keccak preimages of trie keys",
 	}
 	// Miner settings
+	MinerEnabledFlag = cli.BoolFlag{
+		Name:  "creator",
+		Usage: "Enable creating",
+	}
 	MinerThreadsFlag = cli.IntFlag{
 		Name:  "creator.threads",
 		Usage: "Number of CPU threads to use for mining",
@@ -397,6 +413,10 @@ var (
 		Name:  "creator.gaslimit",
 		Usage: "Target gas ceiling for mined blocks",
 		Value: ethconfig.Defaults.Creator.GasCeil,
+	}
+	MinerGasLimitForceFlag = cli.BoolFlag{
+		Name:  "creator.gaslimitForce",
+		Usage: "Creator uses GasCeil conf value for header.gaslimit",
 	}
 	MinerGasPriceFlag = BigFlag{
 		Name:  "creator.gasprice",
@@ -1300,6 +1320,9 @@ func setMiner(ctx *cli.Context, cfg *creator.Config) {
 	if ctx.GlobalIsSet(MinerGasLimitFlag.Name) {
 		cfg.GasCeil = ctx.GlobalUint64(MinerGasLimitFlag.Name)
 	}
+	if ctx.GlobalIsSet(MinerGasLimitForceFlag.Name) {
+		cfg.GasLimitForce = ctx.GlobalBool(MinerGasLimitForceFlag.Name)
+	}
 	if ctx.GlobalIsSet(MinerGasPriceFlag.Name) {
 		cfg.GasPrice = GlobalBig(ctx, MinerGasPriceFlag.Name)
 	}
@@ -1756,7 +1779,7 @@ func MakeChain(ctx *cli.Context, stack *node.Node) (chain *core.BlockChain, chai
 
 	// TODO(rjl493456442) disable snapshot generation/wiping if the chain is read only.
 	// Disable transaction indexing/unindexing by default.
-	chain, err = core.NewBlockChain(chainDb, cache, config, vmcfg, nil)
+	chain, err = core.NewBlockChain(chainDb, cache, config, vmcfg, nil, &node.VerifiersKeystoreConfig{})
 	if err != nil {
 		Fatalf("Can't create BlockChain: %v", err)
 	}

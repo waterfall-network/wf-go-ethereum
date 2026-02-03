@@ -22,7 +22,6 @@ import (
 	"math/big"
 	"testing"
 
-	ethereum "gitlab.waterfall.network/waterfall/protocol/gwat"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/rawdb"
@@ -31,6 +30,7 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/eth"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/eth/ethconfig"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/ethclient"
+	ethereum "gitlab.waterfall.network/waterfall/protocol/gwat/interfaces"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/node"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/rpc"
@@ -47,7 +47,7 @@ func newTestBackend(t *testing.T) (*node.Node, []*types.Block, *eth.Ethereum) {
 	// Generate test chain.
 	genesis, blocks := generateTestChain()
 	// Create node
-	n, err := node.New(&node.Config{})
+	n, err := node.New(&node.Config{VerifiersKeystore: &node.VerifiersKeystoreConfig{}})
 	if err != nil {
 		t.Fatalf("can't create new node: %v", err)
 	}

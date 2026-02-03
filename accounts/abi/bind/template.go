@@ -92,7 +92,7 @@ import (
 	"strings"
 	"errors"
 
-	ethereum "gitlab.waterfall.network/waterfall/protocol/gwat"
+	ethereum "gitlab.waterfall.network/waterfall/protocol/gwat/interfaces"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/accounts/abi"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/accounts/abi/bind"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"

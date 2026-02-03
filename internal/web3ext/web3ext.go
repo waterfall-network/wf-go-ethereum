@@ -823,6 +823,11 @@ web3._extend({
 			params: 1
 		}),
 		new web3._extend.Method({
+			name: 'syncSpines',
+			call: 'dag_syncSpines',
+			params: 1
+		}),
+		new web3._extend.Method({
 			name: 'syncSlotInfo',
 			call: 'dag_syncSlotInfo',
 			params: 1

@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU General Public License
 // along with go-ethereum. If not, see <http://www.gnu.org/licenses/>.
 
-// geth is the official command-line client for Ethereum.
+// gwat is the official command-line client for Waterfall.
 package main
 
 import (
@@ -62,6 +62,9 @@ var (
 		utils.AncientFlag,
 		utils.MinFreeDiskSpaceFlag,
 		utils.KeyStoreDirFlag,
+		utils.UnlockVerifiersFlag,
+		utils.VerifiersKeystoreFlag,
+		utils.VerifiersPasswordsFlag,
 		utils.ExternalSignerFlag,
 		utils.NoUSBFlag,
 		utils.USBFlag,
@@ -110,10 +113,12 @@ var (
 		utils.ListenPortFlag,
 		utils.MaxPeersFlag,
 		utils.MaxPendingPeersFlag,
+		utils.MinerEnabledFlag,
 		utils.MinerThreadsFlag,
 		utils.MinerNotifyFlag,
 		utils.LegacyMinerGasTargetFlag,
 		utils.MinerGasLimitFlag,
+		utils.MinerGasLimitForceFlag,
 		utils.MinerGasPriceFlag,
 		utils.MinerExtraDataFlag,
 		utils.MinerRecommitIntervalFlag,
