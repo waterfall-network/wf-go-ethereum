@@ -67,6 +67,11 @@ func fixMainnet0_resetBadChainSequences(bc *BlockChain) error {
 }
 
 // fixMainnet0_FixValidatorSyncOpProcessing fixes applying validator sync txs of mainntet block nr=3343671.
+// To obtain required info use:
+//
+//	wat.validator.getBlockReceipts(3343671).forEach((v)=>{
+//		console.log(JSON.stringify({idx: v.transactionIndex, hash: v.transactionHash, status: v.status,type: v.type,from: v.from,to: v.to,parsedData: v.logs?.[0]?.parsedData}, null, 2))
+//	})
 func fixMainnet0_FixValidatorSyncOpProcessing(bc *BlockChain, p *validator.Processor, opData operation.Operation, txHash common.Hash, from, to common.Address) (isApplied bool, ret []byte, err error) {
 	if !isMainnet(bc) {
 		return false, nil, nil
