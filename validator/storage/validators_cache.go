@@ -128,6 +128,18 @@ func (c *ValidatorsCache) addValidator(addr common.Address, era uint64) {
 	c.allMu.Lock()
 	defer c.allMu.Unlock()
 
+	_, exists := c.allActiveValidatorsCache[era]
+	if !exists && len(c.allActiveValidatorsCache[era]) > cacheCapacity {
+		needDel := uint64(math.MaxUint64)
+		for e := range c.allActiveValidatorsCache {
+			if e < needDel {
+				needDel = e
+			}
+		}
+
+		delete(c.allActiveValidatorsCache, needDel)
+	}
+
 	c.allActiveValidatorsCache[era] = append(c.allActiveValidatorsCache[era], addr)
 }
 
