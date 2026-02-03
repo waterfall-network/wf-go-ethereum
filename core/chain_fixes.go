@@ -14,12 +14,26 @@ func resetBadChainSequences(bc *BlockChain) error {
 	if err := fixMainnet0_resetBadChainSequences(bc); err != nil {
 		return err
 	}
+	if err := fixMainnet1_resetBadChainSequences(bc); err != nil {
+		return err
+	}
+	if err := fixMainnet2_resetBadChainSequences(bc); err != nil {
+		return err
+	}
 	return nil
 }
 
 // FixValidatorSyncOpProcessing to call while NewBlockChain to check bad state of a block chain and correct if needed.
 func (bc *BlockChain) FixValidatorSyncOpProcessing(processor *validator.Processor, opData operation.Operation, txHash common.Hash, from, to common.Address) (isApplied bool, ret []byte, err error) {
 	isApplied, ret, err = fixMainnet0_FixValidatorSyncOpProcessing(bc, processor, opData, txHash, from, to)
+	if isApplied {
+		return true, ret, err
+	}
+	isApplied, ret, err = fixMainnet1_FixValidatorSyncOpProcessing(bc, processor, opData, txHash, from, to)
+	if isApplied {
+		return true, ret, err
+	}
+	isApplied, ret, err = fixMainnet2_FixValidatorSyncOpProcessing(bc, processor, opData, txHash, from, to)
 	if isApplied {
 		return true, ret, err
 	}
@@ -53,6 +67,11 @@ func fixMainnet0_resetBadChainSequences(bc *BlockChain) error {
 }
 
 // fixMainnet0_FixValidatorSyncOpProcessing fixes applying validator sync txs of mainntet block nr=3343671.
+// To obtain required info use:
+//
+//	wat.validator.getBlockReceipts(3343671).forEach((v)=>{
+//		console.log(JSON.stringify({idx: v.transactionIndex, hash: v.transactionHash, status: v.status,type: v.type,from: v.from,to: v.to,parsedData: v.logs?.[0]?.parsedData}, null, 2))
+//	})
 func fixMainnet0_FixValidatorSyncOpProcessing(bc *BlockChain, p *validator.Processor, opData operation.Operation, txHash common.Hash, from, to common.Address) (isApplied bool, ret []byte, err error) {
 	if !isMainnet(bc) {
 		return false, nil, nil
@@ -62,13 +81,102 @@ func fixMainnet0_FixValidatorSyncOpProcessing(bc *BlockChain, p *validator.Proce
 
 	//Hard fix bad checkpoint state (mainntet block nr=3343671)
 	blkCtx := p.GetBlockContext()
-	if blkCtx.BlockNumber.Uint64() == targetBlockNr && blkCtx.BlockHash == targetBlockHash {
+	if blkCtx.BlockNumber.Uint64() == targetBlockNr && blkCtx.BlockHash == targetBlockHash && to == *bc.chainConfig.ValidatorsStateAddress {
+		//apply to validator op txs only
 		log.Warn("Hard fix mainnet 0: process tx",
 			"blkNr", blkCtx.BlockNumber,
 			"blkHash", blkCtx.BlockHash.Hex(),
 			"txHash", txHash.Hex(),
 		)
 		return true, nil, validator.ErrNoSavedValSyncOp
+	}
+	return false, nil, nil
+}
+
+// fixMainnet1_resetBadChainSequences fixes bad checkpoint state (mainntet block nr=3343937).
+func fixMainnet1_resetBadChainSequences(bc *BlockChain) error {
+	if !isMainnet(bc) {
+		return nil
+	}
+	targetBlockHash := common.HexToHash("0xc8ab6c76d93ae2dcb8a54bb9cefdc8ecdd7af04996965532d1db0428603d9ea0")
+	correctStateRoot := common.HexToHash("0x13357d3bea17190f0a3baf4afb7c61aac224e88d261c9932b9db42afc9ffd808")
+	targetHeader := bc.GetHeaderByHash(targetBlockHash)
+	if targetHeader != nil && targetHeader.Root != correctStateRoot {
+		// rollback to acceptable chain's state
+		lfHash := rawdb.ReadLastFinalizedHash(bc.db)
+		lfNr := rawdb.ReadFinalizedNumberByHash(bc.db, lfHash)
+		if lfNr == nil {
+			// sync stucking at block nr = 3344081
+			*lfNr = uint64(3344081)
+		}
+		log.Warn("Hard fix mainnet 1: reset finalization of nr=3343937 hash=0xc8ab6c76d93ae2dcb8a54bb9cefdc8ecdd7af04996965532d1db0428603d9ea0")
+		return bc.SetHead(targetHeader.CpHash)
+	}
+	return nil
+}
+
+// fixMainnet0_FixValidatorSyncOpProcessing fixes applying validator sync txs of mainntet block nr=3343937.
+func fixMainnet1_FixValidatorSyncOpProcessing(bc *BlockChain, p *validator.Processor, opData operation.Operation, txHash common.Hash, from, to common.Address) (isApplied bool, ret []byte, err error) {
+	if !isMainnet(bc) {
+		return false, nil, nil
+	}
+	targetBlockHash := common.HexToHash("0xc8ab6c76d93ae2dcb8a54bb9cefdc8ecdd7af04996965532d1db0428603d9ea0")
+	targetBlockNr := uint64(3343937)
+
+	//Hard fix bad checkpoint state (mainntet block nr=3343937)
+	blkCtx := p.GetBlockContext()
+	if blkCtx.BlockNumber.Uint64() == targetBlockNr && blkCtx.BlockHash == targetBlockHash && to == *bc.chainConfig.ValidatorsStateAddress {
+		//apply to validator op txs only
+		log.Warn("Hard fix mainnet 1: process tx",
+			"blkNr", blkCtx.BlockNumber,
+			"blkHash", blkCtx.BlockHash.Hex(),
+			"txHash", txHash.Hex(),
+		)
+		return true, nil, validator.ErrTxNF
+	}
+	return false, nil, nil
+}
+
+// fixMainnet2_resetBadChainSequences fixes bad checkpoint state (mainntet block nr=3344099).
+func fixMainnet2_resetBadChainSequences(bc *BlockChain) error {
+	if !isMainnet(bc) {
+		return nil
+	}
+	targetBlockHash := common.HexToHash("0x3e1f45d0ca3d8532b0a41b9b3d82e7269ff3e5c4f4e72b5753f4106c0f23250f")
+	correctStateRoot := common.HexToHash("0x634dccfe477e70d998f41e07213a032035a82790a4cea8e967b5b8fe946ef093")
+	targetHeader := bc.GetHeaderByHash(targetBlockHash)
+	if targetHeader != nil && targetHeader.Root != correctStateRoot {
+		// rollback to acceptable chain's state
+		lfHash := rawdb.ReadLastFinalizedHash(bc.db)
+		lfNr := rawdb.ReadFinalizedNumberByHash(bc.db, lfHash)
+		if lfNr == nil {
+			// sync stucking at block nr = 3344255
+			*lfNr = uint64(3344255)
+		}
+		log.Warn("Hard fix mainnet 2: reset finalization of nr=3344099 hash=0x3e1f45d0ca3d8532b0a41b9b3d82e7269ff3e5c4f4e72b5753f4106c0f23250f")
+		return bc.SetHead(targetHeader.CpHash)
+	}
+	return nil
+}
+
+// fixMainnet2_FixValidatorSyncOpProcessing fixes applying validator sync txs of mainntet block nr=3344099.
+func fixMainnet2_FixValidatorSyncOpProcessing(bc *BlockChain, p *validator.Processor, opData operation.Operation, txHash common.Hash, from, to common.Address) (isApplied bool, ret []byte, err error) {
+	if !isMainnet(bc) {
+		return false, nil, nil
+	}
+	targetBlockHash := common.HexToHash("0x3e1f45d0ca3d8532b0a41b9b3d82e7269ff3e5c4f4e72b5753f4106c0f23250f")
+	targetBlockNr := uint64(3344099)
+
+	//Hard fix bad checkpoint state (mainntet block nr=3344099)
+	blkCtx := p.GetBlockContext()
+	if blkCtx.BlockNumber.Uint64() == targetBlockNr && blkCtx.BlockHash == targetBlockHash && to == *bc.chainConfig.ValidatorsStateAddress {
+		//apply to validator op txs only
+		log.Warn("Hard fix mainnet 2: process tx",
+			"blkNr", blkCtx.BlockNumber,
+			"blkHash", blkCtx.BlockHash.Hex(),
+			"txHash", txHash.Hex(),
+		)
+		return true, nil, validator.ErrTxNF
 	}
 	return false, nil, nil
 }
