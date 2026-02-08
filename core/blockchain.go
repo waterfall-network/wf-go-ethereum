@@ -367,11 +367,6 @@ func NewBlockChain(
 		}
 	}
 
-	err = resetBadChainSequences(bc)
-	if err != nil {
-		log.Crit("Node initializing: reset bad chainSequences failed", "err", err)
-	}
-
 	lastCP := bc.GetLastCoordinatedCheckpoint()
 	if lastCP == nil {
 		lfb := bc.GetLastFinalizedBlock()
@@ -5116,8 +5111,19 @@ func (bc *BlockChain) RestoreValidatorSyncOp(tx *types.Transaction, header *type
 			rc, _, _ := bc.GetTransactionReceipt(*savedValSync.TxHash)
 			if rc != nil && rc.Status == types.ReceiptStatusSuccessful {
 				return nil
-			} else {
+			} else if bc.notProcValSyncOps[savedValSync.Key()] != nil {
 				bc.notProcValSyncOps[savedValSync.Key()].TxHash = nil
+			} else {
+				log.Error("Validator sync tx: NO KEY IN notProcValSyncOps",
+					"failedTx", fmt.Sprintf("%#x", tx.Hash()),
+					"existTx", fmt.Sprintf("%#x", *savedValSync.TxHash),
+					"OpType", v.OpType(),
+					"ProcEpoch", v.ProcEpoch(),
+					"Index", v.Index(),
+					"Creator", fmt.Sprintf("%#x", v.Creator()),
+					"amount", v.Amount().String(),
+					"InitTxHash", fmt.Sprintf("%#x", v.InitTxHash()),
+				)
 			}
 		}
 		//reset tx hash
