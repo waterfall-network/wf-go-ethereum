@@ -58,7 +58,7 @@ func fixMainnet0_FixValidatorSyncOpProcessing(bc *BlockChain, p *validator.Proce
 	*/
 
 	//the period of attempts to apply validator sync ops that must be failed
-	if blkCtx.Era < 5394 || blkCtx.Era > 6601 {
+	if blkCtx.Era < 5394 || blkCtx.Era > 9500 {
 		return false, nil, nil
 	}
 
