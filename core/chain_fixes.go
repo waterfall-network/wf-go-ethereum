@@ -83,35 +83,28 @@ func fixMainnet0_FixValidatorSyncOpProcessing(bc *BlockChain, p *validator.Proce
 			return false, nil, nil
 		}
 
-		if txValSyncOp, ok := bc.notProcValSyncOps[v.InitTxHash()]; ok {
-			//1. set ValSync as done (to clear from caches)
-			txValSyncOp = &types.ValidatorSync{
-				InitTxHash: v.InitTxHash(),
-				OpType:     v.OpType(),
-				ProcEpoch:  v.ProcEpoch(),
-				Index:      v.Index(),
-				Creator:    v.Creator(),
-				Amount:     v.Amount(),
-				TxHash:     &common.Hash{},
-			}
-			bc.SetValidatorSyncData(txValSyncOp)
-
-			log.Info("fixMainnet0_FixValidatorSyncOpProcessing: applied",
-				"OpType", txValSyncOp.OpType,
-				"ProcEpoch", txValSyncOp.ProcEpoch,
-				"Index", txValSyncOp.Index,
-				"Creator", fmt.Sprintf("%#x", txValSyncOp.Creator),
-				"amount", txValSyncOp.Amount,
-				"TxHash", fmt.Sprintf("%#x", txValSyncOp.TxHash),
-				"InitTxHash", txValSyncOp.InitTxHash.Hex(),
-				"currentTx", fmt.Sprintf("%#x", txHash),
-			)
-		} else {
-			log.Warn("fixMainnet0_FixValidatorSyncOpProcessing: skipping processing",
-				"ValSyncOp", nil,
-				"InitTxHash", v.InitTxHash().Hex(),
-			)
+		//1. set ValSync as done (to clear from caches)
+		txValSyncOp := &types.ValidatorSync{
+			InitTxHash: v.InitTxHash(),
+			OpType:     v.OpType(),
+			ProcEpoch:  v.ProcEpoch(),
+			Index:      v.Index(),
+			Creator:    v.Creator(),
+			Amount:     v.Amount(),
+			TxHash:     &common.Hash{},
 		}
+		bc.SetValidatorSyncData(txValSyncOp)
+
+		log.Info("fixMainnet0_FixValidatorSyncOpProcessing: applied",
+			"OpType", txValSyncOp.OpType,
+			"ProcEpoch", txValSyncOp.ProcEpoch,
+			"Index", txValSyncOp.Index,
+			"Creator", fmt.Sprintf("%#x", txValSyncOp.Creator),
+			"amount", txValSyncOp.Amount,
+			"TxHash", fmt.Sprintf("%#x", txValSyncOp.TxHash),
+			"InitTxHash", txValSyncOp.InitTxHash.Hex(),
+			"currentTx", fmt.Sprintf("%#x", txHash),
+		)
 		// action to quickly complete a transaction (not necessary)
 		return true, nil, validator.ErrNoSavedValSyncOp
 	}
