@@ -28,8 +28,7 @@ type DepositMessage struct {
 }
 
 func (d *DepositMessage) GetTree() (*ssz.Node, error) {
-	//TODO implement me
-	panic("implement me")
+	return ssz.ProofTree(d)
 }
 
 // SizeSSZ returns the ssz encoded size in bytes for the DepositMessage object
@@ -84,13 +83,12 @@ type DepositMessageWithDelegate struct {
 }
 
 func (d *DepositMessageWithDelegate) GetTree() (*ssz.Node, error) {
-	//TODO implement me
-	panic("implement me")
+	return ssz.ProofTree(d)
 }
 
-// SizeSSZ returns the ssz encoded size in bytes for the DepositMessage object
+// SizeSSZ returns the ssz encoded size in bytes for the DepositMessageWithDelegate object
 func (d *DepositMessageWithDelegate) SizeSSZ() (size int) {
-	size = 96
+	size = 128
 	return
 }
 
@@ -139,8 +137,7 @@ type SigningData struct {
 }
 
 func (s *SigningData) GetTree() (*ssz.Node, error) {
-	//TODO implement me
-	panic("implement me")
+	return ssz.ProofTree(s)
 }
 
 // SizeSSZ returns the ssz encoded size in bytes for the SigningData object
