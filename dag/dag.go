@@ -42,6 +42,7 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/era"
 	valStore "gitlab.waterfall.network/waterfall/protocol/gwat/validator/storage"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/validatorsync"
 )
 
 var (
@@ -104,6 +105,9 @@ type blockChain interface {
 	GetBlockHashesBySlot(slot uint64) common.HashArray
 	HaveEpochBlocks(epoch uint64) (bool, error)
 	HandleEra(cp *types.Checkpoint) error
+
+	CleanInvalidNotProcessedValidatorSync(validator func(bc *core.BlockChain, stateHash common.Hash, slot uint64, valSyncOp *types.ValidatorSync) (bool, error))
+	UnlockVerifiers(accounts [][]common.Address) error
 }
 
 type ethDownloader interface {
@@ -203,7 +207,7 @@ func (d *Dag) HandleFinalize(data *types.FinalizationParams) *types.Finalization
 			"cp.Root", fmt.Sprintf("%#x", data.Checkpoint.Root),
 			"baseSpine", fmt.Sprintf("%#x", data.BaseSpine),
 			"spines", data.Spines,
-			"ValSyncData", data.ValSyncData,
+			"ValSyncData", len(data.ValSyncData),
 			"\u2692", params.BuildId)
 	} else {
 		log.Info("Handle Finalize: start",
@@ -218,18 +222,18 @@ func (d *Dag) HandleFinalize(data *types.FinalizationParams) *types.Finalization
 			"\u2692", params.BuildId)
 	}
 
-	if data.ValSyncData != nil {
-		for _, vs := range data.ValSyncData {
-			log.Info("received validator sync",
-				"OpType", vs.OpType,
-				"Index", vs.Index,
-				"Creator", vs.Creator.Hex(),
-				"ProcEpoch", vs.ProcEpoch,
-				"Amount", vs.Amount,
-				"InitTxHash", vs.InitTxHash.Hex(),
-			)
-		}
-	}
+	//if data.ValSyncData != nil {
+	//	for _, vs := range data.ValSyncData {
+	//		log.Info("received validator sync",
+	//			"OpType", vs.OpType,
+	//			"Index", vs.Index,
+	//			"Creator", vs.Creator.Hex(),
+	//			"ProcEpoch", vs.ProcEpoch,
+	//			"Amount", vs.Amount,
+	//			"InitTxHash", vs.InitTxHash.Hex(),
+	//		)
+	//	}
+	//}
 
 	var err error
 	baseSpine := *data.BaseSpine
@@ -346,6 +350,72 @@ func (d *Dag) HandleFinalize(data *types.FinalizationParams) *types.Finalization
 		"func:", "Finalize",
 	)
 	return res
+}
+
+// HandleSyncSpines run blocks finalization procedure
+func (d *Dag) HandleSyncSpines(spines common.HashArray) (bool, error) {
+	start := time.Now()
+	defer func(start time.Time) {
+		log.Info("Handle SpineSync: TIME",
+			"elapsed", common.PrettyDuration(time.Since(start)),
+			"func:", "HandleSyncSpines",
+		)
+	}(start)
+
+	if len(spines) <= 1 {
+		return false, nil
+	}
+	if d.bc.GetSlotInfo() == nil {
+		err := fmt.Errorf("no slot info")
+		log.Error("Handle SpineSync: response (no slot info)", "err", err)
+		return false, err
+	}
+	if !d.bc.IsSynced() {
+		err := fmt.Errorf("not synced")
+		log.Error("Handle SpineSync: response (not synced)", "err", err)
+		return false, err
+	}
+	//skip if synchronising
+	if d.downloader.Synchronising() {
+		err := errSynchronization
+		log.Error("Handle SpineSync: response (synchronization)", "err", err)
+		return false, err
+	}
+
+	var err error
+	baseSpine := spines[0]
+	// if baseSpine is in spines - remove
+	if bi := spines.IndexOf(baseSpine); bi >= 0 {
+		spines = spines[bi+1:]
+	}
+	log.Info("Handle SpineSync: start",
+		"baseSpine", fmt.Sprintf("%#x", baseSpine),
+		"spines", spines,
+	)
+	// based on NoSync
+	baseHeader := d.bc.GetHeaderByHash(baseSpine)
+	if baseHeader == nil || baseHeader.Nr() == 0 && baseHeader.Height > 0 {
+		log.Error("Handle SpineSync: response (check unloaded)", "err", downloader.ErrInvalidBaseSpine)
+		return false, downloader.ErrInvalidBaseSpine
+	}
+	isSync, err := d.hasUnloadedBlocks(spines)
+	if err != nil {
+		log.Error("Handle SpineSync: response (check unloaded)", "err", err)
+		return false, err
+	}
+	if !isSync {
+		log.Info("Handle SpineSync: response (no unloaded)")
+		return true, nil
+	}
+
+	if err = d.downloader.OptimisticSpineSync(spines); err != nil {
+		log.Error("Handle SpineSync: response (check unloaded)", "err", err)
+		return false, err
+	}
+	log.Info("Handle SpineSync: end",
+		"spines", spines,
+	)
+	return true, nil
 }
 
 // handleSyncUnloadedBlocks:
@@ -648,6 +718,8 @@ func (d *Dag) workLoop() {
 	secPerSlot := d.bc.GetSlotInfo().SecondsPerSlot
 	genesisTime := time.Unix(int64(d.bc.GetSlotInfo().GenesisTime), 0)
 	slotTicker := slotticker.NewSlotTicker(genesisTime, secPerSlot)
+	// clean invalid not processed val sync pool
+	d.bc.CleanInvalidNotProcessedValidatorSync(validatorsync.ValidateCreateTxValidatorSyncOp)
 
 	for {
 		select {
@@ -747,6 +819,11 @@ func (d *Dag) work(slot uint64, slotCreators []common.Address) {
 	}
 
 	d.saveCheckpoint(d.bc.GetLastCoordinatedCheckpoint())
+
+	if d.bc.GetSlotInfo().CurrentSlot() == slot && slot%d.bc.Config().SlotsPerEpoch == d.bc.Config().SlotsPerEpoch/2 {
+		// clean invalid not processed val sync pool
+		d.bc.CleanInvalidNotProcessedValidatorSync(validatorsync.ValidateCreateTxValidatorSyncOp)
+	}
 }
 
 // getLastFinalizeApiSlot returns the slot of last HandleFinalize api call.

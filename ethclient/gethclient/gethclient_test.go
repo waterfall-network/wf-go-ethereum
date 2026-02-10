@@ -47,7 +47,7 @@ func newTestBackend(t *testing.T) (*node.Node, []*types.Block, *eth.Ethereum) {
 	// Generate test chain.
 	genesis, blocks := generateTestChain()
 	// Create node
-	n, err := node.New(&node.Config{})
+	n, err := node.New(&node.Config{VerifiersKeystore: &node.VerifiersKeystoreConfig{}})
 	if err != nil {
 		t.Fatalf("can't create new node: %v", err)
 	}
