@@ -2877,23 +2877,23 @@ func (bc *BlockChain) verifyCheckpoint(block *types.Block) bool {
 		return false
 	}
 
-	// TODO: temporary fix.
-	// Related to an issue with validators that were not activated/deactivated,
-	// for which old unexecuted operations get rolled back and disrupt the network.
-	// When fixing validators’ status (hard fork), uncomment the CpReceiptHash check.
+	if block.CpReceiptHash() != cpHeader.ReceiptHash {
+		log.Warn("Block verification: mismatch cp receipt hashes",
+			"bl.CpNumber", block.CpNumber(),
+			"cp.Number", cpHeader.Nr(),
+			"cp.Height", cpHeader.Height,
+			"cp.Hash", block.CpHash().Hex(),
+			"bl.Hash", block.Hash().Hex(),
+			"cp.ReceiptHash", cpHeader.ReceiptHash.Hex(),
+			"bl.CpReceiptHash", block.CpReceiptHash().Hex(),
+		)
+		// TODO: temporary fix.
+		// Related to an issue with validators that were not activated/deactivated,
+		// for which old unexecuted operations get rolled back and disrupt the network.
+		// When fixing validators’ status (hard fork), uncomment the CpReceiptHash check.
 
-	//if block.CpReceiptHash() != cpHeader.ReceiptHash {
-	//	log.Warn("Block verification: mismatch cp receipt hashes",
-	//		"bl.CpNumber", block.CpNumber(),
-	//		"cp.Number", cpHeader.Nr(),
-	//		"cp.Height", cpHeader.Height,
-	//		"cp.Hash", block.CpHash().Hex(),
-	//		"bl.Hash", block.Hash().Hex(),
-	//		"cp.ReceiptHash", cpHeader.ReceiptHash.Hex(),
-	//		"bl.CpReceiptHash", block.CpReceiptHash().Hex(),
-	//	)
-	//	return false
-	//}
+		// return false
+	}
 	if block.CpGasUsed() != cpHeader.GasUsed {
 		log.Warn("Block verification: mismatch cp used gas",
 			"bl.CpNumber", block.CpNumber(),
