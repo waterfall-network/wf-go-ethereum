@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
-	"gitlab.waterfall.network/waterfall/protocol/gwat/core/rawdb"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/log"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
@@ -30,7 +29,6 @@ func fixMainnet0_FixValidatorSyncOpProcessing(bc *BlockChain, p *validator.Proce
 	if !isMainnet(bc) {
 		return false, nil, nil
 	}
-	blkCtx := p.GetBlockContext()
 
 	/* validator sync ops that must be failed
 	wat.validator.getBlockReceipts(3343671).forEach((v)=>{ console.log(JSON.stringify({
@@ -57,8 +55,10 @@ func fixMainnet0_FixValidatorSyncOpProcessing(bc *BlockChain, p *validator.Proce
 	opCode=2 initTx=0x22104335f100ccd555d3a234474608c854bc25d3c1b9886a80a44e38d7f36d3b creator=0x6C30179993F98D02d819520C0AB7D93efC1A464f procEpoch=12995
 	*/
 
-	//the period of attempts to apply validator sync ops that must be failed
-	if blkCtx.Era < 5394 || blkCtx.Era > 9500 {
+	//block: 3343671 0xad0df4045483f44474f51511f7169779afc6cb437ebdc6729605892c4c0b9fb4
+	targetBlockNr := uint64(3343671)
+	blkCtx := p.GetBlockContext()
+	if blkCtx.BlockNumber.Uint64() != targetBlockNr {
 		return false, nil, nil
 	}
 
@@ -83,40 +83,30 @@ func fixMainnet0_FixValidatorSyncOpProcessing(bc *BlockChain, p *validator.Proce
 			return false, nil, nil
 		}
 
-		if txValSyncOp, ok := bc.notProcValSyncOps[v.InitTxHash()]; ok {
-			log.Info("fixMainnet0_FixValidatorSyncOpProcessing: 111",
-				"OpType", txValSyncOp.OpType,
-				"ProcEpoch", txValSyncOp.ProcEpoch,
-				"Index", txValSyncOp.Index,
-				"Creator", fmt.Sprintf("%#x", txValSyncOp.Creator),
-				"amount", txValSyncOp.Amount,
-				"TxHash", fmt.Sprintf("%#x", txValSyncOp.TxHash),
-				"InitTxHash", txValSyncOp.InitTxHash.Hex(),
-			)
-
-			//1. set ValSync as done (to clear from caches)
-			txValSyncOp = &types.ValidatorSync{
-				InitTxHash: v.InitTxHash(),
-				OpType:     v.OpType(),
-				ProcEpoch:  v.ProcEpoch(),
-				Index:      v.Index(),
-				Creator:    v.Creator(),
-				Amount:     v.Amount(),
-				TxHash:     &txHash,
-			}
-			bc.SetValidatorSyncData(txValSyncOp)
-			//2. remove from notProcValSyncOps
-			delete(bc.notProcValSyncOps, v.InitTxHash())
-			//3. remove from db
-			rawdb.DeleteValidatorSync(bc.db, v.InitTxHash())
-		} else {
-			log.Info("fixMainnet0_FixValidatorSyncOpProcessing: 111",
-				"ValSyncOp", nil,
-				"InitTxHash", v.InitTxHash().Hex(),
-			)
+		//1. set ValSync as done (to clear from caches)
+		txValSyncOp := &types.ValidatorSync{
+			InitTxHash: v.InitTxHash(),
+			OpType:     v.OpType(),
+			ProcEpoch:  v.ProcEpoch(),
+			Index:      v.Index(),
+			Creator:    v.Creator(),
+			Amount:     v.Amount(),
+			TxHash:     &common.Hash{},
 		}
+		bc.SetValidatorSyncData(txValSyncOp)
+
+		log.Info("fixMainnet0_FixValidatorSyncOpProcessing: applied",
+			"OpType", txValSyncOp.OpType,
+			"ProcEpoch", txValSyncOp.ProcEpoch,
+			"Index", txValSyncOp.Index,
+			"Creator", fmt.Sprintf("%#x", txValSyncOp.Creator),
+			"amount", txValSyncOp.Amount,
+			"TxHash", fmt.Sprintf("%#x", txValSyncOp.TxHash),
+			"InitTxHash", txValSyncOp.InitTxHash.Hex(),
+			"currentTx", fmt.Sprintf("%#x", txHash),
+		)
 		// action to quickly complete a transaction (not necessary)
-		return true, nil, validator.ErrTxNF
+		return true, nil, validator.ErrNoSavedValSyncOp
 	}
 	return false, nil, nil
 }
