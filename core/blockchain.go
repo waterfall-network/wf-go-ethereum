@@ -472,6 +472,11 @@ func NewBlockChain(
 
 	bc.notProcValSyncOps = bc.GetNotProcessedValidatorSyncData()
 
+	err = applyFixesOnStart(bc)
+	if err != nil {
+		log.Crit("Node initializing: reset bad chainSequences failed", "err", err)
+	}
+
 	return bc, nil
 }
 
@@ -5103,6 +5108,21 @@ func (bc *BlockChain) RestoreValidatorSyncOp(tx *types.Transaction, header *type
 		}
 		//has another tx
 		if savedValSync.TxHash != nil && *savedValSync.TxHash != tx.Hash() {
+			// zeroHash is used to prevent re-application of failed valSyncOps.
+			if *savedValSync.TxHash == (common.Hash{}) {
+				log.Error("Validator sync tx: restore op fail: skipped by zeroHash in TxHash",
+					"failedTx", fmt.Sprintf("%#x", tx.Hash()),
+					"TxHash", fmt.Sprintf("%#x", *savedValSync.TxHash),
+					"OpType", v.OpType(),
+					"ProcEpoch", v.ProcEpoch(),
+					"Index", v.Index(),
+					"Creator", fmt.Sprintf("%#x", v.Creator()),
+					"amount", v.Amount().String(),
+					"InitTxHash", fmt.Sprintf("%#x", v.InitTxHash()),
+				)
+				return nil
+			}
+
 			log.Error("Validator sync tx: restore op fail: has other tx",
 				"failedTx", fmt.Sprintf("%#x", tx.Hash()),
 				"existTx", fmt.Sprintf("%#x", *savedValSync.TxHash),

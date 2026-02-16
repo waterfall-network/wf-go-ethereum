@@ -6,7 +6,6 @@ package validator
 
 import (
 	context "context"
-	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/operation"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
@@ -60,10 +59,6 @@ func (mr *MockRefMockRecorder) Address() *gomock.Call {
 type Mockblockchain struct {
 	ctrl     *gomock.Controller
 	recorder *MockblockchainMockRecorder
-}
-
-func (m *Mockblockchain) FixValidatorSyncOpProcessing(processor *Processor, opData operation.Operation, txHash common.Hash, from, to common.Address) (isApplied bool, ret []byte, err error) {
-	return false, nil, nil
 }
 
 // MockblockchainMockRecorder is the mock recorder for Mockblockchain.
