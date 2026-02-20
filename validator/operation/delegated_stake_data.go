@@ -28,6 +28,7 @@ import (
 	"errors"
 	"fmt"
 	"sort"
+	"strings"
 
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/crypto"
@@ -213,64 +214,84 @@ func minDelegatingStakeDataLen() int {
 	return len(emptyBin)
 }
 
-func (dsd *DelegatingStakeData) MarshalJSON() ([]byte, error) {
-	normalizeData := normalizeDelegateData(dsd)
-
-	return json.Marshal(normalizeData)
-}
-
 func normalizeDelegateData(data *DelegatingStakeData) map[string]interface{} {
-	normalizedMap := make(map[string]interface{})
-
-	normalizedMap["rules"] = normalizeRules(&data.Rules)
-	normalizedMap["trial_period"] = data.TrialPeriod
-	normalizedMap["trial_rules"] = normalizeRules(&data.TrialRules)
-
-	return normalizedMap
+	return map[string]interface{}{
+		"rules":        normalizeRules(&data.Rules),
+		"trial_period": data.TrialPeriod,
+		"trial_rules":  normalizeRules(&data.TrialRules),
+	}
 }
 
 func normalizeRules(rules *DelegatingStakeRules) map[string]interface{} {
-	normalizedRules := make(map[string]interface{})
-
-	normalizedRules["profit_share"] = sortMap(rules.ProfitShare())
-	normalizedRules["stake_share"] = sortMap(rules.StakeShare())
-
 	exit := make([]string, len(rules.Exit()))
-	for i, address := range rules.Exit() {
-		exit[i] = address.Hex()
+	for i, addr := range rules.Exit() {
+		exit[i] = strings.ToLower(addr.Hex())
 	}
-	normalizedRules["exit"] = exit
 
 	withdrawal := make([]string, len(rules.Withdrawal()))
-	for i, address := range rules.Withdrawal() {
-		withdrawal[i] = address.Hex()
+	for i, addr := range rules.Withdrawal() {
+		withdrawal[i] = strings.ToLower(addr.Hex())
 	}
-	normalizedRules["withdrawal"] = withdrawal
 
-	return normalizedRules
+	return map[string]interface{}{
+		"exit":         exit,
+		"profit_share": normalizeAddressMap(rules.ProfitShare()),
+		"stake_share":  normalizeAddressMap(rules.StakeShare()),
+		"withdrawal":   withdrawal,
+	}
 }
 
-func sortMap(data map[common.Address]uint8) map[string]uint8 {
-	keys := make([]string, 0, len(data))
-	for k := range data {
-		keys = append(keys, k.Hex())
+func normalizeAddressMap(data map[common.Address]uint8) map[string]uint8 {
+	result := make(map[string]uint8, len(data))
+	for addr, v := range data {
+		result[strings.ToLower(addr.Hex())] = v
 	}
-	sort.Strings(keys)
+	return result
+}
 
-	sortedMap := make(map[string]uint8)
-	for _, k := range keys {
-		sortedMap[k] = data[common.HexToAddress(k)]
+// toCanonicalJSON returns compact JSON with recursively sorted object keys,
+// matching the JS toCanonicalJson function used for hash computation.
+func toCanonicalJSON(v interface{}) string {
+	switch val := v.(type) {
+	case map[string]interface{}:
+		keys := make([]string, 0, len(val))
+		for k := range val {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		parts := make([]string, 0, len(keys))
+		for _, k := range keys {
+			keyJSON, _ := json.Marshal(k)
+			parts = append(parts, string(keyJSON)+":"+toCanonicalJSON(val[k]))
+		}
+		return "{" + strings.Join(parts, ",") + "}"
+	case map[string]uint8:
+		keys := make([]string, 0, len(val))
+		for k := range val {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		parts := make([]string, 0, len(keys))
+		for _, k := range keys {
+			keyJSON, _ := json.Marshal(k)
+			parts = append(parts, string(keyJSON)+":"+fmt.Sprintf("%d", val[k]))
+		}
+		return "{" + strings.Join(parts, ",") + "}"
+	case []string:
+		parts := make([]string, len(val))
+		for i, s := range val {
+			b, _ := json.Marshal(s)
+			parts[i] = string(b)
+		}
+		sort.Strings(parts)
+		return "[" + strings.Join(parts, ",") + "]"
+	default:
+		b, _ := json.Marshal(val)
+		return string(b)
 	}
-
-	return sortedMap
 }
 
 func computeDelegateHash(delegateData *DelegatingStakeData) ([]byte, error) {
-	delegateBytes, err := delegateData.MarshalJSON()
-	if err != nil {
-		return nil, err
-	}
-
-	hash := crypto.Keccak256(delegateBytes)
-	return hash, nil
+	canonical := strings.ToLower(toCanonicalJSON(normalizeDelegateData(delegateData)))
+	return crypto.Keccak256([]byte(canonical)), nil
 }
