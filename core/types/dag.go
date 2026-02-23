@@ -195,14 +195,22 @@ func (vs *ValidatorSync) Print() string {
 	if vs == nil {
 		return "{nil}"
 	}
+	amount := "<nil>"
+	if vs.Amount != nil {
+		amount = vs.Amount.String()
+	}
+	balance := "<nil>"
+	if vs.Balance != nil {
+		balance = vs.Balance.String()
+	}
 	return fmt.Sprintf("{InitTxHash: %#x, OpType: %d, ProcEpoch: %d, Index: %d, Creator: %#x, Amount: %s, Balance: %s, TxHash: %#x, ActivationEpoch: %d, ExitEpoch: %d}",
 		vs.InitTxHash,
 		vs.OpType,
 		vs.ProcEpoch,
 		vs.Index,
 		vs.Creator,
-		vs.Amount.String(),
-		vs.Balance.String(),
+		amount,
+		balance,
 		vs.TxHash,
 		vs.ActivationEpoch,
 		vs.ExitEpoch,
