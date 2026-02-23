@@ -17,6 +17,7 @@
 package core
 
 import (
+	"math"
 	"math/big"
 	"testing"
 
@@ -600,6 +601,102 @@ func TestTransitionDb(t *testing.T) {
 			c.Fn(&c, &common.Address{})
 		})
 	}
+}
+
+// TestTransitionDbNonceOnFailure verifies that when a transaction fails due to
+// ErrIntrinsicGas or ErrInsufficientFundsForTransfer, the sender nonce is
+// incremented if and only if IsForkSlotValSyncProc is active.
+func TestTransitionDbNonceOnFailure(t *testing.T) {
+	recipient := common.BytesToAddress(testutils.RandomData(20))
+
+	// buildST creates a fresh StateTransition with an isolated stateDB.
+	// forkActive=true  → ForkSlotValSyncProc=0   (slot 0 satisfies the check)
+	// forkActive=false → ForkSlotValSyncProc=MaxUint64 (never active)
+	// canTransferFn overrides CanTransfer; nil uses the standard balance >= amount check.
+	buildST := func(
+		t *testing.T,
+		forkActive bool,
+		msgGas uint64,
+		msgValue, senderBalance *big.Int,
+		canTransferFn func(vm.StateDB, common.Address, *big.Int) bool,
+	) *StateTransition {
+		t.Helper()
+
+		db, err := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
+		if err != nil {
+			t.Fatal(err)
+		}
+		sender := common.BytesToAddress(testutils.RandomData(20))
+		db.CreateAccount(sender)
+		db.SetBalance(sender, new(big.Int).Set(senderBalance))
+
+		forkSlot := uint64(math.MaxUint64)
+		if forkActive {
+			forkSlot = 0
+		}
+		cfg := *params.TestChainConfig
+		cfg.ForkSlotValSyncProc = forkSlot
+
+		if canTransferFn == nil {
+			canTransferFn = func(db vm.StateDB, addr common.Address, amount *big.Int) bool {
+				return db.GetBalance(addr).Cmp(amount) >= 0
+			}
+		}
+
+		evm := vm.NewEVM(vm.BlockContext{
+			CanTransfer: canTransferFn,
+			Transfer: func(db vm.StateDB, s, r common.Address, amount *big.Int) {
+				db.SubBalance(s, amount)
+				db.AddBalance(r, amount)
+			},
+			BaseFee: big.NewInt(10),
+		}, vm.TxContext{}, db, &cfg, vm.Config{NoBaseFee: true})
+
+		msg := NewMockMessage(sender, &recipient, msgValue, msgGas, nil)
+		return NewStateTransition(evm, nil, nil, msg, new(GasPool).AddGas(50_000_000))
+	}
+
+	t.Run("ErrIntrinsicGas/fork_active/nonce_incremented", func(t *testing.T) {
+		// gas=100 < intrinsic gas (21000) → ErrIntrinsicGas
+		st := buildST(t, true, 100, big.NewInt(0), big.NewInt(10_000_000), nil)
+		sender := st.msg.From()
+		_, err := st.TransitionDb()
+		assert.ErrorIs(t, err, ErrIntrinsicGas)
+		assert.Equal(t, uint64(1), st.state.GetNonce(sender))
+	})
+
+	t.Run("ErrIntrinsicGas/fork_inactive/nonce_unchanged", func(t *testing.T) {
+		st := buildST(t, false, 100, big.NewInt(0), big.NewInt(10_000_000), nil)
+		sender := st.msg.From()
+		_, err := st.TransitionDb()
+		assert.ErrorIs(t, err, ErrIntrinsicGas)
+		assert.Equal(t, uint64(0), st.state.GetNonce(sender))
+	})
+
+	// With GasFeeCap=0 < BaseFee=10, txFee evaluates to zero (negative tip is clamped
+	// to zero effective fee). To still trigger ErrInsufficientFundsForTransfer we use
+	// a strict CanTransfer (balance > amount) so the check fails when balance == value.
+	strictCT := func(db vm.StateDB, addr common.Address, amount *big.Int) bool {
+		return db.GetBalance(addr).Cmp(amount) > 0
+	}
+
+	t.Run("ErrInsufficientFundsForTransfer/fork_active/nonce_incremented", func(t *testing.T) {
+		// buyGas passes: balanceCheck=value=1_000, have=1_000>=1_000.
+		// CanTransfer fails: 1_000 > 1_000 is false.
+		st := buildST(t, true, 25200, big.NewInt(1_000), big.NewInt(1_000), strictCT)
+		sender := st.msg.From()
+		_, err := st.TransitionDb()
+		assert.ErrorIs(t, err, ErrInsufficientFundsForTransfer)
+		assert.Equal(t, uint64(1), st.state.GetNonce(sender))
+	})
+
+	t.Run("ErrInsufficientFundsForTransfer/fork_inactive/nonce_unchanged", func(t *testing.T) {
+		st := buildST(t, false, 25200, big.NewInt(1_000), big.NewInt(1_000), strictCT)
+		sender := st.msg.From()
+		_, err := st.TransitionDb()
+		assert.ErrorIs(t, err, ErrInsufficientFundsForTransfer)
+		assert.Equal(t, uint64(0), st.state.GetNonce(sender))
+	})
 }
 
 func initStateTransition(m func(token common.Address) Message, init func(tp *token.Processor) common.Address) *StateTransition {
