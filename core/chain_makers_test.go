@@ -25,6 +25,7 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/vm"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/crypto"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/node"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/tests/testutils"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/era"
@@ -136,7 +137,7 @@ func getTestBlockchainAndBlocks() (*BlockChain, []*types.Block) {
 	rawdb.WriteEra(db, genesisEra.Number, genesisEra)
 	rawdb.WriteCurrentEra(db, genesisEra.Number)
 
-	bc, _ := NewBlockChain(db, nil, params.TestChainConfig, vm.Config{}, nil)
+	bc, _ := NewBlockChain(db, nil, params.TestChainConfig, vm.Config{}, nil, &node.VerifiersKeystoreConfig{})
 	blocks, _ := GenerateChain(params.AllEthashProtocolChanges, bc.genesisBlock, bc.db, 3, nil)
 
 	return bc, blocks

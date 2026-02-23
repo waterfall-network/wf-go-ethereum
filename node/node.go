@@ -244,7 +244,7 @@ func (n *Node) doClose(errs []error) error {
 		ks := ksval[0].(*keystore.KeyStore)
 		accs := ks.Accounts()
 		for _, acc := range accs {
-			if ks.IsUnlocked(acc) {
+			if ks.IsUnlocked(acc.Address) {
 				ks.Lock(acc.Address)
 				log.Info("Lock account", "address", acc.Address.Hex())
 			}

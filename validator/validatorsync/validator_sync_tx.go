@@ -24,12 +24,12 @@ import (
 	"math/big"
 
 	"gitlab.waterfall.network/waterfall/protocol/gwat/accounts"
-	"gitlab.waterfall.network/waterfall/protocol/gwat/accounts/keystore"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/log"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/era"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/operation"
 )
 
@@ -49,7 +49,6 @@ func CreateValidatorSyncTx(
 	slot uint64,
 	valSyncOp *types.ValidatorSync,
 	nonce uint64,
-	ks *keystore.KeyStore,
 ) (*types.Transaction, error) {
 	bc := backend.BlockChain()
 	_, err := ValidateCreateTxValidatorSyncOp(bc, stateBlockHash, slot, valSyncOp)
@@ -107,7 +106,7 @@ func CreateValidatorSyncTx(
 	}
 	tx := types.NewTx(txData)
 
-	signed, err := signTx(backend, from, tx, ks)
+	signed, err := signTx(backend, from, tx)
 	if err != nil {
 		return nil, err
 	}
@@ -151,21 +150,25 @@ func ValidateCreateTxValidatorSyncOp(bc *core.BlockChain, stateBlockHash common.
 			return false, fmt.Errorf("validator sync operation failed: validator already deactivated")
 		}
 
-		procEra := bc.EpochToEra(valSyncOp.ProcEpoch)
-		isLowExitEpoch := validator.GetActivationEra() >= procEra.Number
-		if bc.Config().IsForkSlotValSyncProc(slot) {
-			procEpoch := bc.GetSlotInfo().SlotToEpoch(slot)
-			procEra = bc.EpochToEra(procEpoch)
-			isLowExitEpoch = validator.GetActivationEra() > procEra.Number
+		isLowExitEpoch := validator.GetActivationEra() >= bc.GetEraInfo().Number()
+		if isLowExitEpoch {
+			var procEra *era.Era
+			if bc.Config().IsForkSlotValSyncProc(slot) {
+				procEpoch := bc.GetSlotInfo().SlotToEpoch(slot)
+				procEra = bc.EpochToEra(procEpoch)
+				isLowExitEpoch = validator.GetActivationEra() > procEra.Number
+			} else {
+				procEra = bc.EpochToEra(valSyncOp.ProcEpoch)
+				isLowExitEpoch = validator.GetActivationEra() >= procEra.Number
+			}
+			log.Info("Create validator sync tx: exit: is low epoch",
+				"cond", validator.GetActivationEra() > procEra.Number,
+				"procEra", procEra,
+				"valActivationEra", validator.GetActivationEra(),
+				"IsForkSlotValSyncProc", bc.Config().IsForkSlotValSyncProc(slot),
+				"slot", slot,
+			)
 		}
-
-		log.Info("Create validator sync tx: exit: is low epoch",
-			"cond", validator.GetActivationEra() > procEra.Number,
-			"procEra", procEra,
-			"valActivationEra", validator.GetActivationEra(),
-			"IsForkSlotValSyncProc", bc.Config().IsForkSlotValSyncProc(slot),
-			"slot", slot,
-		)
 
 		if isLowExitEpoch {
 			return false, fmt.Errorf("validator sync operation failed: exit epoch is too low")
@@ -212,9 +215,11 @@ func getValSyncTxData(valSyncOp types.ValidatorSync, withdrawal *common.Address,
 }
 
 // sign is a helper function that signs a transaction with the private key of the given address.
-func signTx(backend Backend, addr common.Address, tx *types.Transaction, ks *keystore.KeyStore) (*types.Transaction, error) {
+func signTx(backend Backend, addr common.Address, tx *types.Transaction) (*types.Transaction, error) {
 	// Look up the wallet containing the requested signer
 	account := accounts.Account{Address: addr}
+
+	ks := backend.BlockChain().VerifiersKeystore()
 
 	return ks.SignTx(account, tx, (backend.BlockChain()).Config().ChainID)
 }
@@ -227,26 +232,40 @@ func GetPendingValidatorSyncData(bc *core.BlockChain) map[common.Hash]*types.Val
 	valSyncOps := bc.GetNotProcessedValidatorSyncData()
 	vsPending := make(map[common.Hash]*types.ValidatorSync, len(valSyncOps))
 	for k, vs := range valSyncOps {
-		log.Info("=== ValidatorSync: GetPendingValidatorSyncData ===",
-			"slot", si.CurrentSlot(),
-			"op", vs.Print(),
-		)
+		//log.Info("=== ValidatorSync: GetPendingValidatorSyncData ===",
+		//	"slot", si.CurrentSlot(),
+		//	"Index", vs.Index,
+		//	"ProcEpoch", vs.ProcEpoch,
+		//	"OpType", vs.OpType,
+		//	"Amount", vs.Amount.String(),
+		//	"Balance", vs.Balance.String(),
+		//	"TxHash", fmt.Sprintf("%#x", vs.TxHash),
+		//	"InitTxHash", vs.InitTxHash.Hex(),
+		//	"Creator", vs.Creator.Hex(),
+		//)
 
 		if vs.TxHash != nil {
 			continue
 		}
 		saved := bc.GetValidatorSyncData(vs.InitTxHash)
-		if saved != nil {
-			log.Info("=== ValidatorSync: GetPendingValidatorSyncData === saved",
-				"slot", si.CurrentSlot(),
-				"op", saved.Print(),
-			)
-		} else {
-			log.Info("=== ValidatorSync: GetPendingValidatorSyncData === saved nill",
-				"slot", si.CurrentSlot(),
-				"InitTxHash", vs.InitTxHash.Hex(),
-			)
-		}
+		//if saved != nil {
+		//	log.Info("=== ValidatorSync: GetPendingValidatorSyncData === saved",
+		//		"slot", si.CurrentSlot(),
+		//		"Index", saved.Index,
+		//		"ProcEpoch", saved.ProcEpoch,
+		//		"OpType", saved.OpType,
+		//		"Amount", saved.Amount.String(),
+		//		"Balance", saved.Balance.String(),
+		//		"TxHash", fmt.Sprintf("%#x", saved.TxHash),
+		//		"InitTxHash", saved.InitTxHash.Hex(),
+		//		"Creator", saved.Creator.Hex(),
+		//	)
+		//} else {
+		//	log.Info("=== ValidatorSync: GetPendingValidatorSyncData === saved nill",
+		//		"slot", si.CurrentSlot(),
+		//		"InitTxHash", vs.InitTxHash.Hex(),
+		//	)
+		//}
 
 		if saved != nil && saved.TxHash != nil {
 			continue
