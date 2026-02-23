@@ -240,7 +240,7 @@ func TestNotProcessedValidatorSyncWf(t *testing.T) {
 		ProcEpoch:  45645,
 		Index:      45645,
 		Creator:    common.Address{0x11, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
-		Amount:     new(big.Int),
+		Amount:     nil,
 		TxHash:     nil,
 		InitTxHash: common.Hash{1, 2, 3},
 	}
@@ -249,9 +249,9 @@ func TestNotProcessedValidatorSyncWf(t *testing.T) {
 		ProcEpoch:  45645,
 		Index:      45645,
 		Creator:    common.Address{0x22, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
-		Amount:     new(big.Int),
+		Amount:     nil,
 		TxHash:     nil,
-		InitTxHash: common.Hash{1, 2, 3},
+		InitTxHash: common.Hash{4, 5, 6},
 	}
 	src3 := &types.ValidatorSync{
 		OpType:     types.UpdateBalance,
@@ -260,22 +260,25 @@ func TestNotProcessedValidatorSyncWf(t *testing.T) {
 		Creator:    common.Address{0x33, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff},
 		Amount:     new(big.Int),
 		TxHash:     nil,
-		InitTxHash: common.Hash{1, 2, 3},
+		InitTxHash: common.Hash{7, 8, 9},
 	}
 	src3.Amount.SetString("32789456000000", 10)
 
-	valSyncOps := []*types.ValidatorSync{src1, src2, src3}
+	// WriteNotProcessedValidatorKeys stores only keys; the actual data must be
+	// written separately via WriteValidatorSync (mirrors blockchain.go usage).
+	WriteValidatorSync(db, src1)
+	WriteValidatorSync(db, src2)
+	WriteValidatorSync(db, src3)
 
-	WriteNotProcessedValidatorSyncOps(db, valSyncOps)
+	valSyncOps := map[common.Hash]*types.ValidatorSync{
+		src1.InitTxHash: src1,
+		src2.InitTxHash: src2,
+		src3.InitTxHash: src3,
+	}
+	WriteNotProcessedValidatorKeys(db, valSyncOps)
 	entry := ReadNotProcessedValidatorSyncOps(db)
 	testutils.AssertEqual(t, len(valSyncOps), len(entry))
 	for _, e := range entry {
-		var vsop *types.ValidatorSync
-		for _, vs := range valSyncOps {
-			if vs.OpType == e.OpType {
-				vsop = vs
-			}
-		}
-		testutils.AssertEqual(t, vsop, e)
+		testutils.AssertEqual(t, valSyncOps[e.InitTxHash], e)
 	}
 }
