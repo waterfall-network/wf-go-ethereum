@@ -40,6 +40,7 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/event"
 	ethereum "gitlab.waterfall.network/waterfall/protocol/gwat/interfaces"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/log"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/node"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/rpc"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/tests/testutils"
@@ -115,7 +116,7 @@ func NewSimulatedBackendWithDatabase(database ethdb.Database, alloc core.Genesis
 	rawdb.WriteEra(database, genesisEra.Number, genesisEra)
 	rawdb.WriteCurrentEra(database, genesisEra.Number)
 	// i.o. ethash.NewFaker()
-	blockchain, _ := core.NewBlockChain(database, nil, genesis.Config, vm.Config{}, nil)
+	blockchain, _ := core.NewBlockChain(database, nil, genesis.Config, vm.Config{}, nil, &node.VerifiersKeystoreConfig{})
 
 	backend := &SimulatedBackend{
 		database:   database,

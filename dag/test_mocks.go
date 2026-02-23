@@ -134,6 +134,11 @@ type MockblockChain struct {
 	recorder *MockblockChainMockRecorder
 }
 
+func (m *MockblockChain) CleanInvalidNotProcessedValidatorSync(validator func(bc *core.BlockChain, stateHash common.Hash, slot uint64, valSyncOp *types.ValidatorSync) (bool, error)) {
+	//TODO implement me
+	panic("implement me")
+}
+
 // MockblockChainMockRecorder is the mock recorder for MockblockChain.
 type MockblockChainMockRecorder struct {
 	mock *MockblockChain
@@ -682,6 +687,20 @@ func (m *MockblockChain) StateAt(root common.Hash) (*state.StateDB, error) {
 func (mr *MockblockChainMockRecorder) StateAt(root interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StateAt", reflect.TypeOf((*MockblockChain)(nil).StateAt), root)
+}
+
+// UnlockVerifiers mocks base method.
+func (m *MockblockChain) UnlockVerifiers(accounts [][]common.Address) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UnlockVerifiers", accounts)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UnlockVerifiers indicates an expected call of UnlockVerifiers.
+func (mr *MockblockChainMockRecorder) UnlockVerifiers(accounts interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnlockVerifiers", reflect.TypeOf((*MockblockChain)(nil).UnlockVerifiers), accounts)
 }
 
 // ValidatorStorage mocks base method.

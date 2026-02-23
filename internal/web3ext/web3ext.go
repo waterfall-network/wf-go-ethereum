@@ -823,6 +823,11 @@ web3._extend({
 			params: 1
 		}),
 		new web3._extend.Method({
+			name: 'syncSpines',
+			call: 'dag_syncSpines',
+			params: 1
+		}),
+		new web3._extend.Method({
 			name: 'syncSlotInfo',
 			call: 'dag_syncSlotInfo',
 			params: 1
@@ -1158,6 +1163,13 @@ web3._extend({
 			call: 'wat_validator_GetTransactionReceipt',
 			params: 1,
 			outputFormatter: web3._extend.formatters.outputTransactionReceiptFormatter
+		}),
+		new web3._extend.Method({
+			name: 'validator.getBlockReceipts',
+			call: 'wat_validator_GetBlockReceipts',
+			params: 1,
+			inputFormatter: [web3._extend.formatters.inputBlockNumberFormatter],
+			outputFormatter: web3._extend.formatters.outputTransactionReceiptListFormatter
 		}),
 		new web3._extend.Property({
 		  name: 'info',

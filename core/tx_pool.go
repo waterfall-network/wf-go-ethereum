@@ -181,6 +181,7 @@ type blockChain interface {
 	GetLastCoordinatedCheckpoint() *types.Checkpoint
 	GetEpoch(epoch uint64) common.Hash
 	EpochToEra(uint64) *era.Era
+	UnlockVerifiers(accounts [][]common.Address) error
 }
 
 // TxPoolConfig are the configuration parameters of the transaction pool.
@@ -214,10 +215,10 @@ var DefaultTxPoolConfig = TxPoolConfig{
 
 	//AccountSlots: 16,
 	//GlobalSlots:  4096 + 1024, // urgent + floating queue capacity with 4:1 ratio
-	AccountSlots: 720_000,
-	GlobalSlots:  720_000,
-	AccountQueue: 720_000,
-	GlobalQueue:  720_000,
+	AccountSlots: 1_048_576,
+	GlobalSlots:  1_048_576,
+	AccountQueue: 1_048_576,
+	GlobalQueue:  1_048_576,
 	//AccountSlots: 30_000,
 	//GlobalSlots:  240_000,
 	//AccountQueue: 64,
@@ -527,9 +528,6 @@ func (pool *TxPool) loop() {
 						"block", txs.BlockHash.Hex(),
 					)
 				}(time.Now())
-
-				pool.mu.Lock()
-				defer pool.mu.Unlock()
 
 				pool.cancelProcessingBlockTxs(txs)
 				//	todo run reorg ?
@@ -1641,6 +1639,7 @@ func (pool *TxPool) moveToProcessingAccelerated(txs *types.BlockTransactions) {
 }
 
 func (pool *TxPool) cancelProcessingBlockTxs(txs *types.BlockTransactions) {
+	pool.mu.Lock()
 	transactions := txs.Transactions
 	blockHash := txs.BlockHash
 	dirty := newAccountSet(pool.signer)
@@ -1657,6 +1656,7 @@ func (pool *TxPool) cancelProcessingBlockTxs(txs *types.BlockTransactions) {
 		if pAddr := types.SenderFromCache(pool.signer, btx); pAddr == nil {
 			sndr, err := types.Sender(pool.signer, poolTx) // already validated during insertion
 			if err != nil {
+				pool.mu.Unlock()
 				log.Error("TxPool: cancel processing: get sender failed",
 					"txHash", txHash.Hex(),
 					"blHash", blockHash.Hex(),
@@ -1693,6 +1693,8 @@ func (pool *TxPool) cancelProcessingBlockTxs(txs *types.BlockTransactions) {
 			dirty.add(addr)
 		}
 	}
+	pool.mu.Unlock()
+
 	done := pool.requestPromoteExecutables(dirty)
 	<-done
 }
@@ -1912,7 +1914,7 @@ func (pool *TxPool) runReorg(done chan struct{}, reset *txpoolResetRequest, dirt
 			if err == nil {
 				pendingBaseFee := misc.CalcSlotBaseFee(
 					pool.chainconfig,
-					pool.chainconfig.ValidatorsPerSlot,
+					pool.chainconfig.GetValidatorsPerSlot(reset.newHead.Slot),
 					validatorsCount,
 					pool.chain.Genesis().GasLimit(),
 					reset.newHead.Slot,

@@ -955,16 +955,16 @@ func WriteValidatorSync(db ethdb.KeyValueWriter, vs *types.ValidatorSync) {
 		return
 	}
 
-	log.Info("=== ValidatorSync: WriteValidatorSync ===",
-		"Index", vs.Index,
-		"ProcEpoch", vs.ProcEpoch,
-		"OpType", vs.OpType,
-		"Amount", vs.Amount.String(),
-		"Balance", vs.Balance.String(),
-		"TxHash", fmt.Sprintf("%#x", vs.TxHash),
-		"InitTxHash", vs.InitTxHash.Hex(),
-		"Creator", vs.Creator.Hex(),
-	)
+	//log.Info("=== ValidatorSync: WriteValidatorSync ===",
+	//	"Index", vs.Index,
+	//	"ProcEpoch", vs.ProcEpoch,
+	//	"OpType", vs.OpType,
+	//	"Amount", vs.Amount.String(),
+	//	"Balance", vs.Balance.String(),
+	//	"TxHash", fmt.Sprintf("%#x", vs.TxHash),
+	//	"InitTxHash", vs.InitTxHash.Hex(),
+	//	"Creator", vs.Creator.Hex(),
+	//)
 
 	key := validatorSyncKey(vs.InitTxHash)
 	enc, err := encodeValidatorSync(*vs)
@@ -1007,18 +1007,17 @@ func ReadNotProcessedValidatorSyncOps(db ethdb.KeyValueReader) []*types.Validato
 	return res
 }
 
-// WriteNotProcessedValidatorSyncOps stores the not processed validator sync operations.
-func WriteNotProcessedValidatorSyncOps(db ethdb.KeyValueWriter, valSyncOps []*types.ValidatorSync) {
+// WriteNotProcessedValidatorKeys stores the not processed validator sync operations keys.
+func WriteNotProcessedValidatorKeys(db ethdb.KeyValueWriter, valSyncOps map[common.Hash]*types.ValidatorSync) {
 	keyLen := len(validatorSyncKey(common.Hash{}))
 	dataLen := keyLen * len(valSyncOps)
 	data := make([]byte, 0, dataLen)
 	for _, vs := range valSyncOps {
 		key := validatorSyncKey(vs.InitTxHash)
-		WriteValidatorSync(db, vs)
 		data = append(data, key...)
 	}
 	if err := db.Put(valSyncNotProcKey, data); err != nil {
-		log.Crit("Failed to store the not processed validator sync operations", "err", err)
+		log.Crit("Failed to store the not processed validator sync operations keys", "err", err)
 	}
 }
 
@@ -1123,7 +1122,7 @@ func ReadEra(db ethdb.KeyValueReader, number uint64) *era.Era {
 	key := eraKey(number)
 	encoded, err := db.Get(key)
 	if err != nil {
-		log.Warn("Failed to read era", "err", err, "number", number)
+		//log.Warn("Failed to read era", "err", err, "number", number)
 		return nil
 	}
 
