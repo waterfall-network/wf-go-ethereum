@@ -195,4 +195,148 @@ var mainnetFixData = []*FixOp{
 		// eth.getTransaction("0x4a0d3dda839c3b6691fa383431689fabd320f6c55dfb8851cbae8f30ed57cbbf").blockHash
 		TxBlock: common.HexToHash("0x6e103c6ec7d9980e1d07772023cd337367c974139bd83e4945bc8c7ac3e9cda7"),
 	},
+	{
+		OpType:     types.Activate,
+		Index:      46793,
+		Creator:    common.HexToAddress("0x134828c57593d6f913dcea89e5fb2dc233d65e63"),
+		InitTxHash: common.HexToHash("0x1c893460442fdc5a78ce2de79d11a774b1c3345bfabcff7f427c2106aa8f0289"),
+		PubKey:     common.HexToBlsPubKey("0x9363a750d2f53abb05d836b8039589ea11953f1dc0bc451a9ba74d0a1beec3ec16ad4547d6ce597de26504d40405dcfe"),
+		// eth.getTransactionReceipt("0x1c893460442fdc5a78ce2de79d11a774b1c3345bfabcff7f427c2106aa8f0289").blockHash
+		TxBlock: common.HexToHash("0xae0f21c95aaae244bf609d929927a0e51f1457e4a9b37fc04a147f5257df0e23"),
+	},
+	{
+		OpType:     types.Activate,
+		Index:      46794,
+		Creator:    common.HexToAddress("0xe283a7858b8476ca9cacac957c7866ed8433518f"),
+		InitTxHash: common.HexToHash("0xbe836831d31d723f7dcdf70f8bb37a278e47bfc060148a29ae0648a6099edefb"),
+		PubKey:     common.HexToBlsPubKey("0xa385d2014493f69ce817fe8d8762549bb6b370b3defcf7960cba50884a3ebfbb78369572667f29d0198752a3b887276f"),
+		// eth.getTransactionReceipt("0xbe836831d31d723f7dcdf70f8bb37a278e47bfc060148a29ae0648a6099edefb").blockHash
+		TxBlock: common.HexToHash("0xdc0717140d7a9d10e35d1fcde0c73bf0ee3b116a7dfda589535064635d18c5ad"),
+	},
+	{
+		OpType:     types.Activate,
+		Index:      46984,
+		Creator:    common.HexToAddress("0x998b226353208364b895a8be16a4a0e81d95988b"),
+		InitTxHash: common.HexToHash("0x27c384c8ce5c53bb05c8476ba347562535a779b6ac11c3823031e9708683985b"),
+		PubKey:     common.HexToBlsPubKey("0x85b54e200c1383ad40f6c87e08bdb05fd76609c0cc12df9a2fa24e4e6f44cd526cfd16e674084109db5ffe7189777e57"),
+		// eth.getTransactionReceipt("0x27c384c8ce5c53bb05c8476ba347562535a779b6ac11c3823031e9708683985b").blockHash
+		TxBlock: common.HexToHash("0x0fec6f39b48d3fa208914c485748072ec7e2ca8343ff6e7757f360f25c9a8938"),
+	},
+	{
+		OpType:     types.Activate,
+		Index:      46985,
+		Creator:    common.HexToAddress("0x4c17d39a9db644329246cbeca08b11a4ac8ac50a"),
+		InitTxHash: common.HexToHash("0x1a75a8f1b66742c5ddac96a5fd4a903061c416df07828403a64672a0976b3d4f"),
+		PubKey:     common.HexToBlsPubKey("0xa6f8cf2ba3a25f7405a09e0834f9d15090f41cb27578653dab813bd69f31f7790563523a81f9d0038c97b3cd4f61bf42"),
+		// eth.getTransactionReceipt("0x1a75a8f1b66742c5ddac96a5fd4a903061c416df07828403a64672a0976b3d4f").blockHash
+		TxBlock: common.HexToHash("0xc2988ad4e21074cbcbee6b91450425508715e43a20bf06897271fda2b0afd71f"),
+	},
+	{
+		OpType:     types.Activate,
+		Index:      47541,
+		Creator:    common.HexToAddress("0x2bdce0e0390bf1af69ad0d42dd14e19dc54098ba"),
+		InitTxHash: common.HexToHash("0x6def891e6edf0d1bf173e1307eeaba303d1fae75a8f1394bad933e13c59e18aa"),
+		PubKey:     common.HexToBlsPubKey("0x9685f73266362d665760c4197c642fe21119bfcd375c616618c6da9318b9bbc47077a48d5e6aeab96292e5d857223a03"),
+		// eth.getTransactionReceipt("0x6def891e6edf0d1bf173e1307eeaba303d1fae75a8f1394bad933e13c59e18aa").blockHash
+		TxBlock: common.HexToHash("0x55719e09fd96e4fbc1d5083165c511cda67b2fa54d98ae5d412d80b9ba7fb0cc"),
+	},
+	{
+		OpType:     types.Activate,
+		Index:      47542,
+		Creator:    common.HexToAddress("0xbc5530a92f2bfa215df2fca66b89e61e57295315"),
+		InitTxHash: common.HexToHash("0xd12b65aeb749d89f5b54565c8747dcf91964860d309d90e55ccbf7c36b39259a"),
+		PubKey:     common.HexToBlsPubKey("0xb156a683c0ea4d1d29c04eb7087a113b3956e709948aa2b62e764ca158567792777cf436808fb24bf64f34e627232798"),
+		// eth.getTransactionReceipt("0xd12b65aeb749d89f5b54565c8747dcf91964860d309d90e55ccbf7c36b39259a").blockHash
+		TxBlock: common.HexToHash("0x1a2606641ad5aa89d452c67413f5a2c79920f72f11b1fe0fcc1c210101152a6d"),
+	},
+	{
+		OpType:     types.Activate,
+		Index:      47543,
+		Creator:    common.HexToAddress("0x1ccfb4ecb2c37c9da6c98a7c6e793af97a86d8d0"),
+		InitTxHash: common.HexToHash("0x5f0ad008f04f050a6bd89bcd1ca9b44d58b658b9f4aaf72f0dae4b5c930e9418"),
+		PubKey:     common.HexToBlsPubKey("0x97b03d8cce800e68d092b5d560e544f94faf051f89cdee15a919c83d0f8cd814dd5ce9c5b1f15887acf4630ac4b8aeac"),
+		// eth.getTransactionReceipt("0x5f0ad008f04f050a6bd89bcd1ca9b44d58b658b9f4aaf72f0dae4b5c930e9418").blockHash
+		TxBlock: common.HexToHash("0xb714d6a1548598c3df2543d3a8fbba2a2d2f5d48ba54dd677109405a054b5b9e"),
+	},
+	{
+		OpType:     types.Activate,
+		Index:      47755,
+		Creator:    common.HexToAddress("0xc9f5562a91ffeba99b8947e5aa500d556c96da1e"),
+		InitTxHash: common.HexToHash("0xa7f9fc7c9d2f1a661c1ade6864d3da046457c036a1aa827ef6a26beba827810e"),
+		PubKey:     common.HexToBlsPubKey("0xb2cad6fdcb96df249e85fa3acf5e2dd1ac5cd28b497186327d708c79ef2cea0eab6d8e9165b7b71b55b34b0b6330c320"),
+		// eth.getTransactionReceipt("0xa7f9fc7c9d2f1a661c1ade6864d3da046457c036a1aa827ef6a26beba827810e").blockHash
+		TxBlock: common.HexToHash("0x7928a27ec34f6c91ddb29941d375a70c5a400e04edfcf7bf31d4a617dd0e186d"),
+	},
+	{
+		OpType:     types.Activate,
+		Index:      47756,
+		Creator:    common.HexToAddress("0x54f3a40ac2f077d82d955a996f6e87b809b17c43"),
+		InitTxHash: common.HexToHash("0xeb5a1eb16c7a0a4e7438ccb07d74eb5514b84a21b626ad4be95fc26ea14f9d70"),
+		PubKey:     common.HexToBlsPubKey("0xa819c26e239a0e925c82ea44b7c2fe7ea8c15c96d35f6e4185edebb040b4c16ca7a2fdc1d4637901087ed5dd985edca6"),
+		// eth.getTransactionReceipt("0xeb5a1eb16c7a0a4e7438ccb07d74eb5514b84a21b626ad4be95fc26ea14f9d70").blockHash
+		TxBlock: common.HexToHash("0xc6bdf387c561d8707d10f5c0478f5fd54451c29572d8331f05b17a5d199d5ef9"),
+	},
+	{
+		OpType:     types.Activate,
+		Index:      47757,
+		Creator:    common.HexToAddress("0xb72ed19a6db5c117fd61b741a53d29422456dc62"),
+		InitTxHash: common.HexToHash("0xf1d96d2c5455d1490a26513f24fe787cd388729316e164dfeda0fdcc170ecfd1"),
+		PubKey:     common.HexToBlsPubKey("0xaf10a927a92ac50838ec2b32eb85b070d9f8c890dd79f30c431d560e277b5a5254fd2d65aac6b046097edc3bc72ae2d2"),
+		// eth.getTransactionReceipt("0xf1d96d2c5455d1490a26513f24fe787cd388729316e164dfeda0fdcc170ecfd1").blockHash
+		TxBlock: common.HexToHash("0xf939306c70ea5c2b47c58ebedbfa982d56fee43ce59756135b2dbc7932af4590"),
+	},
+	{
+		OpType:     types.Activate,
+		Index:      47758,
+		Creator:    common.HexToAddress("0xc760f11cd00f78327a941d8daf4bec02cb3675f1"),
+		InitTxHash: common.HexToHash("0x20acaed0f7ad03539cf6a9c595899334f4c0b622910b57f20923dc65327d11ed"),
+		PubKey:     common.HexToBlsPubKey("0xa0851da391b59a3dbc4ea94842ec1ef9db21a5285be1ed8e81fe7f980c4ae6b4b378a014ab50f061e7658497b19b9909"),
+		// eth.getTransactionReceipt("0x20acaed0f7ad03539cf6a9c595899334f4c0b622910b57f20923dc65327d11ed").blockHash
+		TxBlock: common.HexToHash("0x15bbb824305fae6e265911e94a04b5d7d02f545ba2c3d3d1d80b2390f8585cdd"),
+	},
+	{
+		OpType:     types.Activate,
+		Index:      48160,
+		Creator:    common.HexToAddress("0x73f3c03d7f3f6e2711f3aa486bdc60a03dc6463c"),
+		InitTxHash: common.HexToHash("0x2b9410de2f37e9766bca6b14b7699a07be02f42bcb6c3429dd115a48c720f1fa"),
+		PubKey:     common.HexToBlsPubKey("0xb697a275232e77eefa35a1d306e9c5957f6a28ca4ae3c674218551285ae89ebee80ce169214261ab0dd4cb166186a6df"),
+		// eth.getTransactionReceipt("0x2b9410de2f37e9766bca6b14b7699a07be02f42bcb6c3429dd115a48c720f1fa").blockHash
+		TxBlock: common.HexToHash("0x41fe9ef32ed24e22029743d62ede722d41f6eb074bda614a0f354da978029886"),
+	},
+	{
+		OpType:     types.Activate,
+		Index:      48161,
+		Creator:    common.HexToAddress("0xd35f63e71a1d4f6d06c5dd91c05b27d304d059ee"),
+		InitTxHash: common.HexToHash("0x110b99a81a05e6e2ec08371d065e4afe0c7b8a975bf61479e0d2656d863e1e69"),
+		PubKey:     common.HexToBlsPubKey("0xb6cd5bf383f302f107d2ec4cc2557c818bcf2eaa72e1e4dd1fb193f3081b67b82bf6a1b5e70d044adc4cb2d19e031f70"),
+		// eth.getTransactionReceipt("0x110b99a81a05e6e2ec08371d065e4afe0c7b8a975bf61479e0d2656d863e1e69").blockHash
+		TxBlock: common.HexToHash("0xd50b5b54ca6e42688ce98f8948f200ea48142fc458b705e0804fcc68f70df58a"),
+	},
+	{
+		OpType:     types.Activate,
+		Index:      48162,
+		Creator:    common.HexToAddress("0x145a2532913f7490e7885ac5572ad946d754fb10"),
+		InitTxHash: common.HexToHash("0x599afb07d2fd7e3c079854a06e59a034d92f0e12cd91a91e3654c4258e573d5b"),
+		PubKey:     common.HexToBlsPubKey("0x804e219aaeb7f73c3df9d8915408435b60cb450a47be76661c4b42fe3779884414afab5967b6dbfd47bcf9e2b6b94795"),
+		// eth.getTransactionReceipt("0x599afb07d2fd7e3c079854a06e59a034d92f0e12cd91a91e3654c4258e573d5b").blockHash
+		TxBlock: common.HexToHash("0xba3ac22d252f21c1a79142f29a521be905eb10fc6ea461d26a49297da6df788e"),
+	},
+	{
+		OpType:     types.Activate,
+		Index:      48373,
+		Creator:    common.HexToAddress("0xfd1ed6e6f5b13aa47b9023e2edfdd7f3bfded43a"),
+		InitTxHash: common.HexToHash("0xbcf0beffed43a40139fb1fb6dd7e9584aa2709eff83ac39a9f84439205a71f39"),
+		PubKey:     common.HexToBlsPubKey("0xa23a0f5ccb2866e7a94adf6c803f98ce73d0352fb607e0231b843063054ddf02fef3c5127c902ba03a614b9b313ebf5e"),
+		// eth.getTransactionReceipt("0xbcf0beffed43a40139fb1fb6dd7e9584aa2709eff83ac39a9f84439205a71f39").blockHash
+		TxBlock: common.HexToHash("0xfd6875a28c4472f198cec1d69bfd4035226d579ecb84152274dad8085601e6ca"),
+	},
+	{
+		OpType:     types.Activate,
+		Index:      48374,
+		Creator:    common.HexToAddress("0xd67d91840744ed2998e14ab54ab3e675e6ed09fc"),
+		InitTxHash: common.HexToHash("0xbdbf54628dbaf2816a98af968214040ac466f63eb41e56b0f0fbf5c0f29ed106"),
+		PubKey:     common.HexToBlsPubKey("0x927fd9419a32323535387be788bfb7fd2638f535315c1b167ed71cdbc0e17f9c8f386a092d0c250c44e02bae1ed54da7"),
+		// eth.getTransactionReceipt("0xbdbf54628dbaf2816a98af968214040ac466f63eb41e56b0f0fbf5c0f29ed106").blockHash
+		TxBlock: common.HexToHash("0xf3b90ed5118a2a07182531a2b9105ed6675b2138e029cc95122c38245387f0e2"),
+	},
 }
