@@ -14,12 +14,13 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-// Package core implements the Ethereum consensus protocol.
+// Package core implements the Ethereum consensus protocol (Modified for Waterfall).
 package core
 
 import (
 	"bytes"
 	"context"
+	"crypto/ecdsa"
 	"errors"
 	"fmt"
 	"io"
@@ -32,6 +33,7 @@ import (
 
 	lru "github.com/hashicorp/golang-lru"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
+	commonMath "gitlab.waterfall.network/waterfall/protocol/gwat/common/math"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common/mclock"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common/prque"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/consensus"
@@ -46,6 +48,7 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/internal/syncx"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/log"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/metrics"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/node"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/token"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/trie"
@@ -92,10 +95,14 @@ var (
 	errInvalidBlock         = errors.New("invalid block")
 	ErrBadBlockNr           = errors.New("bad block nr")
 	errBlockNotFound        = errors.New("block not found")
+
+	// Errors related to Era processing.
+	errCheckpointInvalid = errors.New("invalid checkpoint") // Error when the checkpoint is invalid.
+	errHandleEraFailed   = errors.New("handle era failed")  // Error when handling the era fails.
 )
 
 const (
-	valSyncCacheLimit          = 128
+	valSyncCacheLimit          = 2048
 	bodyCacheLimit             = 256
 	blockCacheLimit            = 256
 	receiptsCacheLimit         = 32
@@ -227,7 +234,8 @@ type BlockChain struct {
 	checkpointCache       *lru.Cache
 	checkpointSyncCache   *types.Checkpoint
 
-	validatorStorage valStore.Storage
+	validatorStorage  valStore.Storage
+	verifiersKeyStore valStore.VerifiersKeystore
 
 	insBlockCache []*types.Block // Cache for blocks to insert late
 
@@ -248,7 +256,14 @@ type BlockChain struct {
 // NewBlockChain returns a fully initialised block chain using information
 // available in the database. It initialises the default Ethereum Validator and
 // Processor.
-func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *params.ChainConfig, vmConfig vm.Config, txLookupLimit *uint64) (*BlockChain, error) {
+func NewBlockChain(
+	db ethdb.Database,
+	cacheConfig *CacheConfig,
+	chainConfig *params.ChainConfig,
+	vmConfig vm.Config,
+	txLookupLimit *uint64,
+	keyStoreCfg *node.VerifiersKeystoreConfig,
+) (*BlockChain, error) {
 	if cacheConfig == nil {
 		cacheConfig = defaultCacheConfig
 	}
@@ -256,7 +271,16 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 	bodyCache, _ := lru.New(bodyCacheLimit)
 	bodyRLPCache, _ := lru.New(bodyCacheLimit)
 	receiptsCache, _ := lru.New(receiptsCacheLimit)
-	blockCache, _ := lru.New(blockCacheLimit)
+	//blockCache, _ := lru.New(blockCacheLimit)
+	blockCacheLimitCalc, _ := commonMath.Uint64ToInt(4 * chainConfig.SlotsPerEpoch * chainConfig.GetValidatorsPerSlot(chainConfig.ForkSlotUpValsPerSlot))
+	blockCache, _ := lru.New(blockCacheLimitCalc)
+	log.Info("blockCacheLimitCalc",
+		"blockCacheLimitCalc", blockCacheLimitCalc,
+		"SlotsPerEpoch", chainConfig.SlotsPerEpoch,
+		"ValidatorsPerSlot", chainConfig.ValidatorsPerSlot,
+		"UpValidatorsPerSlot", chainConfig.UpValidatorsPerSlot,
+		"ForkSlotUpValsPerSlot", chainConfig.ForkSlotUpValsPerSlot,
+	)
 	txLookupCache, _ := lru.New(txLookupCacheLimit)
 	invBlocksCache, _ := lru.New(invBlocksCacheLimit)
 	optimisticSpinesCache, _ := lru.New(optimisticSpinesCacheLimit)
@@ -286,7 +310,13 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 		vmConfig:              vmConfig,
 		syncProvider:          nil,
 		validatorStorage:      valStore.NewStorage(chainConfig),
+		verifiersKeyStore:     valStore.NewKeystore(keyStoreCfg),
 	}
+
+	if keyStoreCfg.UnlockAllVerifiers {
+		go bc.verifiersKeyStore.UnlockAllAccounts()
+	}
+
 	bc.validator = NewBlockValidator(chainConfig, bc)
 	bc.prefetcher = newStatePrefetcher(chainConfig, bc)
 	bc.processor = NewStateProcessor(chainConfig, bc)
@@ -306,6 +336,16 @@ func NewBlockChain(db ethdb.Database, cacheConfig *CacheConfig, chainConfig *par
 		rawdb.WriteFinalizedHashNumber(db, bc.genesisBlock.Hash(), uint64(0))
 		log.Info("Save genesis hash", "hash", bc.genesisBlock.Hash(), "fn", "NewBlockChain")
 	}
+
+	// set slotInfo on startup
+	if err = bc.SetSlotInfo(&types.SlotInfo{
+		GenesisTime:    bc.Genesis().Time(),
+		SecondsPerSlot: chainConfig.SecondsPerSlot,
+		SlotsPerEpoch:  chainConfig.SlotsPerEpoch,
+	}); err != nil {
+		return nil, err
+	}
+	log.Info("Loaded SlotInfo", "info", bc.GetSlotInfo())
 
 	var nilBlock = bc.genesisBlock
 	bc.lastFinalizedBlock.Store(nilBlock)
@@ -588,7 +628,7 @@ func (bc *BlockChain) SetLastCoordinatedCheckpoint(cp *types.Checkpoint) {
 		if currCp != nil && cp.Root != currCp.Root {
 			prevCpHeader := bc.GetHeader(currCp.Spine)
 			newCpHeader := bc.GetHeader(cp.Spine)
-			if prevCpHeader != nil {
+			if prevCpHeader != nil && prevCpHeader.Height > 0 && prevCpHeader.Nr() > 0 {
 				for i := prevCpHeader.Nr() + 1; i <= newCpHeader.Nr(); i++ {
 					block := bc.GetBlockByNumber(i)
 					bc.RemoveTxsFromPool(block.Transactions())
@@ -675,10 +715,14 @@ func (bc *BlockChain) GetValidatorSyncData(initTxHash common.Hash) *types.Valida
 	// Short circuit if the body's already in the cache, retrieve otherwise
 	if cached, ok := bc.valSyncCache.Get(initTxHash); ok {
 		vs := cached.(*types.ValidatorSync)
-		return vs
+		if vs != nil {
+			return vs
+		}
+		log.Error("Validator sync tx handling: cached nil value", "hash", initTxHash.Hex())
 	}
 	vs := rawdb.ReadValidatorSync(bc.db, initTxHash)
 	if vs == nil {
+		//log.Error("Validator sync tx handling: db not found", "hash", initTxHash.Hex())
 		return nil
 	}
 	// Cache the found data for next time and return
@@ -694,18 +738,8 @@ func (bc *BlockChain) SetValidatorSyncData(validatorSync *types.ValidatorSync) {
 	bc.valSyncCache.Add(key, validatorSync)
 	rawdb.WriteValidatorSync(bc.db, validatorSync)
 	if validatorSync.TxHash != nil && bc.notProcValSyncOps[key] != nil {
-		notProcValSyncOps := map[common.Hash]*types.ValidatorSync{}
-		for k, vs := range bc.notProcValSyncOps {
-			if k != key {
-				notProcValSyncOps[k] = vs
-			}
-		}
-		bc.notProcValSyncOps = notProcValSyncOps
-		vsArr := make([]*types.ValidatorSync, 0, len(bc.notProcValSyncOps))
-		for _, vs := range bc.notProcValSyncOps {
-			vsArr = append(vsArr, vs)
-		}
-		rawdb.WriteNotProcessedValidatorSyncOps(bc.db, vsArr)
+		delete(bc.notProcValSyncOps, key)
+		rawdb.WriteNotProcessedValidatorKeys(bc.db, bc.notProcValSyncOps)
 	}
 }
 
@@ -713,7 +747,7 @@ func (bc *BlockChain) SetValidatorSyncData(validatorSync *types.ValidatorSync) {
 // skips currently existed items
 func (bc *BlockChain) AppendNotProcessedValidatorSyncData(valSyncData []*types.ValidatorSync) {
 	currOps := bc.GetNotProcessedValidatorSyncData()
-	isUpdated := false
+	var batch ethdb.Batch
 	valSyncDataKeys := map[common.Hash]interface{}{}
 	for _, vs := range valSyncData {
 		valSyncDataKeys[vs.Key()] = struct{}{}
@@ -722,24 +756,73 @@ func (bc *BlockChain) AppendNotProcessedValidatorSyncData(valSyncData []*types.V
 			savedValSync := bc.GetValidatorSyncData(vs.InitTxHash)
 			if savedValSync == nil || (savedValSync.ProcEpoch > vs.ProcEpoch && savedValSync.TxHash != nil) {
 				bc.notProcValSyncOps[vs.Key()] = vs
-				isUpdated = true
+				if batch == nil {
+					batch = bc.db.NewBatch()
+				}
+				rawdb.WriteValidatorSync(batch, vs)
 			}
 		}
 	}
-	// rm handled operations
+	// rm handled operations & collect keys
 	for k, vs := range bc.notProcValSyncOps {
 		if vs.TxHash != nil && valSyncDataKeys[vs.Key()] == nil {
 			delete(bc.notProcValSyncOps, k)
-			isUpdated = true
+			if batch == nil {
+				batch = bc.db.NewBatch()
+			}
 		}
 	}
 
-	if isUpdated {
-		vsArr := make([]*types.ValidatorSync, 0, len(bc.notProcValSyncOps))
-		for _, vs := range bc.notProcValSyncOps {
-			vsArr = append(vsArr, vs)
+	if batch != nil {
+		rawdb.WriteNotProcessedValidatorKeys(batch, bc.notProcValSyncOps)
+		if err := batch.Write(); err != nil {
+			log.Crit("AppendNotProcessedValidatorSyncData: failed write batch to db", "err", err)
 		}
-		rawdb.WriteNotProcessedValidatorSyncOps(bc.db, vsArr)
+	}
+}
+
+func (bc *BlockChain) CleanInvalidNotProcessedValidatorSync(validator func(bc *BlockChain, stateHash common.Hash, slot uint64, valSyncOp *types.ValidatorSync) (bool, error)) {
+	var isUpdated bool
+	currOps := bc.GetNotProcessedValidatorSyncData()
+	head := bc.GetLastFinalizedHeader()
+
+	defer func(ts time.Time, itemsCount int) {
+		log.Info("^^^^^^^^^^^^ TIME",
+			"elapsed", common.PrettyDuration(time.Since(ts)),
+			"fn:", "CleanInvalidNotProcessedValidatorSync",
+			"items", itemsCount,
+			"currSlot", bc.GetSlotInfo().CurrentSlot(),
+		)
+	}(time.Now(), len(currOps))
+
+	for k, op := range currOps {
+		isValid, err := validator(bc, head.CpHash, head.Slot, op)
+		if isValid {
+			continue
+		}
+		delete(bc.notProcValSyncOps, k)
+		isUpdated = true
+
+		log.Warn("Clean not proc val sync op",
+			"OpType", op.OpType,
+			"ProcEpoch", op.ProcEpoch,
+			"Index", op.Index,
+			"InitTxHash", op.InitTxHash.Hex(),
+			"Amount", op.Amount.String(),
+			"Balance", op.Balance.String(),
+			"TxHash", fmt.Sprintf("%#x", op.TxHash),
+			"creator", fmt.Sprintf("%#x", op.Creator),
+			"err", err.Error(),
+			"headSlot", head.Slot,
+			"headNr", head.Nr(),
+			"head", fmt.Sprintf("%#x", head.Hash()),
+			"headCpNr", fmt.Sprintf("%d", head.CpNumber),
+			"headCp", fmt.Sprintf("%#x", head.CpHash),
+		)
+	}
+
+	if isUpdated {
+		rawdb.WriteNotProcessedValidatorKeys(bc.db, bc.notProcValSyncOps)
 	}
 }
 
@@ -839,7 +922,14 @@ func (bc *BlockChain) setHeadRecursive(head common.Hash) error {
 	}
 
 	// check head era
-	cpEra := bc.EpochToEra(headCp.FinEpoch)
+	var cpEra *era.Era
+	if bc.eraInfo == nil {
+		currentEraNumber := rawdb.ReadCurrentEra(bc.db)
+		if eraInfo := rawdb.ReadEra(bc.db, currentEraNumber); eraInfo != nil {
+			bc.SetNewEraInfo(eraInfo)
+		}
+	}
+	cpEra = bc.EpochToEra(headCp.FinEpoch)
 	if cpEra == nil {
 		// search valid checkpoint
 		cp := bc.searchValidCheckpoint(headEpoch)
@@ -1672,39 +1762,31 @@ func (bc *BlockChain) rollbackBlockFinalization(finNr uint64) error {
 	return nil
 }
 
-// WriteSyncBlocks writes the blocks and all associated state to the database while synchronization process.
-func (bc *BlockChain) WriteSyncBlocks(blocks types.Blocks, validate bool) (failed *types.Block, err error) {
+// WriteSyncBlocks writes the dag blocks to the database for dag synchronization process.
+func (bc *BlockChain) WriteSyncBlocks(blocks types.Blocks, validate bool) error {
 	bc.blockProcFeed.Send(true)
 	defer bc.blockProcFeed.Send(false)
 
 	// Pre-checks passed, start the full block imports
 	if !bc.chainmu.TryLock() {
-		return nil, errInsertionInterrupted
+		return errInsertionInterrupted
 	}
 
-	// include delayed blocks
-	if len(bc.insBlockCache) > 0 {
-		blocks = append(blocks, bc.insBlockCache...)
-		bc.insBlockCache = []*types.Block{}
+	targetBlocks := append(blocks, bc.insBlockCache...)
+	for i := 0; i < len(targetBlocks); i++ {
+		block := targetBlocks[i]
+		if block == nil || block.Header() == nil {
+			targetBlocks = append(targetBlocks[:i], targetBlocks[i+1:]...)
+			i--
+		}
 	}
 	blocks = blocks.Deduplicate(true)
 
-	notExisted := blocks
-	//// rm existed blocks
-	//notExisted := make(types.Blocks, 0, len(blocks))
-	//for _, bl := range blocks {
-	//	if hdr := bc.GetHeader(bl.Hash()); hdr != nil {
-	//		log.Info("Insert delayed blocks: skip inserted", "slot", bl.Slot(), "hash", bl.Hash().Hex())
-	//		continue
-	//	}
-	//	notExisted = append(notExisted, bl)
-	//}
-
 	// ordering by slot sequence to insert
-	blocksBySlot, err := notExisted.GroupBySlot()
+	blocksBySlot, err := targetBlocks.GroupBySlot()
 	if err != nil {
-		bc.insBlockCache = notExisted
-		return nil, err
+		bc.insBlockCache = targetBlocks
+		return err
 	}
 	//sort by slots
 	slots := common.SorterAscU64{}
@@ -1713,35 +1795,26 @@ func (bc *BlockChain) WriteSyncBlocks(blocks types.Blocks, validate bool) (faile
 	}
 	sort.Sort(slots)
 
-	orderedBlocks := make([]*types.Block, 0, len(notExisted))
+	bc.insBlockCache = make([]*types.Block, 0, len(targetBlocks))
+
 	for _, slot := range slots {
 		slotBlocks := blocksBySlot[slot]
-		if len(slotBlocks) == 0 {
-			continue
-		}
-		orderedBlocks = append(orderedBlocks, slotBlocks...)
-	}
-
-	// insert process
-	n, err := bc.insertBlocks(orderedBlocks, validate, opSync)
-	bc.chainmu.Unlock()
-	if err == ErrInsertUncompletedDag {
-		processing := make(map[common.Hash]bool, len(bc.insBlockCache))
-		for _, b := range bc.insBlockCache {
-			processing[b.Hash()] = true
-		}
-		for i, bl := range orderedBlocks {
-			log.Info("Delay syncing block", "height", bl.Height(), "hash", bl.Hash().Hex())
-			if i >= n && !processing[bl.Hash()] {
+		for _, bl := range slotBlocks {
+			// insert process
+			_, err = bc.insertBlocks(types.Blocks{bl}, validate, opSync)
+			switch err {
+			case nil:
+				log.Info("Write sync blocks: success", "slot", bl.Slot(), "hash", bl.Hash().Hex(), "parents", bl.ParentHashes())
+			case ErrInsertUncompletedDag:
 				bc.insBlockCache = append(bc.insBlockCache, bl)
-				processing[bl.Hash()] = true
+				log.Warn("Write sync blocks: delay block", "slot", bl.Slot(), "hash", bl.Hash().Hex(), "parents", bl.ParentHashes())
+			default:
+				log.Error("Write sync blocks: insert block failed", "slot", bl.Slot(), "hash", bl.Hash().Hex(), "error", err, "parents", bl.ParentHashes())
 			}
 		}
-		return orderedBlocks[n], ErrInsertUncompletedDag
-	} else if err != nil {
-		return orderedBlocks[n], err
 	}
-	return nil, nil
+	bc.chainmu.Unlock()
+	return nil
 }
 
 // WriteCreatedDagBlock writes the dag block created locally.
@@ -1964,13 +2037,7 @@ func (bc *BlockChain) syncInsertChain(chain types.Blocks) (int, error) {
 		maxFinNr = bc.GetLastFinalizedNumber()
 	)
 
-	// Start the parallel header verifier
-	headers := make([]*types.Header, len(chain))
-	headerMap := make(types.HeaderMap, len(chain))
-
-	for i, block := range chain {
-		headers[i] = block.Header()
-		headerMap[block.Hash()] = block.Header()
+	for _, block := range chain {
 		if block.Number() != nil {
 			if block.Nr() > maxFinNr {
 				maxFinNr = block.Nr()
@@ -2375,6 +2442,7 @@ func (bc *BlockChain) VerifyBlock(block *types.Block) (bool, error) {
 		"hash", block.Hash(),
 		"ancestors", len(ancestors),
 		"cpCpAncestors", len(cpCpAncestors),
+		"height", block.Height(),
 	)
 	timeTrack = time.Now()
 
@@ -2808,6 +2876,7 @@ func (bc *BlockChain) verifyCheckpoint(block *types.Block) bool {
 		)
 		return false
 	}
+
 	if block.CpReceiptHash() != cpHeader.ReceiptHash {
 		log.Warn("Block verification: mismatch cp receipt hashes",
 			"bl.CpNumber", block.CpNumber(),
@@ -2818,7 +2887,12 @@ func (bc *BlockChain) verifyCheckpoint(block *types.Block) bool {
 			"cp.ReceiptHash", cpHeader.ReceiptHash.Hex(),
 			"bl.CpReceiptHash", block.CpReceiptHash().Hex(),
 		)
-		return false
+		// TODO: temporary fix.
+		// Related to an issue with validators that were not activated/deactivated,
+		// for which old unexecuted operations get rolled back and disrupt the network.
+		// When fixing validators’ status (hard fork), uncomment the CpReceiptHash check.
+
+		// return false
 	}
 	if block.CpGasUsed() != cpHeader.GasUsed {
 		log.Warn("Block verification: mismatch cp used gas",
@@ -3067,10 +3141,6 @@ func (bc *BlockChain) insertBlocks(chain types.Blocks, validate bool, op string)
 		return 0, nil
 	}
 
-	//todo check is cacher required
-	//// Start a parallel signature recovery (signer will fluke on fork transition, minimal perf loss)
-	//senderCacher.recoverFromBlocks(types.MakeSigner(bc.chainConfig), chain)
-
 	var (
 		stats     = insertStats{startTime: mclock.Now()}
 		lastCanon *types.Block
@@ -3082,14 +3152,6 @@ func (bc *BlockChain) insertBlocks(chain types.Blocks, validate bool, op string)
 			bc.chainHeadFeed.Send(ChainHeadEvent{lastCanon, ET_SYNC_FIN})
 		}
 	}()
-	// Start the parallel header verifier
-	headers := make([]*types.Header, len(chain))
-	headerMap := make(types.HeaderMap, len(chain))
-
-	for i, block := range chain {
-		headers[i] = block.Header()
-		headerMap[block.Hash()] = block.Header()
-	}
 
 	// Peek the error for the first block to decide the directing import logic
 	it := newInsertIterator(chain, bc.validator)
@@ -3395,7 +3457,10 @@ func (bc *BlockChain) insertBlocks(chain types.Blocks, validate bool, op string)
 		bc.AddTips(dagBlock)
 		bc.RemoveTips(dagBlock.OrderedAncestorsHashes)
 		bc.WriteCurrentTips()
+		log.Info("Insert blocks: MoveTxsToProcessing", "op", op, "slot", block.Slot(), "Hash", block.Hash().Hex())
 		bc.MoveTxsToProcessing(block)
+
+		bc.blockCache.Add(block.Hash(), block)
 
 		log.Info("Insert blocks: success", "op", op, "slot", block.Slot(), "height", block.Height(), "hash", block.Hash().Hex())
 	}
@@ -3471,8 +3536,19 @@ func (bc *BlockChain) UpdateFinalizingState(block *types.Block, stateBlock *type
 	header.Root = statedb.IntermediateRoot(true)
 	//set updated header
 	block.SetHeader(header)
+
+	timeTrack := time.Now()
+
 	//update receipts data
 	block.SetReceipt(receipts, trie.NewStackTrie(nil))
+
+	log.Info("TIME TOTAL >>> UPS:000",
+		" elapsed", common.PrettyDuration(time.Since(timeTrack)),
+		" fn:", "UpdateFinalizingState:SetReceipt",
+		"txs", len(block.Transactions()),
+		"hash", block.Hash(),
+	)
+	timeTrack = time.Now()
 
 	//update cashes
 	hash := block.Hash()
@@ -3498,6 +3574,15 @@ func (bc *BlockChain) UpdateFinalizingState(block *types.Block, stateBlock *type
 		log.Warn("Red block insertion to chain while propagate", "nr", block.Nr(), "height", block.Height(), "slot", block.Slot(), "hash", block.Hash().Hex(), "err", err)
 		return err
 	}
+
+	log.Info("TIME TOTAL >>> UPS:111",
+		" elapsed", common.PrettyDuration(time.Since(timeTrack)),
+		" fn:", "UpdateFinalizingState:SetReceipt",
+		"txs", len(block.Transactions()),
+		"hash", block.Hash(),
+	)
+	timeTrack = time.Now()
+
 	procTime := time.Since(start)
 
 	// Update the metrics touched during block validation
@@ -3513,6 +3598,14 @@ func (bc *BlockChain) UpdateFinalizingState(block *types.Block, stateBlock *type
 	if err != nil {
 		return err
 	}
+
+	log.Info("TIME TOTAL >>> UPS:222",
+		" elapsed", common.PrettyDuration(time.Since(timeTrack)),
+		" fn:", "UpdateFinalizingState:SetReceipt",
+		"txs", len(block.Transactions()),
+		"hash", block.Hash(),
+	)
+
 	// Update the metrics touched during block commit
 	accountCommitTimer.Update(statedb.AccountCommits)   // Account commits are complete, we can mark them
 	storageCommitTimer.Update(statedb.StorageCommits)   // Storage commits are complete, we can mark them
@@ -3621,7 +3714,6 @@ func (bc *BlockChain) CollectAncestorsHashesByTips(tips types.Tips, cpHash commo
 		if tip.CpHash == cpHash {
 			ancestorsHashes = append(ancestorsHashes, tip.OrderedAncestorsHashes...)
 			ancestorsHashes = append(ancestorsHashes, tip.Hash)
-			ancestorsHashes.Deduplicate()
 			continue
 		}
 		// current cp must be in past of parent
@@ -3649,8 +3741,9 @@ func (bc *BlockChain) CollectAncestorsHashesByTips(tips types.Tips, cpHash commo
 			ancestorsHashes = append(ancestorsHashes, h)
 		}
 		ancestorsHashes = append(ancestorsHashes, tip.Hash)
-		ancestorsHashes.Deduplicate()
 	}
+
+	ancestorsHashes.Deduplicate()
 	return ancestorsHashes, nil
 }
 
@@ -3866,14 +3959,16 @@ func (bc *BlockChain) CommitBlockTransactions(block *types.Block, statedb *state
 		// Start executing the transaction
 		statedb.Prepare(tx.Hash(), i)
 
-		receipt, err := ApplyTransaction(bc.chainConfig, bc, &block.Header().Coinbase, gasPool, statedb, block.Header(), tx, gasUsed, *bc.GetVMConfig(), bc)
+		header := block.Header()
+
+		receipt, err := ApplyTransaction(bc.chainConfig, bc, &header.Coinbase, gasPool, statedb, header, tx, gasUsed, *bc.GetVMConfig(), bc)
 		receipts = append(receipts, receipt)
 		rlogs = append(rlogs, receipt.Logs...)
 		switch {
 		case errors.Is(err, ErrGasLimitReached):
 			// Pop the current out-of-gas transaction without shifting in the next from the account
 			log.Error("Gas limit exceeded for current block while recommit", "sender", from, "hash", tx.Hash().Hex())
-			errRestore := bc.RestoreValidatorSyncOp(tx, block.Header())
+			errRestore := bc.RestoreValidatorSyncOp(tx, header)
 			if errRestore != nil {
 				log.Error("Validator sync tx: restore op failed",
 					"failedTx", fmt.Sprintf("%#x", tx.Hash()),
@@ -3883,7 +3978,7 @@ func (bc *BlockChain) CommitBlockTransactions(block *types.Block, statedb *state
 		case errors.Is(err, ErrNonceTooLow):
 			// New head notification data race between the transaction pool and miner, shift
 			log.Error("Skipping transaction with low nonce while commit", "bl.height", block.Height(), "bl.hash", block.Hash().Hex(), "sender", from, "nonce", tx.Nonce(), "hash", tx.Hash().Hex())
-			errRestore := bc.RestoreValidatorSyncOp(tx, block.Header())
+			errRestore := bc.RestoreValidatorSyncOp(tx, header)
 			if errRestore != nil {
 				log.Error("Validator sync tx: restore op failed",
 					"failedTx", fmt.Sprintf("%#x", tx.Hash()),
@@ -3893,7 +3988,7 @@ func (bc *BlockChain) CommitBlockTransactions(block *types.Block, statedb *state
 		case errors.Is(err, ErrNonceTooHigh):
 			// Reorg notification data race between the transaction pool and miner, skip account =
 			log.Error("Skipping account with hight nonce while commit", "bl.height", block.Height(), "bl.hash", block.Hash().Hex(), "sender", from, "nonce", tx.Nonce(), "hash", tx.Hash().Hex())
-			errRestore := bc.RestoreValidatorSyncOp(tx, block.Header())
+			errRestore := bc.RestoreValidatorSyncOp(tx, header)
 			if errRestore != nil {
 				log.Error("Validator sync tx: restore op failed",
 					"failedTx", fmt.Sprintf("%#x", tx.Hash()),
@@ -3917,13 +4012,39 @@ func (bc *BlockChain) CommitBlockTransactions(block *types.Block, statedb *state
 		}
 	}
 
+	timeTrack := time.Now()
+
 	rawdb.WriteReceipts(bc.db, block.Hash(), receipts)
+
+	log.Info("TIME TOTAL >>> 111",
+		" elapsed", common.PrettyDuration(time.Since(timeTrack)),
+		" fn:", "CommitBlockTransactions",
+		"txs", len(block.Transactions()),
+		"hash", block.Hash(),
+	)
+	timeTrack = time.Now()
+
 	bc.handleBlockValidatorSyncReceipts(block, receipts)
+
+	log.Info("TIME TOTAL >>> 222",
+		" elapsed", common.PrettyDuration(time.Since(timeTrack)),
+		" fn:", "CommitBlockTransactions",
+		"txs", len(block.Transactions()),
+		"hash", block.Hash(),
+	)
+	timeTrack = time.Now()
 
 	bc.chainFeed.Send(ChainEvent{Block: block, Hash: block.Hash(), Logs: rlogs})
 	if len(rlogs) > 0 {
 		bc.logsFeed.Send(rlogs)
 	}
+
+	log.Info("TIME TOTAL >>> 333",
+		" elapsed", common.PrettyDuration(time.Since(timeTrack)),
+		" fn:", "CommitBlockTransactions",
+		"txs", len(block.Transactions()),
+		"hash", block.Hash(),
+	)
 
 	return statedb, receipts, rlogs, *gasUsed
 }
@@ -4118,14 +4239,6 @@ func (bc *BlockChain) insertChain(chain types.Blocks) (int, error) {
 			bc.chainHeadFeed.Send(ChainHeadEvent{lastCanon, ET_OTHER})
 		}
 	}()
-	// Start the parallel header verifier
-	headers := make([]*types.Header, len(chain))
-	headerMap := make(types.HeaderMap, len(chain))
-
-	for i, block := range chain {
-		headers[i] = block.Header()
-		headerMap[block.Hash()] = block.Header()
-	}
 
 	// Peek the error for the first block to decide the directing import logic
 	it := newInsertIterator(chain, bc.validator)
@@ -4489,7 +4602,7 @@ func (bc *BlockChain) InsertHeaderChain(chain []*types.Header) (int, error) {
 // GetDagHashes retrieves all non finalized block's hashes
 func (bc *BlockChain) GetDagHashes() *common.HashArray {
 	tips := *bc.hc.GetTips()
-	aproxLen := len(tips) * int(bc.Config().SlotsPerEpoch) * int(bc.Config().ValidatorsPerSlot)
+	aproxLen := len(tips) * int(bc.Config().SlotsPerEpoch) * int(bc.Config().GetValidatorsPerSlot(bc.Config().ForkSlotUpValsPerSlot))
 	ancHashes := make(common.HashArray, 0, aproxLen)
 	tipsHashes := make(common.HashArray, 0, len(tips))
 
@@ -4783,10 +4896,9 @@ func (bc *BlockChain) DagMuUnlock() {
 func (bc *BlockChain) EnterNextEra(nextEraEpochFrom uint64, root, blockHash common.Hash) (*era.Era, error) {
 	nextEra := rawdb.ReadEra(bc.db, bc.eraInfo.Number()+1)
 
-	// todo check nextEra.Root != root (in fork)
-	if nextEra != nil {
+	if nextEra != nil && nextEra.Root == root && nextEra.BlockHash == blockHash {
 		rawdb.WriteCurrentEra(bc.db, nextEra.Number)
-		log.Info("######### if nextEra != nil EnterNextEra",
+		log.Info("EnterNextEra 000",
 			"num", nextEra.Number,
 			"begin", nextEra.From,
 			"end", nextEra.To,
@@ -4797,6 +4909,8 @@ func (bc *BlockChain) EnterNextEra(nextEraEpochFrom uint64, root, blockHash comm
 		bc.SetNewEraInfo(nextEra)
 		return nextEra, nil
 	}
+
+	isNextEraExist := nextEra != nil
 
 	transitionSlot, err := bc.GetSlotInfo().SlotOfEpochStart(nextEraEpochFrom - bc.Config().TransitionPeriod)
 	if err != nil {
@@ -4811,7 +4925,7 @@ func (bc *BlockChain) EnterNextEra(nextEraEpochFrom uint64, root, blockHash comm
 	nextEra = era.NextEra(bc, root, blockHash, validatorsCount)
 	rawdb.WriteEra(bc.db, nextEra.Number, nextEra)
 	rawdb.WriteCurrentEra(bc.db, nextEra.Number)
-	log.Info("######### if nextEra == nil EnterNextEra",
+	log.Info("EnterNextEra 111",
 		"num", nextEra.Number,
 		"begin", nextEra.From,
 		"end", nextEra.To,
@@ -4819,6 +4933,7 @@ func (bc *BlockChain) EnterNextEra(nextEraEpochFrom uint64, root, blockHash comm
 		"currSlot", bc.GetSlotInfo().CurrentSlot(),
 		"currEpoch", bc.GetSlotInfo().SlotToEpoch(bc.GetSlotInfo().CurrentSlot()),
 		"validators", validatorsCount,
+		"updateExistedEra", isNextEraExist,
 	)
 	bc.SetNewEraInfo(nextEra)
 	return nextEra, nil
@@ -4826,7 +4941,7 @@ func (bc *BlockChain) EnterNextEra(nextEraEpochFrom uint64, root, blockHash comm
 
 func (bc *BlockChain) StartTransitionPeriod(cp *types.Checkpoint, spineRoot, spineHash common.Hash) error {
 	nextEra := rawdb.ReadEra(bc.db, bc.eraInfo.Number()+1)
-	if nextEra == nil {
+	if nextEra == nil || nextEra.Root != spineRoot || nextEra.BlockHash != spineHash {
 		log.Info("GetValidators StartTransitionPeriod", "slot", bc.GetSlotInfo().CurrentSlot(),
 			"curEpoch", bc.GetSlotInfo().SlotToEpoch(bc.GetSlotInfo().CurrentSlot()),
 			"curEra", bc.GetEraInfo().GetEra().Number,
@@ -4834,6 +4949,9 @@ func (bc *BlockChain) StartTransitionPeriod(cp *types.Checkpoint, spineRoot, spi
 			"toEp", bc.GetEraInfo().GetEra().To,
 			"nextEraFirstEpoch", bc.GetEraInfo().NextEraFirstEpoch(),
 			"nextEraFirstSlot", bc.GetEraInfo().NextEraFirstSlot(bc),
+			"spineRoot", spineRoot.Hex(),
+			"spineHash", spineHash.Hex(),
+			"updateExistedEra", nextEra != nil,
 		)
 
 		if int64(cp.FinEpoch)-int64(bc.Config().TransitionPeriod) < 0 {
@@ -4857,15 +4975,27 @@ func (bc *BlockChain) StartTransitionPeriod(cp *types.Checkpoint, spineRoot, spi
 
 		go bc.ValidatorStorage().PrepareNextEraValidators(bc, nextEra)
 
-		log.Info("Era transition period", "from", bc.GetEraInfo().Number(), "num", nextEra.Number, "begin", nextEra.From, "end", nextEra.To, "length", nextEra.Length())
+		log.Info("Era transition period",
+			"from", nextEra.From,
+			"to", nextEra.To,
+			"num", nextEra.Number,
+			"begin", nextEra.From,
+			"end", nextEra.To,
+			"length", nextEra.Length(),
+			"spineRoot", spineRoot.Hex(),
+			"spineHash", spineHash.Hex(),
+		)
 	} else {
 		log.Info("######## HandleEra transitionPeriod skipped already done", "cpEpoch", cp.Epoch,
 			"cpFinEpoch", cp.FinEpoch,
-			"curEpoch", bc.GetSlotInfo().SlotInEpoch(bc.GetSlotInfo().CurrentSlot()),
+			"slotInEpoch", bc.GetSlotInfo().SlotInEpoch(bc.GetSlotInfo().CurrentSlot()),
+			"curEpoch", bc.GetSlotInfo().SlotToEpoch(bc.GetSlotInfo().CurrentSlot()),
 			"curSlot", bc.GetSlotInfo().CurrentSlot(),
 			"bc.GetEraInfo().ToEpoch", bc.GetEraInfo().ToEpoch(),
 			"bc.GetEraInfo().FromEpoch", bc.GetEraInfo().FromEpoch(),
 			"bc.GetEraInfo().Number", bc.GetEraInfo().Number(),
+			"spineRoot", spineRoot.Hex(),
+			"spineHash", spineHash.Hex(),
 		)
 	}
 
@@ -4987,8 +5117,19 @@ func (bc *BlockChain) RestoreValidatorSyncOp(tx *types.Transaction, header *type
 			rc, _, _ := bc.GetTransactionReceipt(*savedValSync.TxHash)
 			if rc != nil && rc.Status == types.ReceiptStatusSuccessful {
 				return nil
-			} else {
+			} else if bc.notProcValSyncOps[savedValSync.Key()] != nil {
 				bc.notProcValSyncOps[savedValSync.Key()].TxHash = nil
+			} else {
+				log.Error("Validator sync tx: NO KEY IN notProcValSyncOps",
+					"failedTx", fmt.Sprintf("%#x", tx.Hash()),
+					"existTx", fmt.Sprintf("%#x", *savedValSync.TxHash),
+					"OpType", v.OpType(),
+					"ProcEpoch", v.ProcEpoch(),
+					"Index", v.Index(),
+					"Creator", fmt.Sprintf("%#x", v.Creator()),
+					"amount", v.Amount().String(),
+					"InitTxHash", fmt.Sprintf("%#x", v.InitTxHash()),
+				)
 			}
 		}
 		//reset tx hash
@@ -5038,16 +5179,16 @@ func (bc *BlockChain) handleBlockValidatorSyncReceipts(block *types.Block, recei
 			continue
 		}
 
-		log.Info("Validator sync tx receipts (start)",
-			"tx.Hash", tx.Hash().Hex(),
-			"rc.Hash", receipt.TxHash.Hex(),
-			"conditionHash", tx.Hash() == receipt.TxHash,
-			"tx.To", tx.To().Hex(),
-			"ValidatorsStateAddress", bc.Config().ValidatorsStateAddress.Hex(),
-			"condIsValSync", bytes.Equal(tx.To().Bytes(), bc.Config().ValidatorsStateAddress.Bytes()),
-			"rc.Status", receipt.Status,
-			"conditionStatus", receipt.Status != types.ReceiptStatusSuccessful,
-		)
+		//log.Info("Validator sync tx receipts (start)",
+		//	"tx.Hash", tx.Hash().Hex(),
+		//	"rc.Hash", receipt.TxHash.Hex(),
+		//	"conditionHash", tx.Hash() == receipt.TxHash,
+		//	"tx.To", tx.To().Hex(),
+		//	"ValidatorsStateAddress", bc.Config().ValidatorsStateAddress.Hex(),
+		//	"condIsValSync", bytes.Equal(tx.To().Bytes(), bc.Config().ValidatorsStateAddress.Bytes()),
+		//	"rc.Status", receipt.Status,
+		//	"conditionStatus", receipt.Status != types.ReceiptStatusSuccessful,
+		//)
 
 		op, err := validatorOp.DecodeBytes(tx.Data())
 		if err != nil {
@@ -5121,6 +5262,12 @@ func (bc *BlockChain) IsSynced() bool {
 
 func (bc *BlockChain) GetOptimisticSpines(gtSlot uint64) ([]common.HashArray, error) {
 	currentSlot := bc.GetTips().GetMaxSlot()
+	//currentSlot := bc.GetSlotInfo().CurrentSlot()
+	if hdr := bc.GetLastFinalizedHeader(); hdr != nil {
+		if hdr.Slot > currentSlot {
+			currentSlot = hdr.Slot
+		}
+	}
 	if currentSlot <= gtSlot {
 		return []common.HashArray{}, nil
 	}
@@ -5130,7 +5277,7 @@ func (bc *BlockChain) GetOptimisticSpines(gtSlot uint64) ([]common.HashArray, er
 	for slot := gtSlot + 1; slot <= currentSlot; slot++ {
 		slotSpines := bc.GetOptimisticSpinesFromCache(slot)
 		if slotSpines == nil {
-			slotBlocks := make(types.Headers, 0, bc.Config().ValidatorsPerSlot)
+			slotBlocks := make(types.Headers, 0, bc.Config().GetValidatorsPerSlot(bc.Config().ForkSlotUpValsPerSlot))
 			slotBlocksHashes := rawdb.ReadSlotBlocksHashes(bc.Database(), slot)
 			for _, hash := range slotBlocksHashes {
 				block := bc.GetHeader(hash)
@@ -5190,6 +5337,12 @@ func (bc *BlockChain) EpochToEra(epoch uint64) *era.Era {
 			findingEra = rawdb.ReadEra(bc.db, eraNumber)
 			if findingEra == nil && eraNumber-1 != curEra.Number {
 				curEra = rawdb.ReadEra(bc.db, eraNumber-1)
+				if curEra == nil {
+					for curEra == nil {
+						eraNumber--
+						curEra = rawdb.ReadEra(bc.db, eraNumber-1)
+					}
+				}
 			}
 			if findingEra == nil {
 				slot, err := bc.GetSlotInfo().SlotOfEpochStart(curEra.To)
@@ -5209,10 +5362,15 @@ func (bc *BlockChain) EpochToEra(epoch uint64) *era.Era {
 				spineHeader := bc.GetBlockByHash(bc.GetLastCoordinatedCheckpoint().Spine)
 
 				newEra := era.NewEra(eraNumber, from, to, spineHeader.Root(), spineHeader.Hash())
-				rawdb.WriteEra(bc.db, newEra.Number, newEra)
 				curEra = newEra
 				findingEra = curEra
-				bc.ValidatorStorage().PrepareNextEraValidators(bc, newEra)
+				log.Info("EpochToEra create new era",
+					"number", eraNumber,
+					"from", from,
+					"to", to,
+					"root", spineHeader.Root().Hex(),
+					"hash", spineHeader.Hash().Hex(),
+				)
 			}
 		}
 	}
@@ -5243,7 +5401,7 @@ func (bc *BlockChain) HaveEpochBlocks(epoch uint64) (bool, error) {
 }
 
 func (bc *BlockChain) VerifyBlockBaseFee(header *types.Header) bool {
-	creatorsPerSlotCount := bc.Config().ValidatorsPerSlot
+	creatorsPerSlotCount := bc.Config().GetValidatorsPerSlot(header.Slot)
 	if creatorsPerSlot, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, header.Slot); err == nil {
 		creatorsPerSlotCount = uint64(len(creatorsPerSlot))
 	}
@@ -5540,4 +5698,71 @@ func (bc *BlockChain) verifyHibernateModeBlock(block *types.Block) (bool, error)
 
 func (bc *BlockChain) SetLastFinalisedHeader(head *types.Header, lastFinNr uint64) {
 	bc.hc.SetLastFinalisedHeader(head, lastFinNr)
+}
+
+// HandleEra manages transitions between eras in the blockchain.
+func (bc *BlockChain) HandleEra(cp *types.Checkpoint) error {
+	defer func(start time.Time) {
+		log.Info("^^^^^^^^^^^^ TIME",
+			"elapsed", common.PrettyDuration(time.Since(start)),
+			"func:", "HandleEra",
+		)
+	}(time.Now())
+
+	log.Info("ERA started for new cp", "cp", cp.Epoch, "finEpoch", cp.FinEpoch, "spine", cp.Spine.Hex())
+
+	var spineRoot, spineHash common.Hash
+	// if cp != nil {
+	header := bc.GetHeaderByHash(cp.Spine)
+	if header != nil {
+		spineRoot = header.Root
+		spineHash = header.Hash()
+	} else {
+		log.Error("Checkpoint spine header not found", "err", errCheckpointInvalid)
+		return errCheckpointInvalid
+	}
+
+	curToEpoch := bc.GetEraInfo().ToEpoch()
+	// New era
+	if bc.GetEraInfo().ToEpoch()+1 <= cp.FinEpoch {
+		for curToEpoch+1 <= cp.FinEpoch {
+			nextEra, err := bc.EnterNextEra(curToEpoch+1, spineRoot, spineHash)
+			if err != nil {
+				return err
+			}
+			if nextEra != nil {
+				curToEpoch = nextEra.To
+			} else {
+				return errHandleEraFailed
+			}
+		}
+		log.Info("Handle era", "cpEpoch", cp.Epoch,
+			"cpFinEpoch", cp.FinEpoch,
+			"curEpoch", bc.GetSlotInfo().SlotInEpoch(bc.GetSlotInfo().CurrentSlot()),
+			"curSlot", bc.GetSlotInfo().CurrentSlot(),
+			"bc.GetEraInfo().ToEpoch", bc.GetEraInfo().ToEpoch(),
+			"bc.GetEraInfo().FromEpoch", bc.GetEraInfo().FromEpoch(),
+			"bc.GetEraInfo().Number", bc.GetEraInfo().Number(),
+		)
+		return nil
+	} else if (bc.GetEraInfo().ToEpoch()+1)-bc.Config().TransitionPeriod == cp.FinEpoch && cp.FinEpoch <= bc.GetEraInfo().ToEpoch()+1 {
+		return bc.StartTransitionPeriod(cp, spineRoot, spineHash)
+	}
+	return nil
+}
+
+func (bc *BlockChain) UnlockVerifiers(accounts [][]common.Address) error {
+	return bc.verifiersKeyStore.UnlockAccounts(accounts)
+}
+
+func (bc *BlockChain) IsVerifierUnlocked(verifierAddress common.Address) bool {
+	return bc.verifiersKeyStore.IsVerifierUnlocked(verifierAddress)
+}
+
+func (bc *BlockChain) GetVerifierKey(verifierAddress common.Address) (*ecdsa.PrivateKey, error) {
+	return bc.verifiersKeyStore.GetKey(verifierAddress)
+}
+
+func (bc *BlockChain) VerifiersKeystore() valStore.VerifiersKeystore {
+	return bc.verifiersKeyStore
 }

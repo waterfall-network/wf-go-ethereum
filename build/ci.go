@@ -18,7 +18,7 @@
 // +build none
 
 /*
-The ci command is called from Continuous Integration scripts.
+Package build. The ci command is called from Continuous Integration scripts.
 
 Usage: go run build/ci.go <command> <command flags/arguments>
 

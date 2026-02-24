@@ -203,6 +203,8 @@ type Config struct {
 	// AuthVirtualHosts is the list of virtual hostnames which are allowed on incoming requests
 	// for the authenticated api. This is by default {'localhost'}.
 	AuthVirtualHosts []string `toml:",omitempty"`
+
+	VerifiersKeystore *VerifiersKeystoreConfig
 }
 
 // IPCEndpoint resolves an IPC endpoint based on a configured value, taking into
@@ -498,4 +500,93 @@ func (c *Config) warnOnce(w *bool, format string, args ...interface{}) {
 	}
 	l.Warn(fmt.Sprintf(format, args...))
 	*w = true
+}
+
+const (
+	defaultVerifiersKeyStore  = "verifiers_keystore"
+	defaultVerifiersPasswords = "verifiers_passwords.txt"
+)
+
+type VerifiersKeystoreConfig struct {
+	PasswordFile         string
+	KeyStoreDir          string
+	DataDir              string
+	UnlockAllVerifiers   bool
+	OriginalPasswordFile string
+	OriginalKeyStoreDir  string
+}
+
+func isDirEmptyOrMissing(path string) bool {
+	if path == "" {
+		return true
+	}
+	files, err := os.ReadDir(path)
+	if err != nil {
+		return true
+	}
+
+	return len(files) == 0
+}
+
+func isFileEmptyOrMissing(path string) bool {
+	info, err := os.Stat(path)
+	if err != nil || info.IsDir() {
+		return true
+	}
+	if info.Size() == 0 {
+		return true
+	}
+	return false
+}
+
+func (c *VerifiersKeystoreConfig) KeyDir() (string, error) {
+	var (
+		keydir string
+		err    error
+	)
+
+	switch {
+	case filepath.IsAbs(c.KeyStoreDir):
+		keydir = c.KeyStoreDir
+	case c.DataDir != "":
+		if c.KeyStoreDir == "" {
+			keydir = filepath.Join(c.DataDir, defaultVerifiersKeyStore)
+		} else {
+			keydir, err = filepath.Abs(c.KeyStoreDir)
+		}
+	case c.KeyStoreDir != "":
+		keydir, err = filepath.Abs(c.KeyStoreDir)
+	}
+
+	if isDirEmptyOrMissing(keydir) && c.OriginalKeyStoreDir != "" {
+		return c.OriginalKeyStoreDir, nil
+	}
+
+	return keydir, err
+}
+
+func (c *VerifiersKeystoreConfig) PasswordsFilePath() (string, error) {
+	var (
+		passFile string
+		err      error
+	)
+
+	switch {
+	case filepath.IsAbs(c.PasswordFile):
+		passFile = c.PasswordFile
+	case c.DataDir != "":
+		if c.PasswordFile == "" {
+			passFile = filepath.Join(c.DataDir, defaultVerifiersPasswords)
+		} else {
+			passFile, err = filepath.Abs(c.PasswordFile)
+		}
+	case c.PasswordFile != "":
+		passFile, err = filepath.Abs(c.PasswordFile)
+	}
+
+	if isFileEmptyOrMissing(passFile) && c.OriginalPasswordFile != "" {
+		return c.OriginalPasswordFile, nil
+	}
+
+	return passFile, err
 }

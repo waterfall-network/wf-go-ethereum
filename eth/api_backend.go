@@ -22,7 +22,6 @@ import (
 	"math/big"
 	"time"
 
-	ethereum "gitlab.waterfall.network/waterfall/protocol/gwat"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/accounts"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core"
@@ -35,6 +34,7 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/eth/gasprice"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/ethdb"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/event"
+	ethereum "gitlab.waterfall.network/waterfall/protocol/gwat/interfaces"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/rpc"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/token"
@@ -49,6 +49,10 @@ type EthAPIBackend struct {
 	allowUnprotectedTxs bool
 	eth                 *Ethereum
 	gpo                 *gasprice.Oracle
+}
+
+func (b *EthAPIBackend) UnlockVerifiers(accounts [][]common.Address) error {
+	return b.eth.BlockChain().UnlockVerifiers(accounts)
 }
 
 func (b *EthAPIBackend) StateAt(root common.Hash) (*state.StateDB, error) {

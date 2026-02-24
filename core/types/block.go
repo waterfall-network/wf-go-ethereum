@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-// Package types contains data types related to Ethereum consensus.
+// Package types contains data types related to Ethereum consensus (Modified for Waterfall).
 package types
 
 import (
@@ -38,6 +38,8 @@ import (
 
 var (
 	EmptyRootHash = common.HexToHash("56e81f171bcc55a6ff8345e692c0f86e5b48e01b996cadc001622fb5e363b421")
+
+	EmptyUncleHash = rlpHash(common.HashArray{})
 )
 
 const uint32Length = 4
@@ -452,6 +454,13 @@ func CopyHeader(h *Header) *Header {
 	return &cpy
 }
 
+func CalcUncleHash(header *Header) common.Hash {
+	if len(header.ParentHashes) == 0 {
+		return EmptyUncleHash
+	}
+	return rlpHash(header.ParentHashes)
+}
+
 // DecodeRLP decodes the Ethereum
 func (b *Block) DecodeRLP(s *rlp.Stream) error {
 	var eb extblock
@@ -682,7 +691,7 @@ func (bs *Blocks) Deduplicate(rmNil bool) Blocks {
 		return Blocks{}
 	}
 	cpy := make(Blocks, 0, len(*bs))
-	bmap := map[common.Hash]bool{}
+	bmap := map[common.Hash]struct{}{}
 	for _, block := range *bs {
 		if block == nil {
 			if rmNil {
@@ -690,13 +699,13 @@ func (bs *Blocks) Deduplicate(rmNil bool) Blocks {
 			}
 			if _, ok := bmap[common.Hash{}]; !ok {
 				cpy = append(cpy, block)
-				bmap[common.Hash{}] = true
+				bmap[common.Hash{}] = struct{}{}
 			}
 			continue
 		}
 		if _, ok := bmap[block.Hash()]; !ok {
 			cpy = append(cpy, block)
-			bmap[block.Hash()] = true
+			bmap[block.Hash()] = struct{}{}
 		}
 	}
 	return cpy

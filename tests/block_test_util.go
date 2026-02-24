@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-// Package tests implements execution of Ethereum JSON tests.
+// Package tests implements execution of Ethereum JSON tests (Modified for Waterfall).
 package tests
 
 import (
@@ -33,6 +33,7 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/state"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/vm"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/node"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/rlp"
 )
@@ -115,7 +116,7 @@ func (t *BlockTest) Run(snapshotter bool) error {
 		cache.SnapshotLimit = 1
 		cache.SnapshotWait = true
 	}
-	chain, err := core.NewBlockChain(db, cache, config, vm.Config{}, nil)
+	chain, err := core.NewBlockChain(db, cache, config, vm.Config{}, nil, &node.VerifiersKeystoreConfig{})
 	if err != nil {
 		return err
 	}

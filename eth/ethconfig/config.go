@@ -14,7 +14,7 @@
 // You should have received a copy of the GNU Lesser General Public License
 // along with the go-ethereum library. If not, see <http://www.gnu.org/licenses/>.
 
-// Package ethconfig contains the configuration of the ETH and LES protocols.
+// Package ethconfig contains the configuration of the ETH and LES protocols (Modified for Waterfall).
 package ethconfig
 
 import (

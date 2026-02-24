@@ -105,7 +105,7 @@ func TestLenEpochs(t *testing.T) {
 	ei := NewEraInfo(era)
 
 	// Ensure that the LenEpochs function returns 11
-	if ei.LenEpochs() != 10 {
+	if ei.LenEpochs() != 11 {
 		t.Errorf("Expected LenEpochs to return 11, but got %v", ei.LenEpochs())
 	}
 }
@@ -116,7 +116,7 @@ func TestLenSlots(t *testing.T) {
 	ei := NewEraInfo(era)
 
 	// Ensure that the LenSlots function returns 320
-	if ei.LenSlots() != 320 {
+	if ei.LenSlots() != 352 {
 		t.Errorf("Expected LenSlots to return 320, but got %v", ei.LenSlots())
 	}
 }

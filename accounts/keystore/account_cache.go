@@ -299,3 +299,7 @@ func (ac *accountCache) scanAccounts() error {
 	log.Trace("Handled keystore changes", "time", end.Sub(start))
 	return nil
 }
+
+func (ac *accountCache) ScanAccounts() error {
+	return ac.scanAccounts()
+}
