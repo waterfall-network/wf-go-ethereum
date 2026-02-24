@@ -6,7 +6,6 @@ package validator
 
 import (
 	context "context"
-	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/operation"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
@@ -16,6 +15,7 @@ import (
 	ethdb "gitlab.waterfall.network/waterfall/protocol/gwat/ethdb"
 	params "gitlab.waterfall.network/waterfall/protocol/gwat/params"
 	era "gitlab.waterfall.network/waterfall/protocol/gwat/validator/era"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/operation"
 	storage "gitlab.waterfall.network/waterfall/protocol/gwat/validator/storage"
 )
 
