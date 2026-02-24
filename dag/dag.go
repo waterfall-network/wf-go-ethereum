@@ -218,7 +218,6 @@ func (d *Dag) HandleFinalize(data *types.FinalizationParams) *types.Finalization
 			"cp.BaseSpine", fmt.Sprintf("%#x", data.Checkpoint.Spine),
 			"baseSpine", nil,
 			"spines", data.Spines,
-			"ValSyncData", data.ValSyncData,
 			"\u2692", params.BuildId)
 	}
 

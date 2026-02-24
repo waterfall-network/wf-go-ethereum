@@ -24,13 +24,14 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/rlp"
 )
 
-const valSyncOpDataMinLen = 8 + 8 + common.AddressLength + common.HashLength
+const valSyncOpDataMinLen = common.Uint64Size + common.Uint64Size + common.AddressLength + common.HashLength
 
 type VersionValSyncOp uint16
 
 const (
 	NoVer VersionValSyncOp = iota
 	Ver1
+	Ver2
 )
 
 type validatorSyncOperation struct {
@@ -43,6 +44,22 @@ type validatorSyncOperation struct {
 	amount            *big.Int
 	withdrawalAddress *common.Address
 	balance           *big.Int
+	activationEpoch   uint64
+	exitEpoch         uint64
+}
+
+// rlpValSyncOpVer2 rlp representation of ValidatorSyncOperation op ver 2.
+type rlpValSyncOpVer2 struct {
+	OpType            types.ValidatorSyncOp
+	InitTxHash        common.Hash
+	ProcEpoch         uint64
+	Index             uint64
+	Creator           common.Address
+	WithdrawalAddress common.Address
+	Amount            big.Int
+	Balance           big.Int
+	ActivationEpoch   uint64
+	ExitEpoch         uint64
 }
 
 // rlpValSyncOpVer1 rlp representation of ValidatorSyncOperation op ver 1.
@@ -67,6 +84,8 @@ func (op *validatorSyncOperation) init(
 	amount *big.Int,
 	withdrawalAddress *common.Address,
 	balance *big.Int,
+	activationEpoch uint64,
+	exitEpoch uint64,
 ) error {
 	if initTxHash == (common.Hash{}) {
 		return ErrNoInitTxHash
@@ -95,6 +114,9 @@ func (op *validatorSyncOperation) init(
 		op.withdrawalAddress = withdrawalAddress
 		op.balance = balance
 	}
+	op.activationEpoch = activationEpoch
+	op.exitEpoch = exitEpoch
+	//set data version
 	op.version = version
 	return nil
 }
@@ -110,9 +132,11 @@ func NewValidatorSyncOperation(
 	amount *big.Int,
 	withdrawalAddress *common.Address,
 	balance *big.Int,
+	activationEpoch uint64,
+	exitEpoch uint64,
 ) (ValidatorSync, error) {
 	op := validatorSyncOperation{}
-	if err := op.init(version, opType, initTxHash, procEpoch, index, creator, amount, withdrawalAddress, balance); err != nil {
+	if err := op.init(version, opType, initTxHash, procEpoch, index, creator, amount, withdrawalAddress, balance, activationEpoch, exitEpoch); err != nil {
 		return nil, err
 	}
 	return &op, nil
@@ -131,7 +155,19 @@ func (op *validatorSyncOperation) UnmarshalBinary(b []byte) error {
 		if err != nil {
 			return err
 		}
-		return op.init(version, dec.OpType, dec.InitTxHash, dec.ProcEpoch, dec.Index, dec.Creator, &dec.Amount, &dec.WithdrawalAddress, &dec.Balance)
+		return op.init(version, dec.OpType, dec.InitTxHash, dec.ProcEpoch, dec.Index, dec.Creator, &dec.Amount, &dec.WithdrawalAddress, &dec.Balance, 0, 0)
+	case Ver2:
+		dec := &rlpValSyncOpVer2{}
+		err = rlp.DecodeBytes(binData, dec)
+		if err != nil {
+			return err
+		}
+		return op.init(version,
+			dec.OpType, dec.InitTxHash, dec.ProcEpoch,
+			dec.Index, dec.Creator, &dec.Amount,
+			&dec.WithdrawalAddress, &dec.Balance,
+			dec.ActivationEpoch, dec.ExitEpoch,
+		)
 	default:
 		return ErrOpBadVersion
 	}
@@ -165,6 +201,19 @@ func (op *validatorSyncOperation) MarshalBinary() ([]byte, error) {
 			Amount:            *amount,
 			Balance:           *balance,
 		})
+	case Ver2:
+		binData, err = rlp.EncodeToBytes(&rlpValSyncOpVer2{
+			OpType:            op.opType,
+			InitTxHash:        op.initTxHash,
+			ProcEpoch:         op.procEpoch,
+			Index:             op.index,
+			Creator:           op.creator,
+			WithdrawalAddress: *withdrawalAddress,
+			Amount:            *amount,
+			Balance:           *balance,
+			ActivationEpoch:   op.ActivationEpoch(),
+			ExitEpoch:         op.ExitEpoch(),
+		})
 	default:
 		return nil, ErrOpBadVersion
 	}
@@ -180,7 +229,7 @@ func (op *validatorSyncOperation) unmarshalBinaryLegacy(b []byte) error {
 		return ErrBadDataLen
 	}
 	startOffset := 0
-	endOffset := startOffset + 8
+	endOffset := startOffset + common.Uint64Size
 	opType := types.ValidatorSyncOp(binary.BigEndian.Uint64(b[startOffset:endOffset]))
 
 	startOffset = endOffset
@@ -188,11 +237,11 @@ func (op *validatorSyncOperation) unmarshalBinaryLegacy(b []byte) error {
 	initTxHash := common.BytesToHash(b[startOffset:endOffset])
 
 	startOffset = endOffset
-	endOffset = startOffset + 8
+	endOffset = startOffset + common.Uint64Size
 	procEpoch := binary.BigEndian.Uint64(b[startOffset:endOffset])
 
 	startOffset = endOffset
-	endOffset = startOffset + 8
+	endOffset = startOffset + common.Uint64Size
 	index := binary.BigEndian.Uint64(b[startOffset:endOffset])
 
 	startOffset = endOffset
@@ -210,24 +259,24 @@ func (op *validatorSyncOperation) unmarshalBinaryLegacy(b []byte) error {
 		startOffset = endOffset
 		amount = new(big.Int).SetBytes(b[startOffset:])
 	}
-	return op.init(NoVer, opType, initTxHash, procEpoch, index, creator, amount, &withdrawal, nil)
+	return op.init(NoVer, opType, initTxHash, procEpoch, index, creator, amount, &withdrawal, nil, 0, 0)
 }
 
 // marshalBinaryLegacy marshals deprecated validator sync operation to byte encoding.
 func (op *validatorSyncOperation) marshalBinaryLegacy() ([]byte, error) {
 	bin := make([]byte, 0, valSyncOpDataMinLen)
 
-	enc := make([]byte, 8)
+	enc := make([]byte, common.Uint64Size)
 	binary.BigEndian.PutUint64(enc, uint64(op.opType))
 	bin = append(bin, enc...)
 
 	bin = append(bin, op.initTxHash.Bytes()...)
 
-	enc = make([]byte, 8)
+	enc = make([]byte, common.Uint64Size)
 	binary.BigEndian.PutUint64(enc, op.procEpoch)
 	bin = append(bin, enc...)
 
-	enc = make([]byte, 8)
+	enc = make([]byte, common.Uint64Size)
 	binary.BigEndian.PutUint64(enc, op.index)
 	bin = append(bin, enc...)
 
@@ -307,6 +356,14 @@ func (op *validatorSyncOperation) Balance() *big.Int {
 	return new(big.Int).Set(op.balance)
 }
 
+func (op *validatorSyncOperation) ActivationEpoch() uint64 {
+	return op.activationEpoch
+}
+
+func (op *validatorSyncOperation) ExitEpoch() uint64 {
+	return op.exitEpoch
+}
+
 func (op *validatorSyncOperation) Version() VersionValSyncOp {
 	return op.version
 }
@@ -318,7 +375,8 @@ func (op *validatorSyncOperation) Print() string {
 	if op == nil {
 		return "{nil}"
 	}
-	return fmt.Sprintf("{InitTxHash: %#x, OpType: %d, ProcEpoch: %d, Index: %d, Creator: %#x, Amount: %s, Balance: %s, WithdrawalAddress: %#x, ver: %d}",
+	return fmt.Sprintf("{InitTxHash: %#x, OpType: %d, ProcEpoch: %d, Index: %d, Creator: %#x, Amount: %s, "+
+		"Balance: %s, WithdrawalAddress: %#x, ActivationEpoch: %d, exitEpoch: %d, ver: %d}",
 		op.initTxHash,
 		op.opType,
 		op.procEpoch,
@@ -327,6 +385,8 @@ func (op *validatorSyncOperation) Print() string {
 		op.amount.String(),
 		op.balance.String(),
 		op.withdrawalAddress.Hex(),
+		op.activationEpoch,
+		op.exitEpoch,
 		op.version,
 	)
 }

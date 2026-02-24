@@ -84,13 +84,7 @@ func CreateValidatorSyncTx(
 	log.Info("Validator sync tx data",
 		"slot", slot,
 		"ver", opVer,
-		"Creator", valSyncOp.Creator.Hex(),
-		"ProcEpoch", valSyncOp.ProcEpoch,
-		"OpType", valSyncOp.OpType,
-		"Amount", valSyncOp.Amount.String(),
-		"Balance", valSyncOp.Balance.String(),
-		"Index", valSyncOp.Index,
-		"InitTxHash", valSyncOp.InitTxHash.Hex(),
+		"op", valSyncOp.Print(),
 		"from", from.Hex(),
 	)
 
@@ -207,6 +201,8 @@ func getValSyncTxData(valSyncOp types.ValidatorSync, withdrawal *common.Address,
 		valSyncOp.Amount,
 		withdrawal,
 		valSyncOp.Balance,
+		valSyncOp.ActivationEpoch,
+		valSyncOp.ExitEpoch,
 	); err != nil {
 		return nil, err
 	}
@@ -286,16 +282,8 @@ func GetPendingValidatorSyncData(bc *core.BlockChain) map[common.Hash]*types.Val
 					}
 					bc.SetValidatorSyncData(vs)
 					log.Warn("=== ValidatorSync: GetPendingValidatorSyncData: stale op removed",
-						"OpType", vs.OpType,
-						"currEpoch", currEpoch,
-						"ProcEpoch", vs.ProcEpoch,
-						"Index", vs.Index,
-						"OpType", vs.OpType,
-						"Amount", vs.Amount.String(),
-						"Balance", vs.Balance.String(),
-						"TxHash", fmt.Sprintf("%#x", vs.TxHash),
-						"InitTxHash", vs.InitTxHash.Hex(),
-						"Creator", vs.Creator.Hex(),
+						"slot", si.CurrentSlot(),
+						"op", vs.Print(),
 					)
 					continue
 				}
@@ -305,14 +293,7 @@ func GetPendingValidatorSyncData(bc *core.BlockChain) map[common.Hash]*types.Val
 				vsPending[k] = vs
 				log.Info("=== ValidatorSync: GetPendingValidatorSyncData === 11111",
 					"slot", si.CurrentSlot(),
-					"ProcEpoch", vs.ProcEpoch,
-					"Index", vs.Index,
-					"OpType", vs.OpType,
-					"Amount", vs.Amount.String(),
-					"Balance", vs.Balance.String(),
-					"TxHash", fmt.Sprintf("%#x", vs.TxHash),
-					"InitTxHash", vs.InitTxHash.Hex(),
-					"Creator", vs.Creator.Hex(),
+					"op", vs.Print(),
 				)
 			}
 		}
@@ -324,6 +305,9 @@ func getValSyncVersionBySlot(conf *params.ChainConfig, slot uint64) operation.Ve
 	var ver operation.VersionValSyncOp
 	if conf.IsForkSlotDelegate(slot) {
 		ver = operation.Ver1
+	}
+	if conf.IsForkSlotValSyncProc(slot) {
+		ver = operation.Ver2
 	}
 	return ver
 }

@@ -67,15 +67,6 @@ var (
 )
 
 const (
-	//	// 1024 bytes
-	//	MetadataMaxSize = 1 << 10
-	//
-	//	// Common fields
-	//	pubkeyLogType    = "pubkey"
-	//	signatureLogType = "signature"
-	//	addressLogType   = "address"
-	//	uint256LogType   = "uint256"
-	//	boolLogType      = "bool"
 	postpone = 2
 )
 
@@ -238,6 +229,7 @@ func (p *Processor) Call(caller Ref, toAddr common.Address, value *big.Int, msg 
 				"procEpoch", v.ProcEpoch(),
 				"blHash", p.ctx.BlockHash.Hex(),
 				"err", err,
+				"tx", msg.TxHash().Hex(),
 			)
 		} else {
 			log.Info("Validator sync: success",
@@ -246,6 +238,7 @@ func (p *Processor) Call(caller Ref, toAddr common.Address, value *big.Int, msg 
 				"creator", v.Creator().Hex(),
 				"procEpoch", v.ProcEpoch(),
 				"blHash", p.ctx.BlockHash.Hex(),
+				"tx", msg.TxHash().Hex(),
 			)
 		}
 	case operation.Exit:
@@ -739,8 +732,12 @@ func (p *Processor) validatorActivate(op operation.ValidatorSync) ([]byte, error
 	validator.ResetDepositTxs()
 
 	opEra := p.blockchain.EpochToEra(op.ProcEpoch())
-
-	validator.SetActivationEra(opEra.Number + postpone)
+	opEraNr := opEra.Number
+	if p.blockchain.Config().IsForkSlotValSyncProc(p.ctx.Slot) {
+		//use current block era
+		opEraNr = p.ctx.Era
+	}
+	validator.SetActivationEra(opEraNr + postpone)
 	validator.SetIndex(op.Index())
 	validator.UnsetStake()
 	err = p.Storage().SetValidator(p.state, validator)
@@ -787,7 +784,7 @@ func (p *Processor) validatorDeactivate(op operation.ValidatorSync) ([]byte, err
 	validator = p.updateValidatorVersionBySlot(validator)
 	validator.SetExitTx(nil)
 
-	exitEra := opEra.Number + postpone
+	exitEra := opEraNr + postpone
 	validator.SetExitEra(exitEra)
 	err = p.Storage().SetValidator(p.state, validator)
 	if err != nil {
@@ -807,7 +804,161 @@ func (p *Processor) validatorDeactivate(op operation.ValidatorSync) ([]byte, err
 	return op.Creator().Bytes(), nil
 }
 
+// checkAndFixActivationStatus checks and fix activity status by op data while update balance operation.
+func (p *Processor) checkAndFixActivationStatus(op operation.ValidatorSync) error {
+	if op.Version() < operation.Ver2 {
+		return nil
+	}
+
+	validator, err := p.Storage().GetValidator(p.state, op.Creator())
+	if err != nil {
+		return err
+	}
+	if validator == nil {
+		return ErrUnknownValidator
+	}
+
+	currEpoch := p.blockchain.GetSlotInfo().SlotToEpoch(p.ctx.Slot)
+
+	//check and fix activation
+	if validator.GetActivationEra() == math.MaxUint64 &&
+		op.ActivationEpoch() < math.MaxUint64 &&
+		currEpoch > op.ActivationEpoch() &&
+		op.ActivationEpoch() > 0 {
+		activationSlot, err := p.blockchain.GetSlotInfo().SlotOfEpochStart(op.ActivationEpoch())
+		if err != nil {
+			return err
+		}
+		// check is activation is expired
+		fixActivation := p.ctx.Slot >= activationSlot+p.blockchain.Config().ValidatorOpExpireSlots
+
+		log.Info("Validator fix activation: run",
+			"fixActivation", fixActivation,
+			"activationSlot", activationSlot,
+			"expireSlots", p.blockchain.Config().ValidatorOpExpireSlots,
+			"blSlot", p.ctx.Slot,
+			"blEra", p.ctx.Era,
+			"blHash", p.ctx.BlockHash.Hex(),
+			"op", op.Print(),
+		)
+
+		//run activation procedure
+		if fixActivation {
+			//update current validator's data version
+			validator = p.updateValidatorVersionBySlot(validator)
+			validator.ResetDepositTxs()
+
+			activateEra := p.ctx.Era + postpone
+			validator.SetActivationEra(activateEra)
+			validator.SetIndex(op.Index())
+			validator.UnsetStake()
+			err = p.Storage().SetValidator(p.state, validator)
+			if err != nil {
+				log.Error("Validator fix activation: set validator failed",
+					"fixActivation", fixActivation,
+					"blHash", p.ctx.BlockHash.Hex(),
+					"op", op.Print(),
+					"err", err,
+				)
+				return err
+			}
+
+			p.Storage().AddValidatorToList(p.state, op.Index(), op.Creator())
+
+			//add tx log
+			logData, err := txlog.PackActivateLogData(op.InitTxHash(), op.Creator(), op.ProcEpoch(), op.Index())
+			if err != nil {
+				log.Error("Validator fix activation: pack log data failed",
+					"fixActivation", fixActivation,
+					"blHash", p.ctx.BlockHash.Hex(),
+					"op", op.Print(),
+					"err", err,
+				)
+				return err
+			}
+			p.eventEmmiter.AddActivateLog(p.GetValidatorsStateAddress(), logData, op.Creator(), op.InitTxHash())
+
+			log.Info("Validator fix activation: success",
+				"fixActivation", fixActivation,
+				"activateEra", activateEra,
+				"blHash", p.ctx.BlockHash.Hex(),
+				"op", op.Print(),
+			)
+		}
+	}
+
+	//check and fix deactivation
+	if validator.GetExitEra() == math.MaxUint64 &&
+		op.ExitEpoch() < math.MaxUint64 && currEpoch > op.ExitEpoch() &&
+		validator.GetActivationEra() < p.ctx.Era &&
+		op.ExitEpoch() > 0 {
+		exitSlot, err := p.blockchain.GetSlotInfo().SlotOfEpochStart(op.ExitEpoch())
+		if err != nil {
+			return err
+		}
+		// check is activation is expired
+		fixDeactivation := p.ctx.Slot >= exitSlot+p.blockchain.Config().ValidatorOpExpireSlots
+
+		log.Info("Validator fix deactivation: run",
+			"fixDeactivation", fixDeactivation,
+			"exitSlot", exitSlot,
+			"expireSlots", p.blockchain.Config().ValidatorOpExpireSlots,
+			"blSlot", p.ctx.Slot,
+			"blEra", p.ctx.Era,
+			"blHash", p.ctx.BlockHash.Hex(),
+			"op", op.Print(),
+		)
+
+		//run activation procedure
+		if fixDeactivation {
+			//update current validator's data version
+			validator = p.updateValidatorVersionBySlot(validator)
+			validator.SetExitTx(nil)
+
+			exitEra := p.ctx.Era + postpone
+			validator.SetExitEra(exitEra)
+			err = p.Storage().SetValidator(p.state, validator)
+			if err != nil {
+				log.Error("Validator fix deactivation: set validator failed",
+					"fixDeactivation", fixDeactivation,
+					"blHash", p.ctx.BlockHash.Hex(),
+					"op", op.Print(),
+					"err", err,
+				)
+				return err
+			}
+
+			//add tx log
+			logData, err := txlog.PackDeactivateLogData(op.InitTxHash(), op.Creator(), op.ProcEpoch(), op.Index())
+			if err != nil {
+				log.Error("Validator fix deactivation: pack log data failed",
+					"fixDeactivation", fixDeactivation,
+					"blHash", p.ctx.BlockHash.Hex(),
+					"op", op.Print(),
+					"err", err,
+				)
+				return err
+			}
+			p.eventEmmiter.AddDeactivateLog(p.GetValidatorsStateAddress(), logData, op.Creator(), op.InitTxHash())
+
+			log.Info("Validator fix deactivation: success",
+				"fixDeactivation", fixDeactivation,
+				"exitEra", exitEra,
+				"blHash", p.ctx.BlockHash.Hex(),
+				"op", op.Print(),
+			)
+		}
+	}
+
+	return nil
+}
+
 func (p *Processor) validatorUpdateBalance(op operation.ValidatorSync) ([]byte, error) {
+	if p.blockchain.Config().IsForkSlotValSyncProc(p.ctx.Slot) {
+		// fixes lost activate/deactivate operations
+		p.checkAndFixActivationStatus(op)
+	}
+
 	valAddress := op.Creator()
 	validator, err := p.Storage().GetValidator(p.state, valAddress)
 	if err != nil {
@@ -947,6 +1098,13 @@ func (p *Processor) validatorUpdateBalance(op operation.ValidatorSync) ([]byte, 
 			}
 		}
 	} else if validator.HasDelegatingStake() {
+		if p.blockchain.Config().IsForkSlotValSyncProc(p.ctx.Slot) {
+			// update validator data
+			err = p.Storage().SetValidator(p.state, validator)
+			if err != nil {
+				return nil, err
+			}
+		}
 		// Handle delegate rules
 		return p.applyDelegatingStakeRules(op, validator)
 	} else {
@@ -981,13 +1139,8 @@ func (p *Processor) validatorUpdateBalance(op operation.ValidatorSync) ([]byte, 
 
 func (p *Processor) applyDelegatingStakeRules(op operation.ValidatorSync, validator *valStore.Validator) ([]byte, error) {
 	log.Info("Validator update balance: apply delegate rules: start",
-		"opCode", op.OpCode(),
-		"InitTxHash", op.InitTxHash().Hex(),
-		"amount", op.Amount().String(),
-		"balance", op.Balance().String(),
-		"procEpoch", op.ProcEpoch(),
-		"vIndex", op.Index(),
-		"creator", op.Creator().Hex(),
+		"slot", p.ctx.Slot,
+		"op", op.Print(),
 		"blHash", p.ctx.BlockHash.Hex(),
 	)
 
