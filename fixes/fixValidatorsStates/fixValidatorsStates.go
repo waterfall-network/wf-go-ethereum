@@ -45,6 +45,10 @@ func GetFixValidatorSyncOps(bc blockChain, currEpoch uint64) []*types.ValidatorS
 	si := bc.GetSlotInfo()
 	bcConf := bc.Config()
 	forkEpoch := si.SlotToEpoch(bcConf.ForkSlotValSyncProc)
+	// procEpoch is the epoch at which the fix ops will be executed.
+	// During the window [forkEpoch, procEpoch), the ops are repeatedly injected into the
+	// not-processed pool on every finalization so that all nodes have time to receive them
+	// before execution. Actual processing happens when currEpoch reaches procEpoch.
 	procEpoch := forkEpoch + 4
 
 	if currEpoch < forkEpoch || currEpoch >= procEpoch {
@@ -59,8 +63,8 @@ func GetFixValidatorSyncOps(bc blockChain, currEpoch uint64) []*types.ValidatorS
 		ops = mainnetFixData
 	}
 
-	res = make([]*types.ValidatorSync, len(ops))
-	for i, op := range ops {
+	res = make([]*types.ValidatorSync, 0, len(ops))
+	for _, op := range ops {
 		//check init tx lookup entry
 		if op.TxBlock != (common.Hash{}) {
 			if txBlock := bc.GetTxBlockHash(op.InitTxHash); txBlock != op.TxBlock {
@@ -70,7 +74,7 @@ func GetFixValidatorSyncOps(bc blockChain, currEpoch uint64) []*types.ValidatorS
 				}
 			}
 		}
-		res[i] = op.CreateValidatorSync(procEpoch)
+		res = append(res, op.CreateValidatorSync(procEpoch))
 	}
 	log.Info("Fix validator sync: add sync ops",
 		"currEpoch", currEpoch,
@@ -85,14 +89,14 @@ func restoreLookupEntry(bc blockChain, blHash common.Hash) error {
 	block := bc.GetBlockByHash(blHash)
 	if block == nil {
 		log.Error("Fix validator sync: update tx lookup entry: no block", "blHash", blHash.Hex())
-		return fmt.Errorf("Fix validator sync: update tx lookup entry: no block")
+		return fmt.Errorf("fix validator sync: update tx lookup entry: no block")
 	}
 	receipts := bc.GetReceiptsByHash(blHash)
 	for i, tx := range block.Transactions() {
 		receipt := receipts[i]
 		if receipt == nil {
 			log.Error("Fix validator sync: update tx lookup entry: no receipt", "blNr", block.Nr(), "blHash", blHash.Hex(), "txI", i, "txHash", tx.Hash())
-			return fmt.Errorf("Fix validator sync: update tx lookup entry: no receipt")
+			return fmt.Errorf("fix validator sync: update tx lookup entry: no receipt")
 		}
 		log.Info("Fix validator sync: update tx lookup entry", "blNr", block.Nr(), "blHash", blHash.Hex(), "txI", i, "txHash", tx.Hash())
 		bc.WriteTxLookupEntry(i, tx.Hash(), block.Hash(), receipt.Status)
