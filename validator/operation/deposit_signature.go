@@ -28,8 +28,7 @@ type DepositMessage struct {
 }
 
 func (d *DepositMessage) GetTree() (*ssz.Node, error) {
-	//TODO implement me
-	panic("implement me")
+	return ssz.ProofTree(d)
 }
 
 // SizeSSZ returns the ssz encoded size in bytes for the DepositMessage object
@@ -75,14 +74,70 @@ func (d *DepositMessage) HashTreeRootWith(hh ssz.HashWalker) (err error) {
 	return
 }
 
+type DepositMessageWithDelegate struct {
+	PublicKey             []byte
+	CreatorAddress        []byte
+	WithdrawalCredentials []byte
+	Amount                uint64
+	DelegateHash          []byte
+}
+
+func (d *DepositMessageWithDelegate) GetTree() (*ssz.Node, error) {
+	return ssz.ProofTree(d)
+}
+
+// SizeSSZ returns the ssz encoded size in bytes for the DepositMessageWithDelegate object
+func (d *DepositMessageWithDelegate) SizeSSZ() (size int) {
+	size = 128
+	return
+}
+
+// HashTreeRoot ssz hashes the DepositMessage object
+func (d *DepositMessageWithDelegate) HashTreeRoot() ([32]byte, error) {
+	return ssz.HashWithDefaultHasher(d)
+}
+
+// HashTreeRootWith ssz hashes the DepositMessage object with a hasher
+func (d *DepositMessageWithDelegate) HashTreeRootWith(hh ssz.HashWalker) error {
+	indx := hh.Index()
+
+	// Field (0) 'PublicKey'
+	if len(d.PublicKey) != 48 {
+		return ssz.ErrBytesLength
+	}
+	hh.PutBytes(d.PublicKey)
+
+	// Field (1) 'CreatorAddress'
+	if len(d.CreatorAddress) != 20 {
+		return ssz.ErrBytesLength
+	}
+	hh.PutBytes(d.CreatorAddress)
+
+	// Field (2) 'WithdrawalCredentials'
+	if len(d.WithdrawalCredentials) != 20 {
+		return ssz.ErrBytesLength
+	}
+	hh.PutBytes(d.WithdrawalCredentials)
+
+	// Field (3) 'Amount'
+	hh.PutUint64(d.Amount)
+
+	// Field (4) 'DelegateRules'
+
+	hh.PutBytes(d.DelegateHash)
+
+	hh.Merkleize(indx)
+
+	return nil
+}
+
 type SigningData struct {
 	ObjectRoot []byte
 	Domain     []byte
 }
 
 func (s *SigningData) GetTree() (*ssz.Node, error) {
-	//TODO implement me
-	panic("implement me")
+	return ssz.ProofTree(s)
 }
 
 // SizeSSZ returns the ssz encoded size in bytes for the SigningData object
@@ -130,6 +185,41 @@ func VerifyDepositSig(
 		WithdrawalCredentials: withdrawalCred.Bytes(),
 		Amount:                0,
 	}
+	sigDataRoot, err := sigData.HashTreeRoot()
+	if err != nil {
+		return err
+	}
+	root, err := (&SigningData{ObjectRoot: sigDataRoot[:], Domain: depositDomain()}).HashTreeRoot()
+	if err != nil {
+		return err
+	}
+	isValid := bls_sig.VerifyCompressed(sig[:], pk[:], root[:])
+	if !isValid {
+		return ErrInvalidDepositSig
+	}
+	return nil
+}
+
+func VerifyDepositSigWithDelegate(
+	sig common.BlsSignature,
+	pk common.BlsPubKey,
+	creatorAddr common.Address,
+	withdrawalCred common.Address,
+	data *DelegatingStakeData,
+) error {
+	delegateHash, err := computeDelegateHash(data)
+	if err != nil {
+		return err
+	}
+
+	sigData := &DepositMessageWithDelegate{
+		PublicKey:             pk.Bytes(),
+		CreatorAddress:        creatorAddr.Bytes(),
+		WithdrawalCredentials: withdrawalCred.Bytes(),
+		Amount:                0,
+		DelegateHash:          delegateHash,
+	}
+
 	sigDataRoot, err := sigData.HashTreeRoot()
 	if err != nil {
 		return err

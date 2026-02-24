@@ -24,10 +24,14 @@ package operation
 import (
 	"bytes"
 	"encoding/binary"
+	"encoding/json"
 	"errors"
 	"fmt"
+	"sort"
+	"strings"
 
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/crypto"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/log"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/rlp"
 )
@@ -208,4 +212,86 @@ func minDelegatingStakeDataLen() int {
 		log.Crit("Validator: calc min delegate stake binary data length failed")
 	}
 	return len(emptyBin)
+}
+
+func normalizeDelegateData(data *DelegatingStakeData) map[string]interface{} {
+	return map[string]interface{}{
+		"rules":        normalizeRules(&data.Rules),
+		"trial_period": data.TrialPeriod,
+		"trial_rules":  normalizeRules(&data.TrialRules),
+	}
+}
+
+func normalizeRules(rules *DelegatingStakeRules) map[string]interface{} {
+	exit := make([]string, len(rules.Exit()))
+	for i, addr := range rules.Exit() {
+		exit[i] = strings.ToLower(addr.Hex())
+	}
+
+	withdrawal := make([]string, len(rules.Withdrawal()))
+	for i, addr := range rules.Withdrawal() {
+		withdrawal[i] = strings.ToLower(addr.Hex())
+	}
+
+	return map[string]interface{}{
+		"exit":         exit,
+		"profit_share": normalizeAddressMap(rules.ProfitShare()),
+		"stake_share":  normalizeAddressMap(rules.StakeShare()),
+		"withdrawal":   withdrawal,
+	}
+}
+
+func normalizeAddressMap(data map[common.Address]uint8) map[string]uint8 {
+	result := make(map[string]uint8, len(data))
+	for addr, v := range data {
+		result[strings.ToLower(addr.Hex())] = v
+	}
+	return result
+}
+
+// toCanonicalJSON returns compact JSON with recursively sorted object keys,
+// matching the JS toCanonicalJson function used for hash computation.
+func toCanonicalJSON(v interface{}) string {
+	switch val := v.(type) {
+	case map[string]interface{}:
+		keys := make([]string, 0, len(val))
+		for k := range val {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		parts := make([]string, 0, len(keys))
+		for _, k := range keys {
+			keyJSON, _ := json.Marshal(k)
+			parts = append(parts, string(keyJSON)+":"+toCanonicalJSON(val[k]))
+		}
+		return "{" + strings.Join(parts, ",") + "}"
+	case map[string]uint8:
+		keys := make([]string, 0, len(val))
+		for k := range val {
+			keys = append(keys, k)
+		}
+		sort.Strings(keys)
+		parts := make([]string, 0, len(keys))
+		for _, k := range keys {
+			keyJSON, _ := json.Marshal(k)
+			parts = append(parts, string(keyJSON)+":"+fmt.Sprintf("%d", val[k]))
+		}
+		return "{" + strings.Join(parts, ",") + "}"
+	case []string:
+		parts := make([]string, len(val))
+		for i, s := range val {
+			b, _ := json.Marshal(s)
+			parts[i] = string(b)
+		}
+		sort.Strings(parts)
+		return "[" + strings.Join(parts, ",") + "]"
+	default:
+		b, _ := json.Marshal(val)
+		return string(b)
+	}
+}
+
+func computeDelegateHash(delegateData *DelegatingStakeData) ([]byte, error) {
+	canonical := strings.ToLower(toCanonicalJSON(normalizeDelegateData(delegateData)))
+	return crypto.Keccak256([]byte(canonical)), nil
 }
