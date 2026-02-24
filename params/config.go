@@ -499,7 +499,7 @@ func OverrideTestnet5(conf *ChainConfig) *ChainConfig {
 	conf.ForkSlotValSyncProc = 2048
 	//conf.StartEpochsPerEra = 0
 	//conf.AcceptCpRootOnFinEpoch = nil
-	conf.ForkSlotUpValsPerSlot = 512
+	conf.ForkSlotUpValsPerSlot = 0
 	conf.UpValidatorsPerSlot = 25
 
 	return conf
