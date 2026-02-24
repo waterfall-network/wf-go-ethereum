@@ -406,6 +406,11 @@ func fixMainnet0_setFailedValSyncOps(bc *BlockChain) error {
 		return nil
 	}
 
+	lastFinNr := bc.GetLastFinalizedNumber()
+	if bc.Config().IsForkSlotValSyncProc(lastFinNr) {
+		return nil
+	}
+
 	for _, valSyncOp := range failedOpsByInitTx {
 		valSyncOp.ProcEpoch = 0
 		if valSyncOp.TxHash == nil {
@@ -433,6 +438,11 @@ func fixMainnet0_FixValidatorSyncOpProcessing(bc *BlockChain, p *validator.Proce
 		return false, nil, nil
 	}
 
+	blkCtx := p.GetBlockContext()
+	if bc.Config().IsForkSlotValSyncProc(blkCtx.Slot) {
+		return false, nil, nil
+	}
+
 	switch v := opData.(type) {
 	case operation.ValidatorSync:
 		txValSyncOp, ok := failedOpsByInitTx[v.InitTxHash()]
@@ -446,7 +456,6 @@ func fixMainnet0_FixValidatorSyncOpProcessing(bc *BlockChain, p *validator.Proce
 		}
 		bc.SetValidatorSyncData(txValSyncOp)
 
-		blkCtx := p.GetBlockContext()
 		log.Info("fixMainnet0_FixValidatorSyncOpProcessing: applied",
 			"OpType", txValSyncOp.OpType,
 			"ProcEpoch", txValSyncOp.ProcEpoch,
