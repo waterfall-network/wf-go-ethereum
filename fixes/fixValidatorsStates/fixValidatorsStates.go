@@ -1,8 +1,6 @@
 package fixValidatorsStates
 
 import (
-	"fmt"
-
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/log"
@@ -13,10 +11,8 @@ type blockChain interface {
 	GetSlotInfo() *types.SlotInfo
 	Config() *params.ChainConfig
 	Genesis() *types.Block
-	GetBlockByHash(hash common.Hash) *types.Block
-	WriteTxLookupEntry(txIndex int, txHash, blockHash common.Hash, receiptStatus uint64) bool
 	GetTxBlockHash(txHash common.Hash) common.Hash
-	GetReceiptsByHash(blHash common.Hash) types.Receipts
+	RestoreTxLookupEntries(blHash common.Hash) error
 }
 
 type FixOp struct {
@@ -68,8 +64,9 @@ func GetFixValidatorSyncOps(bc blockChain, currEpoch uint64) []*types.ValidatorS
 		//check init tx lookup entry
 		if op.TxBlock != (common.Hash{}) {
 			if txBlock := bc.GetTxBlockHash(op.InitTxHash); txBlock != op.TxBlock {
-				err := restoreLookupEntry(bc, op.TxBlock)
-				if err != nil {
+				if err := bc.RestoreTxLookupEntries(op.TxBlock); err != nil {
+					log.Error("GetFixValidatorSyncOps: restore tx lookup failed",
+						"err", err, "txBlock", op.TxBlock, "initTxHash", op.InitTxHash)
 					continue
 				}
 			}
@@ -83,23 +80,4 @@ func GetFixValidatorSyncOps(bc blockChain, currEpoch uint64) []*types.ValidatorS
 		"isMainnet", bc.Genesis().Hash() == params.MainnetGenesisHash,
 	)
 	return res
-}
-
-func restoreLookupEntry(bc blockChain, blHash common.Hash) error {
-	block := bc.GetBlockByHash(blHash)
-	if block == nil {
-		log.Error("Fix validator sync: update tx lookup entry: no block", "blHash", blHash.Hex())
-		return fmt.Errorf("fix validator sync: update tx lookup entry: no block")
-	}
-	receipts := bc.GetReceiptsByHash(blHash)
-	for i, tx := range block.Transactions() {
-		receipt := receipts[i]
-		if receipt == nil {
-			log.Error("Fix validator sync: update tx lookup entry: no receipt", "blNr", block.Nr(), "blHash", blHash.Hex(), "txI", i, "txHash", tx.Hash())
-			return fmt.Errorf("fix validator sync: update tx lookup entry: no receipt")
-		}
-		log.Info("Fix validator sync: update tx lookup entry", "blNr", block.Nr(), "blHash", blHash.Hex(), "txI", i, "txHash", tx.Hash())
-		bc.WriteTxLookupEntry(i, tx.Hash(), block.Hash(), receipt.Status)
-	}
-	return nil
 }

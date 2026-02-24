@@ -134,17 +134,12 @@ type MockblockChain struct {
 	recorder *MockblockChainMockRecorder
 }
 
-func (m *MockblockChain) WriteTxLookupEntry(txIndex int, txHash, blockHash common.Hash, receiptStatus uint64) bool {
-	//TODO implement me
-	panic("implement me")
-}
-
 func (m *MockblockChain) GetTxBlockHash(txHash common.Hash) common.Hash {
 	//TODO implement me
 	panic("implement me")
 }
 
-func (m *MockblockChain) GetReceiptsByHash(blHash common.Hash) types.Receipts {
+func (m *MockblockChain) RestoreTxLookupEntries(blHash common.Hash) error {
 	//TODO implement me
 	panic("implement me")
 }

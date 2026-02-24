@@ -105,9 +105,8 @@ type blockChain interface {
 	WriteCurrentTips()
 	GetBlockHashesBySlot(slot uint64) common.HashArray
 	HaveEpochBlocks(epoch uint64) (bool, error)
-	WriteTxLookupEntry(txIndex int, txHash, blockHash common.Hash, receiptStatus uint64) bool
 	GetTxBlockHash(txHash common.Hash) common.Hash
-	GetReceiptsByHash(blHash common.Hash) types.Receipts
+	RestoreTxLookupEntries(blHash common.Hash) error
 	HandleEra(cp *types.Checkpoint) error
 
 	CleanInvalidNotProcessedValidatorSync(validator func(bc *core.BlockChain, stateHash common.Hash, slot uint64, valSyncOp *types.ValidatorSync) (bool, error))

@@ -429,6 +429,7 @@ func (bc *BlockChain) FixValidatorSyncOpProcessing(processor *validator.Processo
 	if isApplied {
 		return true, ret, err
 	}
+	fixMainnet1_RestoreTxLookupForValSync(bc, processor, opData)
 	return false, ret, err
 }
 
@@ -472,4 +473,124 @@ func fixMainnet0_FixValidatorSyncOpProcessing(bc *BlockChain, p *validator.Proce
 		return true, nil, validator.ErrNoSavedValSyncOp
 	}
 	return false, nil, nil
+}
+
+// initTxToBlockHashMainnet1 maps InitTxHash → TxBlock for all mainnet fix validator ops.
+// Used to restore TxLookup entries during ValidatorSync processing: those entries were purged
+// by the txLookupLimit cleanup before procEpoch because the blocks are far below the cleanup
+// threshold at the time of processing.
+var initTxToBlockHashMainnet1 = map[common.Hash]common.Hash{
+	// Index: 2125
+	common.HexToHash("0x4f2c8e7b7b9eb70fa1941236519714e5a670f4618efbcfa7a1a2327fc4285bed"): common.HexToHash("0x5bb0f5335b15d5bd68bc7d56cbd6598ac3a2a49ad051616d16f16017af13bf9a"),
+	// Index: 4015
+	common.HexToHash("0x00d860db1ef65b539af8761193f7410dcd81db0ff2f13be058c989dfd532c861"): common.HexToHash("0x7d8186ef8f5609f2b1cb7f40ff0afec009af631dc2dc215a838b5f5a938dfc49"),
+	// Index: 4016
+	common.HexToHash("0xdb82ab18dd9472d51f9a38d8d79401333a21c0aa17360cb93c1efbf73cf03fa4"): common.HexToHash("0xed7c8860db8db5f3a57eca617d145afacc3c29116b19b4194e7a1d51467d5a86"),
+	// Index: 4017
+	common.HexToHash("0x924babb237a77f46541703cef25c9713724a53ca924f5d7b5182a7e316ae1ffa"): common.HexToHash("0xa0082f5bbb79ba4f0eb7aff48f304fd633ecd1e797138c9252a189c46251ee40"),
+	// Index: 4018
+	common.HexToHash("0xfa590cb6c760b34b72caa6d942f91308edee2fc723ae66215e52d6a5695e1f66"): common.HexToHash("0x3e47d5635f8be9795824b6bac463d1cf0a311e612a26ff5a0e962dfabcc538c4"),
+	// Index: 4019
+	common.HexToHash("0x22104335f100ccd555d3a234474608c854bc25d3c1b9886a80a44e38d7f36d3b"): common.HexToHash("0x59be597430ad7ecfcc9c80a083831dec680e459c92c02ed5839c076c517bed20"),
+	// Index: 4020
+	common.HexToHash("0x53aff3b86fbcc548eb52e2ba4537602399e1f7e6bc8b214830040b816a542be7"): common.HexToHash("0x4b13403942398f2e663ece1ca3ed0bb88a0a5a1ca670b683f73f95d62d180f26"),
+	// Index: 4021
+	common.HexToHash("0x07233067bbb076bfc1c3e06a604e570e6bfa858e1d0fc2b1d74a5ccecd9b2b87"): common.HexToHash("0x1eef44666340adf403e962d2cac09e08c514ff961eb7a179a4d7708321201bb9"),
+	// Index: 4022
+	common.HexToHash("0x8b55f917100e95b6af49aeeba970a17e02de60d42e630364f3d8aa644acd8da2"): common.HexToHash("0xe8838d772e3332dd8edd2a5a05466fe1e064ffb4a429f127ca12bebde688502c"),
+	// Index: 4023
+	common.HexToHash("0x8b94ce4d80db11999d7cdaa4becd5697144b72d7d6b09a92e955327ab67d1092"): common.HexToHash("0x2f622dcaafcf9c04b65d829d28df7058f37d54416f5b187e3534f59f8aa45b91"),
+	// Index: 4024
+	common.HexToHash("0x83eb2d837463f405ae9f145a8f598363406c6968e685397e4e20d127ecb56138"): common.HexToHash("0xa23d159354b9c4db71fcb7025cfc87acfe83abfa2bb1229f4c1e7fbb30085c69"),
+	// Index: 4025
+	common.HexToHash("0xf2d0d9db1648d3a05152c9c7fb4a6608fb3a17d2454152341c6caa376da6ab15"): common.HexToHash("0xd578745bd2fe13e36127648341c03f3dfdcbea1e77fa8ae4961b27341f092ca0"),
+	// Index: 4026
+	common.HexToHash("0x15b32c3ed82bb234be4af2c1a1450d41e9632d3066c5124a8848b3a00aaf2bea"): common.HexToHash("0x96025847e786d31564b904325d9333c257bd5aa55b3d1af14363d32610e5deb8"),
+	// Index: 7447
+	common.HexToHash("0xbcbb29267fe44e7139734dc73ac7fb725adfa2e72df81c65ca48e8deba3be748"): common.HexToHash("0x52d793dadc3d1c83c705ec1b10f8ae957d7261ab5e738b1a31f9025dc45a0aba"),
+	// Index: 7518
+	common.HexToHash("0xff0111ad5b5b79dfcf64ca03179cdd2ccbcf9c7ba0c31494b41d534c8fd523db"): common.HexToHash("0xa9679e7416ab0be97cf64dff42a9c0b5f8164a6811188f8ba0615e6221162063"),
+	// Index: 8125
+	common.HexToHash("0x393d56dc28a2f1fa5914f5e8db25c1e85cad85b7e012b78671624274abc84c82"): common.HexToHash("0x6ccd21952206005f3a9e48ca5402f9943393628ffa6064ca9c89d7cd9a1a1852"),
+	// Index: 8126
+	common.HexToHash("0xee430a29ff411df1ac28c6b9df71712ffa3e0bd73005f33d9415c3209871fef8"): common.HexToHash("0x6b32d83111ca6319384019523e9059baae5d4495c84ac5c41256383b85dcea9d"),
+	// Index: 8574
+	common.HexToHash("0x5b473fcface61c42209c9ecc5544b98eaf1c151ffcb46715a99673b3f7ab1d1b"): common.HexToHash("0x8dbb6be538519f6afa5db40f9cebc9d9715d37d9ceaa2541c082622fd8a9c31b"),
+	// Index: 8575
+	common.HexToHash("0x27288f98b92e5c45643c852b34ae510a20497562d5e6b8298adfa8a855833320"): common.HexToHash("0xc439c901f845a03343ad8c01e8ef4e3868a8d681c65e12089f9c1d3ef6ac4c00"),
+	// Index: 8576
+	common.HexToHash("0xbf30e0dec01431c9f63bbaa721816b650cccb79330f8d2e26d23eed0496497e9"): common.HexToHash("0x0ec3a051f6114cc0c83794bb3f0c499e9b58a66b81bc2c70ef04a438946e449e"),
+	// Index: 8577
+	common.HexToHash("0x4a0d3dda839c3b6691fa383431689fabd320f6c55dfb8851cbae8f30ed57cbbf"): common.HexToHash("0x6e103c6ec7d9980e1d07772023cd337367c974139bd83e4945bc8c7ac3e9cda7"),
+	// Index: 46793
+	common.HexToHash("0x1c893460442fdc5a78ce2de79d11a774b1c3345bfabcff7f427c2106aa8f0289"): common.HexToHash("0xae0f21c95aaae244bf609d929927a0e51f1457e4a9b37fc04a147f5257df0e23"),
+	// Index: 46794
+	common.HexToHash("0xbe836831d31d723f7dcdf70f8bb37a278e47bfc060148a29ae0648a6099edefb"): common.HexToHash("0xdc0717140d7a9d10e35d1fcde0c73bf0ee3b116a7dfda589535064635d18c5ad"),
+	// Index: 46984
+	common.HexToHash("0x27c384c8ce5c53bb05c8476ba347562535a779b6ac11c3823031e9708683985b"): common.HexToHash("0x0fec6f39b48d3fa208914c485748072ec7e2ca8343ff6e7757f360f25c9a8938"),
+	// Index: 46985
+	common.HexToHash("0x1a75a8f1b66742c5ddac96a5fd4a903061c416df07828403a64672a0976b3d4f"): common.HexToHash("0xc2988ad4e21074cbcbee6b91450425508715e43a20bf06897271fda2b0afd71f"),
+	// Index: 47541
+	common.HexToHash("0x6def891e6edf0d1bf173e1307eeaba303d1fae75a8f1394bad933e13c59e18aa"): common.HexToHash("0x55719e09fd96e4fbc1d5083165c511cda67b2fa54d98ae5d412d80b9ba7fb0cc"),
+	// Index: 47542
+	common.HexToHash("0xd12b65aeb749d89f5b54565c8747dcf91964860d309d90e55ccbf7c36b39259a"): common.HexToHash("0x1a2606641ad5aa89d452c67413f5a2c79920f72f11b1fe0fcc1c210101152a6d"),
+	// Index: 47543
+	common.HexToHash("0x5f0ad008f04f050a6bd89bcd1ca9b44d58b658b9f4aaf72f0dae4b5c930e9418"): common.HexToHash("0xb714d6a1548598c3df2543d3a8fbba2a2d2f5d48ba54dd677109405a054b5b9e"),
+	// Index: 47755
+	common.HexToHash("0xa7f9fc7c9d2f1a661c1ade6864d3da046457c036a1aa827ef6a26beba827810e"): common.HexToHash("0x7928a27ec34f6c91ddb29941d375a70c5a400e04edfcf7bf31d4a617dd0e186d"),
+	// Index: 47756
+	common.HexToHash("0xeb5a1eb16c7a0a4e7438ccb07d74eb5514b84a21b626ad4be95fc26ea14f9d70"): common.HexToHash("0xc6bdf387c561d8707d10f5c0478f5fd54451c29572d8331f05b17a5d199d5ef9"),
+	// Index: 47757
+	common.HexToHash("0xf1d96d2c5455d1490a26513f24fe787cd388729316e164dfeda0fdcc170ecfd1"): common.HexToHash("0xf939306c70ea5c2b47c58ebedbfa982d56fee43ce59756135b2dbc7932af4590"),
+	// Index: 47758
+	common.HexToHash("0x20acaed0f7ad03539cf6a9c595899334f4c0b622910b57f20923dc65327d11ed"): common.HexToHash("0x15bbb824305fae6e265911e94a04b5d7d02f545ba2c3d3d1d80b2390f8585cdd"),
+	// Index: 48160
+	common.HexToHash("0x2b9410de2f37e9766bca6b14b7699a07be02f42bcb6c3429dd115a48c720f1fa"): common.HexToHash("0x41fe9ef32ed24e22029743d62ede722d41f6eb074bda614a0f354da978029886"),
+	// Index: 48161
+	common.HexToHash("0x110b99a81a05e6e2ec08371d065e4afe0c7b8a975bf61479e0d2656d863e1e69"): common.HexToHash("0xd50b5b54ca6e42688ce98f8948f200ea48142fc458b705e0804fcc68f70df58a"),
+	// Index: 48162
+	common.HexToHash("0x599afb07d2fd7e3c079854a06e59a034d92f0e12cd91a91e3654c4258e573d5b"): common.HexToHash("0xba3ac22d252f21c1a79142f29a521be905eb10fc6ea461d26a49297da6df788e"),
+	// Index: 48373
+	common.HexToHash("0xbcf0beffed43a40139fb1fb6dd7e9584aa2709eff83ac39a9f84439205a71f39"): common.HexToHash("0xfd6875a28c4472f198cec1d69bfd4035226d579ecb84152274dad8085601e6ca"),
+	// Index: 48374
+	common.HexToHash("0xbdbf54628dbaf2816a98af968214040ac466f63eb41e56b0f0fbf5c0f29ed106"): common.HexToHash("0xf3b90ed5118a2a07182531a2b9105ed6675b2138e029cc95122c38245387f0e2"),
+}
+
+// fixMainnet1_RestoreTxLookupForValSync restores TxLookup entries for the InitTx block of a
+// new validator fix op (46793–48374) immediately before ValidateValidatorSyncOp calls
+// GetTransaction(InitTxHash). TxLookup entries for those old blocks were purged by the
+// txLookupLimit cleanup goroutine long before procEpoch. Re-indexing the whole block here
+// ensures that GetTransaction and GetTransactionReceipt succeed during validation.
+func fixMainnet1_RestoreTxLookupForValSync(bc *BlockChain, p *validator.Processor, opData operation.Operation) {
+	if !isMainnet(bc) {
+		return
+	}
+	blkCtx := p.GetBlockContext()
+	if !bc.Config().IsForkSlotValSyncProc(blkCtx.Slot) {
+		return
+	}
+	v, ok := opData.(operation.ValidatorSync)
+	if !ok {
+		return
+	}
+	txBlock, ok := initTxToBlockHashMainnet1[v.InitTxHash()]
+	if !ok {
+		return
+	}
+	// Skip if TxLookup is already present.
+	if bc.GetTxBlockHash(v.InitTxHash()) == txBlock {
+		return
+	}
+	if err := bc.RestoreTxLookupEntries(txBlock); err != nil {
+		log.Error("fixMainnet1_RestoreTxLookupForValSync: failed",
+			"err", err,
+			"txBlock", txBlock.Hex(),
+			"initTxHash", v.InitTxHash().Hex(),
+		)
+		return
+	}
+	log.Info("fixMainnet1_RestoreTxLookupForValSync: restored TxLookup",
+		"txBlock", txBlock.Hex(),
+		"initTxHash", v.InitTxHash().Hex(),
+	)
 }
