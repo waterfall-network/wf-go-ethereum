@@ -17,9 +17,11 @@ type mockFixChain struct {
 	config          *params.ChainConfig
 	genesis         *types.Block
 	txBlockHashes   map[common.Hash]common.Hash
+	valSyncData     map[common.Hash]*types.ValidatorSync
 	restoreErr      error
 	restoreCalls    []common.Hash
 	getTxBlockCalls []common.Hash
+	setSyncCalls    []*types.ValidatorSync
 }
 
 func (m *mockFixChain) GetSlotInfo() *types.SlotInfo { return m.slotInfo }
@@ -33,6 +35,13 @@ func (m *mockFixChain) RestoreTxLookupEntries(blHash common.Hash) error {
 	m.restoreCalls = append(m.restoreCalls, blHash)
 	return m.restoreErr
 }
+func (m *mockFixChain) GetValidatorSyncData(initTxHash common.Hash) *types.ValidatorSync {
+	return m.valSyncData[initTxHash]
+}
+func (m *mockFixChain) SetValidatorSyncData(vs *types.ValidatorSync) {
+	m.setSyncCalls = append(m.setSyncCalls, vs)
+	m.valSyncData[vs.InitTxHash] = vs
+}
 
 // newMockFixChain creates a mock with the given forkSlot and SlotsPerEpoch=32.
 // The genesis block is non-mainnet.
@@ -42,6 +51,7 @@ func newMockFixChain(forkSlot uint64) *mockFixChain {
 		config:        &params.ChainConfig{ForkSlotValSyncProc: forkSlot},
 		genesis:       types.NewBlockWithHeader(&types.Header{}),
 		txBlockHashes: make(map[common.Hash]common.Hash),
+		valSyncData:   make(map[common.Hash]*types.ValidatorSync),
 	}
 }
 
@@ -307,5 +317,83 @@ func TestGetFixValidatorSyncOpsFromData_ProcEpochInResult(t *testing.T) {
 	const wantProcEpoch = uint64(14) // forkEpoch(10) + 4
 	if result[0].ProcEpoch != wantProcEpoch {
 		t.Errorf("ProcEpoch: got %d, want %d", result[0].ProcEpoch, wantProcEpoch)
+	}
+}
+
+func TestGetFixValidatorSyncOpsFromData_ZeroTxHash_Reset(t *testing.T) {
+	// Stored op has TxHash == zero hash (written by fixMainnet0).
+	// getFixValidatorSyncOpsFromData must reset TxHash→nil and ProcEpoch=procEpoch and save.
+	fixData, op := testFixData()
+	bc := newMockFixChain(320)
+	bc.txBlockHashes[op.InitTxHash] = op.InitTxBlock
+
+	zeroHash := common.Hash{}
+	bc.valSyncData[op.InitTxHash] = &types.ValidatorSync{
+		InitTxHash: op.InitTxHash,
+		OpType:     op.OpType,
+		Index:      op.Index,
+		Creator:    op.Creator,
+		TxHash:     &zeroHash,
+		ProcEpoch:  0,
+	}
+
+	result := getFixValidatorSyncOpsFromData(bc, 10, fixData)
+
+	if len(result) != 1 {
+		t.Fatalf("expected 1 op, got %d", len(result))
+	}
+	if len(bc.setSyncCalls) != 1 {
+		t.Fatalf("expected 1 SetValidatorSyncData call, got %d", len(bc.setSyncCalls))
+	}
+	saved := bc.setSyncCalls[0]
+	if saved.TxHash != nil {
+		t.Errorf("saved TxHash: got %v, want nil", saved.TxHash)
+	}
+	const wantProcEpoch = uint64(14)
+	if saved.ProcEpoch != wantProcEpoch {
+		t.Errorf("saved ProcEpoch: got %d, want %d", saved.ProcEpoch, wantProcEpoch)
+	}
+}
+
+func TestGetFixValidatorSyncOpsFromData_NonZeroTxHash_NotReset(t *testing.T) {
+	// Stored op has a real (non-zero) TxHash → must NOT be overwritten.
+	fixData, op := testFixData()
+	bc := newMockFixChain(320)
+	bc.txBlockHashes[op.InitTxHash] = op.InitTxBlock
+
+	realHash := common.HexToHash("0x1234000000000000000000000000000000000000000000000000000000000000")
+	bc.valSyncData[op.InitTxHash] = &types.ValidatorSync{
+		InitTxHash: op.InitTxHash,
+		OpType:     op.OpType,
+		Index:      op.Index,
+		Creator:    op.Creator,
+		TxHash:     &realHash,
+		ProcEpoch:  5,
+	}
+
+	result := getFixValidatorSyncOpsFromData(bc, 10, fixData)
+
+	if len(result) != 1 {
+		t.Fatalf("expected 1 op, got %d", len(result))
+	}
+	if len(bc.setSyncCalls) != 0 {
+		t.Errorf("expected no SetValidatorSyncData calls, got %d", len(bc.setSyncCalls))
+	}
+}
+
+func TestGetFixValidatorSyncOpsFromData_NilStoredOp_NotReset(t *testing.T) {
+	// No stored op → GetValidatorSyncData returns nil → no save.
+	fixData, op := testFixData()
+	bc := newMockFixChain(320)
+	bc.txBlockHashes[op.InitTxHash] = op.InitTxBlock
+	// valSyncData is empty
+
+	result := getFixValidatorSyncOpsFromData(bc, 10, fixData)
+
+	if len(result) != 1 {
+		t.Fatalf("expected 1 op, got %d", len(result))
+	}
+	if len(bc.setSyncCalls) != 0 {
+		t.Errorf("expected no SetValidatorSyncData calls, got %d", len(bc.setSyncCalls))
 	}
 }

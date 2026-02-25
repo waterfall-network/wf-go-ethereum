@@ -106,6 +106,8 @@ type blockChain interface {
 	HaveEpochBlocks(epoch uint64) (bool, error)
 	GetTxBlockHash(txHash common.Hash) common.Hash
 	RestoreTxLookupEntries(blHash common.Hash) error
+	GetValidatorSyncData(initTxHash common.Hash) *types.ValidatorSync
+	SetValidatorSyncData(validatorSync *types.ValidatorSync)
 	HandleEra(cp *types.Checkpoint) error
 
 	CleanInvalidNotProcessedValidatorSync(validator func(bc *core.BlockChain, stateHash common.Hash, slot uint64, valSyncOp *types.ValidatorSync) (bool, error))

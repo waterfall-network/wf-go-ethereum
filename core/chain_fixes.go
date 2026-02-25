@@ -28,8 +28,8 @@ func fixMainnet0_setFailedValSyncOps(bc *BlockChain) error {
 		return nil
 	}
 
-	lastFinNr := bc.GetLastFinalizedNumber()
-	if bc.Config().IsForkSlotValSyncProc(lastFinNr) {
+	lastFinSlot := bc.GetLastFinalizedHeader().Slot
+	if bc.Config().IsForkSlotValSyncProc(lastFinSlot) {
 		return nil
 	}
 
@@ -152,6 +152,8 @@ type fixValSyncChain interface {
 	Genesis() *types.Block
 	GetTxBlockHash(txHash common.Hash) common.Hash
 	RestoreTxLookupEntries(blHash common.Hash) error
+	GetValidatorSyncData(initTxHash common.Hash) *types.ValidatorSync
+	SetValidatorSyncData(validatorSync *types.ValidatorSync)
 }
 
 // FixOp describes a single validator fix operation.
@@ -199,6 +201,15 @@ func getFixValidatorSyncOpsFromData(bc fixValSyncChain, currEpoch uint64, fixDat
 	// before execution. Actual processing happens when currEpoch reaches procEpoch.
 	procEpoch := forkEpoch + 4
 
+	log.Info("Fix validator sync: add sync ops 000",
+		"retCond", currEpoch < forkEpoch || currEpoch >= procEpoch,
+		"currEpoch", currEpoch,
+		"forkEpoch", forkEpoch,
+		"procEpoch", procEpoch,
+		"isMainnet", bc.Genesis().Hash() == params.MainnetGenesisHash,
+		"fixData", len(fixData),
+	)
+
 	if currEpoch < forkEpoch || currEpoch >= procEpoch {
 		return []*types.ValidatorSync{}
 	}
@@ -213,11 +224,26 @@ func getFixValidatorSyncOpsFromData(bc fixValSyncChain, currEpoch uint64, fixDat
 						"err", err, "txBlock", op.InitTxBlock, "initTxHash", op.InitTxHash)
 					continue
 				}
+			} else {
+				log.Error("GetFixValidatorSyncOps: tx block not found", "txBlock", txBlock, "txBlock", op.InitTxBlock, "initTxHash", op.InitTxHash)
+				continue
 			}
 		}
+
+		// If the stored op has a zero TxHash (written by fixMainnet0), reset it so
+		// that it can be re-queued for processing at procEpoch.
+		if existing := bc.GetValidatorSyncData(op.InitTxHash); existing != nil {
+			if existing.TxHash != nil && *existing.TxHash == (common.Hash{}) {
+				existing.TxHash = nil
+				existing.ProcEpoch = procEpoch
+				bc.SetValidatorSyncData(existing)
+			}
+		}
+
 		res = append(res, op.CreateValidatorSync(procEpoch))
 	}
 	log.Info("Fix validator sync: add sync ops",
+		"fixData", len(fixData),
 		"currEpoch", currEpoch,
 		"forkEpoch", forkEpoch,
 		"procEpoch", procEpoch,
