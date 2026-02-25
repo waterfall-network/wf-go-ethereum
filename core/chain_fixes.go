@@ -224,9 +224,6 @@ func getFixValidatorSyncOpsFromData(bc fixValSyncChain, currEpoch uint64, fixDat
 						"err", err, "txBlock", op.InitTxBlock, "initTxHash", op.InitTxHash)
 					continue
 				}
-			} else {
-				log.Error("GetFixValidatorSyncOps: tx block not found", "txBlock", txBlock, "txBlock", op.InitTxBlock, "initTxHash", op.InitTxHash)
-				continue
 			}
 		}
 
