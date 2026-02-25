@@ -11,7 +11,7 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/operation"
 )
 
-// applyFixesOnStart to call while NewBlockChain to .
+// applyFixesOnStart to call while NewBlockChain.
 func applyFixesOnStart(bc *BlockChain) error {
 	if err := fixMainnet0_setFailedValSyncOps(bc); err != nil {
 		return err
@@ -34,17 +34,13 @@ func fixMainnet0_setFailedValSyncOps(bc *BlockChain) error {
 	}
 
 	for _, op := range mainnetValSyncFixData {
-		opTxHash := op.TxHash
-		if opTxHash == nil {
-			opTxHash = &common.Hash{}
-		}
 		vs := &types.ValidatorSync{
 			InitTxHash: op.InitTxHash,
 			OpType:     op.OpType,
 			ProcEpoch:  0,
 			Index:      op.Index,
 			Creator:    op.Creator,
-			TxHash:     opTxHash,
+			TxHash:     &common.Hash{},
 		}
 		bc.SetValidatorSyncData(vs)
 		log.Info("fixMainnet0_setFailedValSyncOps: applied", "op", vs.Print())
@@ -81,17 +77,13 @@ func fixMainnet0_FixValidatorSyncOpProcessing(bc *BlockChain, p *validator.Proce
 			return false, nil, nil
 		}
 		//1. set ValSync as done (to clear from caches)
-		opTxHash := op.TxHash
-		if opTxHash == nil {
-			opTxHash = &common.Hash{}
-		}
 		vs := &types.ValidatorSync{
 			InitTxHash: op.InitTxHash,
 			OpType:     op.OpType,
 			ProcEpoch:  0,
 			Index:      op.Index,
 			Creator:    op.Creator,
-			TxHash:     opTxHash,
+			TxHash:     &common.Hash{},
 		}
 		bc.SetValidatorSyncData(vs)
 
