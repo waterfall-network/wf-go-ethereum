@@ -181,6 +181,15 @@ func (f *FixOp) CreateValidatorSync(procEpoch uint64) *types.ValidatorSync {
 // GetFixValidatorSyncOps returns validator sync fix operations that must be injected
 // into the not-processed pool during the window [forkEpoch, forkEpoch+4).
 func GetFixValidatorSyncOps(bc fixValSyncChain, currEpoch uint64) []*types.ValidatorSync {
+	var fixData map[common.Hash]*FixOp
+	if bc.Genesis().Hash() == params.MainnetGenesisHash {
+		fixData = mainnetValSyncFixData
+	}
+	return getFixValidatorSyncOpsFromData(bc, currEpoch, fixData)
+}
+
+// getFixValidatorSyncOpsFromData is the testable core of GetFixValidatorSyncOps.
+func getFixValidatorSyncOpsFromData(bc fixValSyncChain, currEpoch uint64, fixData map[common.Hash]*FixOp) []*types.ValidatorSync {
 	si := bc.GetSlotInfo()
 	bcConf := bc.Config()
 	forkEpoch := si.SlotToEpoch(bcConf.ForkSlotValSyncProc)
@@ -192,11 +201,6 @@ func GetFixValidatorSyncOps(bc fixValSyncChain, currEpoch uint64) []*types.Valid
 
 	if currEpoch < forkEpoch || currEpoch >= procEpoch {
 		return []*types.ValidatorSync{}
-	}
-
-	var fixData map[common.Hash]*FixOp
-	if bc.Genesis().Hash() == params.MainnetGenesisHash {
-		fixData = mainnetValSyncFixData
 	}
 
 	res := make([]*types.ValidatorSync, 0, len(fixData))
