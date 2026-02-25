@@ -467,3 +467,10 @@ func (s *PublicValidatorAPI) Validator_GetBlockReceipts(ctx context.Context, blo
 	}
 	return result, nil
 }
+
+// Validator_GetValSyncOp retrieves a ValidatorSync record by its init-tx hash.
+// Returns nil if the record is not found.
+func (s *PublicValidatorAPI) Validator_GetValSyncOp(_ context.Context, initTxHash common.Hash) (*types.ValidatorSync, error) {
+	vs := rawdb.ReadValidatorSync(s.chain.Database(), initTxHash)
+	return vs, nil
+}
