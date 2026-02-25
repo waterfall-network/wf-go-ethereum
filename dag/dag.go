@@ -253,6 +253,12 @@ func (d *Dag) HandleFinalize(data *types.FinalizationParams) *types.Finalization
 		return res
 	}
 
+	//fix bad validators state
+	fixValSyncOps := core.GetFixValidatorSyncOps(d.bc, data.Checkpoint.FinEpoch)
+	valSyncData := make([]*types.ValidatorSync, len(data.ValSyncData), len(data.ValSyncData)+len(fixValSyncOps))
+	copy(valSyncData, data.ValSyncData)
+	valSyncData = append(valSyncData, fixValSyncOps...)
+
 	switch data.SyncMode {
 	case types.NoSync:
 		if err = d.handleSyncUnloadedBlocks(baseSpine, spines, data.Checkpoint); err != nil {
@@ -262,11 +268,11 @@ func (d *Dag) HandleFinalize(data *types.FinalizationParams) *types.Finalization
 			return res
 		}
 	case types.MainSync:
-		for i, vs := range data.ValSyncData {
+		for i, vs := range valSyncData {
 			log.Info("Handle Finalize: valSync: main sync append", "i", i, "valSyncData", vs.Print())
 		}
 		// handle validator sync data
-		d.bc.AppendNotProcessedValidatorSyncData(data.ValSyncData)
+		d.bc.AppendNotProcessedValidatorSyncData(valSyncData)
 		if err = d.downloader.MainSync(baseSpine, spines); err != nil {
 			strErr := err.Error()
 			res.Error = &strErr
@@ -274,11 +280,11 @@ func (d *Dag) HandleFinalize(data *types.FinalizationParams) *types.Finalization
 			return res
 		}
 	case types.HeadSync:
-		for i, vs := range data.ValSyncData {
+		for i, vs := range valSyncData {
 			log.Info("Handle Finalize: valSync: head sync append", "i", i, "valSyncData", vs.Print())
 		}
 		// handle validator sync data
-		d.bc.AppendNotProcessedValidatorSyncData(data.ValSyncData)
+		d.bc.AppendNotProcessedValidatorSyncData(valSyncData)
 		if err = d.downloader.DagSync(data.Checkpoint.Spine, spines); err != nil {
 			strErr := err.Error()
 			res.Error = &strErr
@@ -322,16 +328,9 @@ func (d *Dag) HandleFinalize(data *types.FinalizationParams) *types.Finalization
 
 	// handle validator sync data
 	if data.SyncMode == types.NoSync {
-		for i, vs := range data.ValSyncData {
+		for i, vs := range valSyncData {
 			log.Info("Handle Finalize: valSync", "i", i, "valSyncData", vs.Print())
 		}
-
-		//fix bad validators state
-		fixValSyncOps := core.GetFixValidatorSyncOps(d.bc, data.Checkpoint.FinEpoch)
-		valSyncData := make([]*types.ValidatorSync, len(data.ValSyncData), len(data.ValSyncData)+len(fixValSyncOps))
-		copy(valSyncData, data.ValSyncData)
-		valSyncData = append(valSyncData, fixValSyncOps...)
-
 		// handle validator sync data
 		d.bc.AppendNotProcessedValidatorSyncData(valSyncData)
 	}
