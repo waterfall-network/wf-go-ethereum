@@ -11,8 +11,6 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/operation"
 )
 
-const procEpochOffset = 4
-
 // applyFixesOnStart to call while NewBlockChain.
 func applyFixesOnStart(bc *BlockChain) error {
 	if err := fixMainnet0_setFailedValSyncOps(bc); err != nil {
@@ -23,6 +21,15 @@ func applyFixesOnStart(bc *BlockChain) error {
 
 func isMainnet(bc *BlockChain) bool {
 	return bc.Genesis().Hash() == params.MainnetGenesisHash
+}
+
+func forkSlotValSyncProc_epoch_procEpoch(bc fixValSyncChain) (uint64, uint64) {
+	const procEpochOffset = 4
+	si := bc.GetSlotInfo()
+	bcConf := bc.Config()
+	forkEpoch := si.SlotToEpoch(bcConf.ForkSlotValSyncProc)
+	// procEpoch is the epoch at which the fix ops will be executed.
+	return forkEpoch, forkEpoch + procEpochOffset
 }
 
 func fixMainnet0_setFailedValSyncOps(bc *BlockChain) error {
@@ -133,10 +140,7 @@ func fixMainnet1_RestoreTxLookupForValSync(bc *BlockChain, p *validator.Processo
 	}
 
 	// Skip ops that were scheduled before the fix processing epoch.
-	si := bc.GetSlotInfo()
-	bcConf := bc.Config()
-	forkEpoch := si.SlotToEpoch(bcConf.ForkSlotValSyncProc)
-	procEpoch := forkEpoch + procEpochOffset
+	_, procEpoch := forkSlotValSyncProc_epoch_procEpoch(bc)
 	if v.ProcEpoch() < procEpoch {
 		log.Info("fixMainnet1_RestoreTxLookupForValSync: skip, ProcEpoch before fix procEpoch",
 			"OpType", v.OpType(),
@@ -155,6 +159,10 @@ func fixMainnet1_RestoreTxLookupForValSync(bc *BlockChain, p *validator.Processo
 	txBlock := op.InitTxBlock
 	// Skip if TxLookup is already present.
 	if bc.GetTxBlockHash(v.InitTxHash()) == txBlock {
+		log.Info("fixMainnet1_RestoreTxLookupForValSync: TxLookup already present, skip",
+			"txBlock", txBlock.Hex(),
+			"initTxHash", v.InitTxHash().Hex(),
+		)
 		return
 	}
 	if err = bc.RestoreTxLookupEntries(txBlock); err != nil {
@@ -227,14 +235,7 @@ func FixValidatorSyncOps(bc fixValSyncChain, currEpoch uint64, valSyncOps []*typ
 
 // getFixValidatorSyncOpsFromData is the testable core of FixValidatorSyncOps.
 func getFixValidatorSyncOpsFromData(bc fixValSyncChain, currEpoch uint64, fixData map[common.Hash]*FixOp) []*types.ValidatorSync {
-	si := bc.GetSlotInfo()
-	bcConf := bc.Config()
-	forkEpoch := si.SlotToEpoch(bcConf.ForkSlotValSyncProc)
-	// procEpoch is the epoch at which the fix ops will be executed.
-	// During the window [forkEpoch, procEpoch), the ops are repeatedly injected into the
-	// not-processed pool on every finalization so that all nodes have time to receive them
-	// before execution. Actual processing happens when currEpoch reaches procEpoch.
-	procEpoch := forkEpoch + procEpochOffset
+	forkEpoch, procEpoch := forkSlotValSyncProc_epoch_procEpoch(bc)
 
 	log.Info("Fix validator sync: add sync ops 000",
 		"retCond", currEpoch < forkEpoch || currEpoch >= procEpoch,

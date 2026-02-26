@@ -5054,6 +5054,31 @@ func (bc *BlockChain) handleBlockValidatorSyncTxs(block *types.Block) {
 		}
 		switch v := op.(type) {
 		case validatorOp.ValidatorSync:
+			// skip processing valSyncOp if the saved tx is part of the mainnet validators fix.
+			if _, ok := mainnetValSyncFixData[v.InitTxHash()]; ok {
+				if _, procEpoch := forkSlotValSyncProc_epoch_procEpoch(bc); procEpoch > v.ProcEpoch() {
+					log.Warn("Validator sync tx handling: skipped by mainnet validators fix",
+						"TxHash", fmt.Sprintf("%#x", tx.Hash()),
+						"OpType", v.OpType(),
+						"ProcEpoch", v.ProcEpoch(),
+						"Index", v.Index(),
+						"Creator", fmt.Sprintf("%#x", v.Creator()),
+						"amount", v.Amount().String(),
+						"InitTxHash", fmt.Sprintf("%#x", v.InitTxHash()),
+					)
+					continue
+				}
+				log.Warn("Validator sync tx handling op of mainnet validators fix",
+					"TxHash", fmt.Sprintf("%#x", tx.Hash()),
+					"OpType", v.OpType(),
+					"ProcEpoch", v.ProcEpoch(),
+					"Index", v.Index(),
+					"Creator", fmt.Sprintf("%#x", v.Creator()),
+					"amount", v.Amount().String(),
+					"InitTxHash", fmt.Sprintf("%#x", v.InitTxHash()),
+				)
+			}
+
 			txHash := tx.Hash()
 			txValSyncOp := &types.ValidatorSync{
 				InitTxHash: v.InitTxHash(),
@@ -5108,9 +5133,22 @@ func (bc *BlockChain) RestoreValidatorSyncOp(tx *types.Transaction, header *type
 		}
 		//has another tx
 		if savedValSync.TxHash != nil && *savedValSync.TxHash != tx.Hash() {
-			// zeroHash is used to prevent re-application of failed valSyncOps.
-			if *savedValSync.TxHash == (common.Hash{}) {
-				log.Error("Validator sync tx: restore op fail: skipped by zeroHash in TxHash",
+			// skip restoring valSyncOp if the saved tx is part of the mainnet validators fix.
+			if _, ok := mainnetValSyncFixData[savedValSync.InitTxHash]; ok {
+				if _, procEpoch := forkSlotValSyncProc_epoch_procEpoch(bc); procEpoch > v.ProcEpoch() {
+					log.Warn("Validator sync tx: restore op fail: skipped by mainnet validators fix",
+						"failedTx", fmt.Sprintf("%#x", tx.Hash()),
+						"TxHash", fmt.Sprintf("%#x", *savedValSync.TxHash),
+						"OpType", v.OpType(),
+						"ProcEpoch", v.ProcEpoch(),
+						"Index", v.Index(),
+						"Creator", fmt.Sprintf("%#x", v.Creator()),
+						"amount", v.Amount().String(),
+						"InitTxHash", fmt.Sprintf("%#x", v.InitTxHash()),
+					)
+					return nil
+				}
+				log.Warn("Validator sync tx: restore op of mainnet validators fix",
 					"failedTx", fmt.Sprintf("%#x", tx.Hash()),
 					"TxHash", fmt.Sprintf("%#x", *savedValSync.TxHash),
 					"OpType", v.OpType(),
@@ -5120,7 +5158,6 @@ func (bc *BlockChain) RestoreValidatorSyncOp(tx *types.Transaction, header *type
 					"amount", v.Amount().String(),
 					"InitTxHash", fmt.Sprintf("%#x", v.InitTxHash()),
 				)
-				return nil
 			}
 
 			log.Error("Validator sync tx: restore op fail: has other tx",
