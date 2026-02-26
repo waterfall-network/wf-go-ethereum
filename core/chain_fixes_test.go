@@ -398,103 +398,16 @@ func TestGetFixValidatorSyncOpsFromData_NilStoredOp_NotReset(t *testing.T) {
 	}
 }
 
-// ── mergeValSyncOps ───────────────────────────────────────────────────────────
-
-func TestMergeValSyncOps_EmptyFixes_ReturnsBase(t *testing.T) {
-	hash := common.HexToHash("0x0101010101010101010101010101010101010101010101010101010101010101")
-	base := []*types.ValidatorSync{{InitTxHash: hash}}
-
-	result := mergeValSyncOps(base, nil)
-
-	if len(result) != 1 || result[0].InitTxHash != hash {
-		t.Errorf("expected base slice unchanged, got %v", result)
-	}
-}
-
-func TestMergeValSyncOps_NoDuplicates_AppendsFixes(t *testing.T) {
-	h1 := common.HexToHash("0x0101010101010101010101010101010101010101010101010101010101010101")
-	h2 := common.HexToHash("0x0202020202020202020202020202020202020202020202020202020202020202")
-	base := []*types.ValidatorSync{{InitTxHash: h1}}
-	fixes := []*types.ValidatorSync{{InitTxHash: h2}}
-
-	result := mergeValSyncOps(base, fixes)
-
-	if len(result) != 2 {
-		t.Fatalf("expected 2 ops, got %d", len(result))
-	}
-}
-
-func TestMergeValSyncOps_DuplicateInitTxHash_FixWins(t *testing.T) {
-	hash := common.HexToHash("0x0303030303030303030303030303030303030303030303030303030303030303")
-	baseOp := &types.ValidatorSync{InitTxHash: hash, ProcEpoch: 5}
-	fixOp := &types.ValidatorSync{InitTxHash: hash, ProcEpoch: 14}
-	base := []*types.ValidatorSync{baseOp}
-	fixes := []*types.ValidatorSync{fixOp}
-
-	result := mergeValSyncOps(base, fixes)
-
-	if len(result) != 1 {
-		t.Fatalf("expected 1 op after dedup, got %d", len(result))
-	}
-	if result[0].ProcEpoch != 14 {
-		t.Errorf("fix op should win: ProcEpoch got %d, want 14", result[0].ProcEpoch)
-	}
-}
-
-func TestMergeValSyncOps_MultipleDuplicates_AllDropped(t *testing.T) {
-	h1 := common.HexToHash("0x0404040404040404040404040404040404040404040404040404040404040404")
-	h2 := common.HexToHash("0x0505050505050505050505050505050505050505050505050505050505050505")
-	h3 := common.HexToHash("0x0606060606060606060606060606060606060606060606060606060606060606")
-	base := []*types.ValidatorSync{
-		{InitTxHash: h1, ProcEpoch: 1},
-		{InitTxHash: h2, ProcEpoch: 2},
-		{InitTxHash: h3, ProcEpoch: 3},
-	}
-	fixes := []*types.ValidatorSync{
-		{InitTxHash: h1, ProcEpoch: 14},
-		{InitTxHash: h3, ProcEpoch: 14},
-	}
-
-	result := mergeValSyncOps(base, fixes)
-
-	// h2 from base + h1,h3 from fixes = 3 total
-	if len(result) != 3 {
-		t.Fatalf("expected 3 ops, got %d", len(result))
-	}
-	// h2 base entry must be preserved
-	found := false
-	for _, op := range result {
-		if op.InitTxHash == h2 && op.ProcEpoch == 2 {
-			found = true
-		}
-	}
-	if !found {
-		t.Errorf("base op with h2/ProcEpoch=2 should be preserved")
-	}
-}
-
-func TestMergeValSyncOps_NilBase_OnlyFixes(t *testing.T) {
-	hash := common.HexToHash("0x0707070707070707070707070707070707070707070707070707070707070707")
-	fixes := []*types.ValidatorSync{{InitTxHash: hash, ProcEpoch: 14}}
-
-	result := mergeValSyncOps(nil, fixes)
-
-	if len(result) != 1 || result[0].InitTxHash != hash {
-		t.Errorf("expected single fix op, got %v", result)
-	}
-}
-
-// ── FixValidatorSyncOps deduplication ─────────────────────────────────────────
+// ── FixValidatorSyncOps ───────────────────────────────────────────────────────
 
 func TestFixValidatorSyncOps_NonMainnet_PassesThroughBase(t *testing.T) {
-	// Non-mainnet: no fix ops → base returned unchanged.
+	// Non-mainnet: fixData is nil → valSyncOps passed through unchanged.
 	bc := newMockFixChain(320)
 	hash := common.HexToHash("0x0808080808080808080808080808080808080808080808080808080808080808")
 	base := []*types.ValidatorSync{{InitTxHash: hash}}
 
 	result := FixValidatorSyncOps(bc, 10, base)
 
-	// fixData is nil (non-mainnet) → fixValSyncOps is empty → mergeValSyncOps returns base
 	if len(result) != 1 || result[0].InitTxHash != hash {
 		t.Errorf("expected base unchanged for non-mainnet, got %v", result)
 	}

@@ -180,37 +180,22 @@ func (f *FixOp) CreateValidatorSync(procEpoch uint64) *types.ValidatorSync {
 	}
 }
 
-// FixValidatorSyncOps merges valSyncOps with fix operations for the current chain,
-// deduplicating by InitTxHash (fix ops take precedence).
-// Fix ops are only injected for mainnet
-// during the window [bcConf.ForkSlotValSyncProc, bcConf.ForkSlotValSyncProc + 4 epoches).
+// FixValidatorSyncOps removes from valSyncOps entries whose InitTxHash is present
+// in mainnetValSyncFixData, then appends fix ops for the current epoch window
+// [forkEpoch, forkEpoch+4). Only active on mainnet.
 func FixValidatorSyncOps(bc fixValSyncChain, currEpoch uint64, valSyncOps []*types.ValidatorSync) []*types.ValidatorSync {
 	var fixData map[common.Hash]*FixOp
 	if bc.Genesis().Hash() == params.MainnetGenesisHash {
 		fixData = mainnetValSyncFixData
 	}
-	fixValSyncOps := getFixValidatorSyncOpsFromData(bc, currEpoch, fixData)
-	return mergeValSyncOps(valSyncOps, fixValSyncOps)
-}
-
-// mergeValSyncOps merges base and fix ops into a single slice, deduplicating by
-// InitTxHash. Fix ops take precedence: any base entry whose InitTxHash matches a
-// fix op is dropped.
-func mergeValSyncOps(base, fixes []*types.ValidatorSync) []*types.ValidatorSync {
-	if len(fixes) == 0 {
-		return base
-	}
-	fixHashes := make(map[common.Hash]struct{}, len(fixes))
-	for _, op := range fixes {
-		fixHashes[op.InitTxHash] = struct{}{}
-	}
-	result := make([]*types.ValidatorSync, 0, len(base)+len(fixes))
-	for _, op := range base {
-		if _, dup := fixHashes[op.InitTxHash]; !dup {
-			result = append(result, op)
+	filtered := make([]*types.ValidatorSync, 0, len(valSyncOps))
+	for _, op := range valSyncOps {
+		if _, found := fixData[op.InitTxHash]; !found {
+			filtered = append(filtered, op)
 		}
 	}
-	return append(result, fixes...)
+	fixValSyncOps := getFixValidatorSyncOpsFromData(bc, currEpoch, fixData)
+	return append(filtered, fixValSyncOps...)
 }
 
 // getFixValidatorSyncOpsFromData is the testable core of FixValidatorSyncOps.
