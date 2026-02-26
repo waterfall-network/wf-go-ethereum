@@ -256,10 +256,7 @@ func (d *Dag) HandleFinalize(data *types.FinalizationParams) *types.Finalization
 	}
 
 	//fix bad validators state
-	fixValSyncOps := core.GetFixValidatorSyncOps(d.bc, data.Checkpoint.FinEpoch)
-	valSyncData := make([]*types.ValidatorSync, len(data.ValSyncData), len(data.ValSyncData)+len(fixValSyncOps))
-	copy(valSyncData, data.ValSyncData)
-	valSyncData = append(valSyncData, fixValSyncOps...)
+	valSyncData := core.FixValidatorSyncOps(d.bc, data.Checkpoint.FinEpoch, data.ValSyncData)
 
 	switch data.SyncMode {
 	case types.NoSync:

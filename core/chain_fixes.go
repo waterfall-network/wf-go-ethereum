@@ -145,7 +145,7 @@ func fixMainnet1_RestoreTxLookupForValSync(bc *BlockChain, p *validator.Processo
 	)
 }
 
-// fixValSyncChain is a minimal interface used by GetFixValidatorSyncOps.
+// fixValSyncChain is a minimal interface used by FixValidatorSyncOps.
 type fixValSyncChain interface {
 	GetSlotInfo() *types.SlotInfo
 	Config() *params.ChainConfig
@@ -180,17 +180,40 @@ func (f *FixOp) CreateValidatorSync(procEpoch uint64) *types.ValidatorSync {
 	}
 }
 
-// GetFixValidatorSyncOps returns validator sync fix operations that must be injected
-// into the not-processed pool during the window [forkEpoch, forkEpoch+4).
-func GetFixValidatorSyncOps(bc fixValSyncChain, currEpoch uint64) []*types.ValidatorSync {
+// FixValidatorSyncOps merges valSyncOps with fix operations for the current chain,
+// deduplicating by InitTxHash (fix ops take precedence).
+// Fix ops are only injected for mainnet
+// during the window [bcConf.ForkSlotValSyncProc, bcConf.ForkSlotValSyncProc + 4 epoches).
+func FixValidatorSyncOps(bc fixValSyncChain, currEpoch uint64, valSyncOps []*types.ValidatorSync) []*types.ValidatorSync {
 	var fixData map[common.Hash]*FixOp
 	if bc.Genesis().Hash() == params.MainnetGenesisHash {
 		fixData = mainnetValSyncFixData
 	}
-	return getFixValidatorSyncOpsFromData(bc, currEpoch, fixData)
+	fixValSyncOps := getFixValidatorSyncOpsFromData(bc, currEpoch, fixData)
+	return mergeValSyncOps(valSyncOps, fixValSyncOps)
 }
 
-// getFixValidatorSyncOpsFromData is the testable core of GetFixValidatorSyncOps.
+// mergeValSyncOps merges base and fix ops into a single slice, deduplicating by
+// InitTxHash. Fix ops take precedence: any base entry whose InitTxHash matches a
+// fix op is dropped.
+func mergeValSyncOps(base, fixes []*types.ValidatorSync) []*types.ValidatorSync {
+	if len(fixes) == 0 {
+		return base
+	}
+	fixHashes := make(map[common.Hash]struct{}, len(fixes))
+	for _, op := range fixes {
+		fixHashes[op.InitTxHash] = struct{}{}
+	}
+	result := make([]*types.ValidatorSync, 0, len(base)+len(fixes))
+	for _, op := range base {
+		if _, dup := fixHashes[op.InitTxHash]; !dup {
+			result = append(result, op)
+		}
+	}
+	return append(result, fixes...)
+}
+
+// getFixValidatorSyncOpsFromData is the testable core of FixValidatorSyncOps.
 func getFixValidatorSyncOpsFromData(bc fixValSyncChain, currEpoch uint64, fixData map[common.Hash]*FixOp) []*types.ValidatorSync {
 	si := bc.GetSlotInfo()
 	bcConf := bc.Config()
@@ -220,7 +243,7 @@ func getFixValidatorSyncOpsFromData(bc fixValSyncChain, currEpoch uint64, fixDat
 		if op.InitTxBlock != (common.Hash{}) {
 			if txBlock := bc.GetTxBlockHash(op.InitTxHash); txBlock != op.InitTxBlock {
 				if err := bc.RestoreTxLookupEntries(op.InitTxBlock); err != nil {
-					log.Error("GetFixValidatorSyncOps: restore tx lookup failed",
+					log.Error("FixValidatorSyncOps: restore tx lookup failed",
 						"err", err, "txBlock", op.InitTxBlock, "initTxHash", op.InitTxHash)
 					continue
 				}
