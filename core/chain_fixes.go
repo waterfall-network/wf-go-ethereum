@@ -51,10 +51,10 @@ func fixMainnet0_setFailedValSyncOps(bc *BlockChain) error {
 
 // FixValidatorSyncOpProcessing to call while NewBlockChain to check bad state of a block chain and correct if needed.
 func (bc *BlockChain) FixValidatorSyncOpProcessing(processor *validator.Processor, opData operation.Operation, txHash common.Hash, from, to common.Address) (isApplied bool, ret []byte, err error) {
-	isApplied, ret, err = fixMainnet0_FixValidatorSyncOpProcessing(bc, processor, opData, txHash, from, to)
-	if isApplied {
-		return true, ret, err
-	}
+	//isApplied, ret, err = fixMainnet0_FixValidatorSyncOpProcessing(bc, processor, opData, txHash, from, to)
+	//if isApplied {
+	//	return true, ret, err
+	//}
 	fixMainnet1_RestoreTxLookupForValSync(bc, processor, opData)
 	return false, ret, err
 }
