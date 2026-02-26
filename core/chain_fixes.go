@@ -71,51 +71,51 @@ func (bc *BlockChain) FixValidatorSyncOpProcessing(processor *validator.Processo
 	return false, ret, err
 }
 
-// fixMainnet0_FixValidatorSyncOpProcessing fixes applying validator sync txs of mainnet block nr=3343671.
-func fixMainnet0_FixValidatorSyncOpProcessing(bc *BlockChain, p *validator.Processor, opData operation.Operation, txHash common.Hash, from, to common.Address) (isApplied bool, ret []byte, err error) {
-	if !isMainnet(bc) {
-		return false, nil, nil
-	}
-
-	blkCtx := p.GetBlockContext()
-	if bc.Config().IsForkSlotValSyncProc(blkCtx.Slot) {
-		return false, nil, nil
-	}
-
-	switch v := opData.(type) {
-	case operation.ValidatorSync:
-		op, ok := mainnetValSyncFixData[v.InitTxHash()]
-		if !ok {
-			return false, nil, nil
-		}
-		//1. set ValSync as done (to clear from caches)
-		vs := &types.ValidatorSync{
-			InitTxHash: op.InitTxHash,
-			OpType:     op.OpType,
-			ProcEpoch:  0,
-			Index:      op.Index,
-			Creator:    op.Creator,
-			TxHash:     &common.Hash{},
-		}
-		bc.SetValidatorSyncData(vs)
-
-		log.Info("fixMainnet0_FixValidatorSyncOpProcessing: applied",
-			"OpType", vs.OpType,
-			"ProcEpoch", vs.ProcEpoch,
-			"Index", vs.Index,
-			"Creator", fmt.Sprintf("%#x", vs.Creator),
-			"amount", vs.Amount,
-			"TxHash", fmt.Sprintf("%#x", vs.TxHash),
-			"InitTxHash", vs.InitTxHash.Hex(),
-			"currentTx", fmt.Sprintf("%#x", txHash),
-			"blNr", blkCtx.BlockNumber.Uint64(),
-			"blHash", fmt.Sprintf("%#x", blkCtx.BlockHash),
-		)
-		// action to quickly complete a transaction (not necessary)
-		return true, nil, validator.ErrNoSavedValSyncOp
-	}
-	return false, nil, nil
-}
+//// fixMainnet0_FixValidatorSyncOpProcessing fixes applying validator sync txs of mainnet block nr=3343671.
+//func fixMainnet0_FixValidatorSyncOpProcessing(bc *BlockChain, p *validator.Processor, opData operation.Operation, txHash common.Hash, from, to common.Address) (isApplied bool, ret []byte, err error) {
+//	if !isMainnet(bc) {
+//		return false, nil, nil
+//	}
+//
+//	blkCtx := p.GetBlockContext()
+//	if bc.Config().IsForkSlotValSyncProc(blkCtx.Slot) {
+//		return false, nil, nil
+//	}
+//
+//	switch v := opData.(type) {
+//	case operation.ValidatorSync:
+//		op, ok := mainnetValSyncFixData[v.InitTxHash()]
+//		if !ok {
+//			return false, nil, nil
+//		}
+//		//1. set ValSync as done (to clear from caches)
+//		vs := &types.ValidatorSync{
+//			InitTxHash: op.InitTxHash,
+//			OpType:     op.OpType,
+//			ProcEpoch:  0,
+//			Index:      op.Index,
+//			Creator:    op.Creator,
+//			TxHash:     &common.Hash{},
+//		}
+//		bc.SetValidatorSyncData(vs)
+//
+//		log.Info("fixMainnet0_FixValidatorSyncOpProcessing: applied",
+//			"OpType", vs.OpType,
+//			"ProcEpoch", vs.ProcEpoch,
+//			"Index", vs.Index,
+//			"Creator", fmt.Sprintf("%#x", vs.Creator),
+//			"amount", vs.Amount,
+//			"TxHash", fmt.Sprintf("%#x", vs.TxHash),
+//			"InitTxHash", vs.InitTxHash.Hex(),
+//			"currentTx", fmt.Sprintf("%#x", txHash),
+//			"blNr", blkCtx.BlockNumber.Uint64(),
+//			"blHash", fmt.Sprintf("%#x", blkCtx.BlockHash),
+//		)
+//		// action to quickly complete a transaction (not necessary)
+//		return true, nil, validator.ErrNoSavedValSyncOp
+//	}
+//	return false, nil, nil
+//}
 
 // fixMainnet1_RestoreTxLookupForValSync restores TxLookup entries for the InitTx block of a
 // new validator fix op (46793–48374) immediately before ValidateValidatorSyncOp calls
