@@ -11,6 +11,8 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/operation"
 )
 
+const procEpochOffset = 4
+
 // applyFixesOnStart to call while NewBlockChain.
 func applyFixesOnStart(bc *BlockChain) error {
 	if err := fixMainnet0_setFailedValSyncOps(bc); err != nil {
@@ -55,7 +57,10 @@ func (bc *BlockChain) FixValidatorSyncOpProcessing(processor *validator.Processo
 	//if isApplied {
 	//	return true, ret, err
 	//}
-	fixMainnet1_RestoreTxLookupForValSync(bc, processor, opData)
+	isApplied, ret, err = fixMainnet1_RestoreTxLookupForValSync(bc, processor, opData, txHash)
+	if isApplied {
+		return true, ret, err
+	}
 	return false, ret, err
 }
 
@@ -110,7 +115,7 @@ func fixMainnet0_FixValidatorSyncOpProcessing(bc *BlockChain, p *validator.Proce
 // GetTransaction(InitTxHash). TxLookup entries for those old blocks were purged by the
 // txLookupLimit cleanup goroutine long before procEpoch. Re-indexing the whole block here
 // ensures that GetTransaction and GetTransactionReceipt succeed during validation.
-func fixMainnet1_RestoreTxLookupForValSync(bc *BlockChain, p *validator.Processor, opData operation.Operation) {
+func fixMainnet1_RestoreTxLookupForValSync(bc *BlockChain, p *validator.Processor, opData operation.Operation, txHash common.Hash) (isApplied bool, ret []byte, err error) {
 	if !isMainnet(bc) {
 		return
 	}
@@ -126,12 +131,33 @@ func fixMainnet1_RestoreTxLookupForValSync(bc *BlockChain, p *validator.Processo
 	if !ok {
 		return
 	}
+
+	// Skip ops that were scheduled before the fix processing epoch.
+	si := bc.GetSlotInfo()
+	bcConf := bc.Config()
+	forkEpoch := si.SlotToEpoch(bcConf.ForkSlotValSyncProc)
+	procEpoch := forkEpoch + procEpochOffset
+	if v.ProcEpoch() < procEpoch {
+		log.Info("fixMainnet1_RestoreTxLookupForValSync: skip, ProcEpoch before fix procEpoch",
+			"OpType", v.OpType(),
+			"ProcEpoch", v.ProcEpoch(),
+			"Index", v.Index(),
+			"Creator", fmt.Sprintf("%#x", v.Creator()),
+			"amount", v.Amount(),
+			"InitTxHash", fmt.Sprintf("%#x", v.InitTxHash()),
+			"currentTx", fmt.Sprintf("%#x", txHash),
+			"blNr", blkCtx.BlockNumber.Uint64(),
+			"blHash", fmt.Sprintf("%#x", blkCtx.BlockHash),
+		)
+		return true, nil, validator.ErrTxNF
+	}
+
 	txBlock := op.InitTxBlock
 	// Skip if TxLookup is already present.
 	if bc.GetTxBlockHash(v.InitTxHash()) == txBlock {
 		return
 	}
-	if err := bc.RestoreTxLookupEntries(txBlock); err != nil {
+	if err = bc.RestoreTxLookupEntries(txBlock); err != nil {
 		log.Error("fixMainnet1_RestoreTxLookupForValSync: failed",
 			"err", err,
 			"txBlock", txBlock.Hex(),
@@ -143,6 +169,7 @@ func fixMainnet1_RestoreTxLookupForValSync(bc *BlockChain, p *validator.Processo
 		"txBlock", txBlock.Hex(),
 		"initTxHash", v.InitTxHash().Hex(),
 	)
+	return
 }
 
 // fixValSyncChain is a minimal interface used by FixValidatorSyncOps.
@@ -207,7 +234,7 @@ func getFixValidatorSyncOpsFromData(bc fixValSyncChain, currEpoch uint64, fixDat
 	// During the window [forkEpoch, procEpoch), the ops are repeatedly injected into the
 	// not-processed pool on every finalization so that all nodes have time to receive them
 	// before execution. Actual processing happens when currEpoch reaches procEpoch.
-	procEpoch := forkEpoch + 4
+	procEpoch := forkEpoch + procEpochOffset
 
 	log.Info("Fix validator sync: add sync ops 000",
 		"retCond", currEpoch < forkEpoch || currEpoch >= procEpoch,
