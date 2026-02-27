@@ -446,7 +446,11 @@ func (st *StateTransition) processRewards(creatorAddress common.Address, reward 
 		return nil
 	}
 
-	st.state.AddBalance(*val.WithdrawalAddress, reward)
+	if val.WithdrawalAddress == nil {
+		st.state.AddBalance(creatorAddress, reward)
+	} else {
+		st.state.AddBalance(*val.WithdrawalAddress, reward)
+	}
 
 	return nil
 }
