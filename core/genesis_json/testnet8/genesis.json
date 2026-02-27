@@ -15,6 +15,8 @@
     "forkSlotValOpTracking": 18446744073709551615,
     "forkSlotReduceBaseFee": 18446744073709551615,
     "forkSlotValSyncProc": 18446744073709551615,
+    "forkSlotUpValsPerSlot": 18446744073709551615,
+    "upValidatorsPerSlot": 25,
     "startEpochsPerEra": 18446744073709551615,
     "acceptCpRootOnFinEpoch": {
       "0xd76dd012c08baefd84750cf9752a6987dbc8ff4451069056cfd110e32250ed4a": [96176],

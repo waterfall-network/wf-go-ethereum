@@ -30,4 +30,7 @@ var (
 
 	// ErrBadParams returned when received unacceptable params.
 	ErrBadParams = errors.New("bad params")
+
+	// ErrEmptyFinSeq returned when calculated sequence of finalization is empty.
+	ErrEmptyFinSeq = errors.New("sequence of finalization is empty")
 )
