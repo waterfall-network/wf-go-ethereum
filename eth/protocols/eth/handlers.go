@@ -694,7 +694,7 @@ func handleGetHashesBySlots66(backend Backend, msg Decoder, peer *Peer) error {
 	}
 	//Gather hashes by slots.
 	from, to := query.From, query.To
-	maxHashLen := (to - from) * backend.Chain().Config().ValidatorsPerSlot
+	maxHashLen := (to - from) * backend.Chain().Config().GetValidatorsPerSlot(to)
 	// check length limit
 	if maxHashLen > LimitDagHashes {
 		peer.Log().Error("Handle request: failed", "err", "maxHashLen > LimitDagHashes", "fn", "handleGetHashesBySlots66", "maxHashLen", maxHashLen, "LimitDagHashes", LimitDagHashes)

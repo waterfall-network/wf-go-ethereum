@@ -31,6 +31,7 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/vm"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/crypto"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/event"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/node"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/rpc"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/tests/testutils"
@@ -43,6 +44,10 @@ const testHead = 0
 type testBackend struct {
 	chain   *core.BlockChain
 	pending bool // pending block available
+}
+
+func (b *testBackend) UnlockVerifiers(accounts [][]common.Address) error {
+	return b.chain.UnlockVerifiers(accounts)
 }
 
 func (b *testBackend) StateAt(root common.Hash) (*state.StateDB, error) {
@@ -175,7 +180,7 @@ func newTestBackend(t *testing.T, londonBlock *big.Int, pending bool) *testBacke
 	rawdb.WriteCoordinatedCheckpoint(db, genesisCp)
 	rawdb.WriteEpoch(db, 0, genesisCp.Spine)
 
-	bc, err := core.NewBlockChain(db, &core.CacheConfig{TrieCleanNoPrefetch: true}, &config, vm.Config{}, nil)
+	bc, err := core.NewBlockChain(db, &core.CacheConfig{TrieCleanNoPrefetch: true}, &config, vm.Config{}, nil, &node.VerifiersKeystoreConfig{})
 	if err != nil {
 		t.Fatalf("Failed to create local chain, %v", err)
 	}

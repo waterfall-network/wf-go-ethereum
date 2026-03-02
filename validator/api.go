@@ -61,6 +61,7 @@ type Blockchain interface {
 	GetEpoch(epoch uint64) common.Hash
 	EpochToEra(uint64) *era.Era
 	GetEraInfo() *era.EraInfo
+	UnlockVerifiers(accounts [][]common.Address) error
 }
 
 // PublicValidatorAPI provides an API to access validator functions.
@@ -404,4 +405,76 @@ func (s *PublicValidatorAPI) Validator_GetTransactionReceipt(ctx context.Context
 		fields["logs"] = parsedLogs
 	}
 	return fields, nil
+}
+
+// Validator_GetBlockReceipts returns block's receipts.
+func (s *PublicValidatorAPI) Validator_GetBlockReceipts(ctx context.Context, blockNrOrHash rpc.BlockNumberOrHash) ([]map[string]interface{}, error) {
+	_, header, err := s.b.StateAndHeaderByNumberOrHash(ctx, blockNrOrHash)
+	if header == nil || err != nil {
+		return nil, err
+	}
+	block := s.chain.GetBlock(ctx, header.Hash())
+	if block == nil {
+		return nil, errors.New("block not found")
+	}
+
+	txs := block.Transactions()
+	receipts, err := s.b.GetReceipts(ctx, block.Hash())
+	if err != nil {
+		return nil, err
+	}
+
+	if len(receipts) > len(txs) {
+		return nil, errors.New("invalid receipts data")
+	}
+
+	result := make([]map[string]interface{}, len(receipts))
+	for idx, receipt := range receipts {
+		tx := txs[idx]
+		// Derive the sender.
+		signer := types.MakeSigner(s.b.ChainConfig())
+		from, _ := types.Sender(signer, tx)
+
+		fields := map[string]interface{}{
+			"blockHash":         block.Hash().Hex(),
+			"blockNumber":       hexutil.Uint64(*block.Number()),
+			"transactionHash":   tx.Hash().Hex(),
+			"transactionIndex":  hexutil.Uint64(idx),
+			"from":              from,
+			"to":                tx.To(),
+			"gasUsed":           hexutil.Uint64(receipt.GasUsed),
+			"cumulativeGasUsed": hexutil.Uint64(receipt.CumulativeGasUsed),
+			"contractAddress":   nil,
+			"logs":              receipt.Logs,
+			"logsBloom":         receipt.Bloom,
+			"type":              hexutil.Uint(tx.Type()),
+		}
+
+		header := block.Header()
+		gasPrice := new(big.Int).Add(header.BaseFee, tx.EffectiveGasTipValue(header.BaseFee))
+		fields["effectiveGasPrice"] = hexutil.Uint64(gasPrice.Uint64())
+
+		// Assign receipt status or post state.
+		if len(receipt.PostState) > 0 {
+			fields["root"] = hexutil.Bytes(receipt.PostState)
+		} else {
+			fields["status"] = hexutil.Uint(receipt.Status)
+		}
+		// If the ContractAddress is 20 0x0 bytes, assume it is not a contract creation
+		if receipt.ContractAddress != (common.Address{}) {
+			fields["contractAddress"] = receipt.ContractAddress
+		}
+		// add parsed logs
+		if receipt.Logs == nil {
+			fields["logs"] = [][]*types.Log{}
+		} else {
+			parsedLogs := make([]*types.ParsedLog, len(receipt.Logs))
+			for i, log := range receipt.Logs {
+				parsedLogs[i] = txlog.LogToParsedLog(log)
+			}
+			fields["logs"] = parsedLogs
+		}
+		result[idx] = fields
+	}
+	return result, nil
 }
