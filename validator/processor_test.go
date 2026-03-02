@@ -2589,6 +2589,136 @@ func TestValidatePartialDepositOp(t *testing.T) {
 	}
 }
 
+func TestProcessorWithdrawalFromValState(t *testing.T) {
+	ctrl = gomock.NewController(t)
+	defer ctrl.Finish()
+
+	msg := NewMockmessage(ctrl)
+
+	withdrawalFromValStateOp := operation.NewWithdrawalFromValStateOperation()
+	opData, err := operation.EncodeToBytes(withdrawalFromValStateOp)
+	testutils.AssertNoError(t, err)
+	msg.EXPECT().Data().AnyTimes().Return(opData)
+	msg.EXPECT().TxHash().AnyTimes().Return(common.Hash{})
+
+	allocationContractAddress := common.BytesToAddress(testutils.RandomData(20))
+	dummyAddress := common.BytesToAddress(testutils.RandomData(20))
+
+	testCfg := *testmodels.TestChainConfig
+	testCfg.AllocationContractAddress = allocationContractAddress
+	testCfg.WaterfallDummyAddress = dummyAddress
+
+	bc := NewMockblockchain(ctrl)
+	bc.EXPECT().Config().AnyTimes().Return(&testCfg)
+
+	testStateDb, _ := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
+	processor := NewProcessor(ctx, testStateDb, bc)
+	to := processor.GetValidatorsStateAddress()
+
+	cases := []*testmodels.TestCase{
+		{
+			CaseName: "WithdrawalFromValState: invalid to address",
+			TestData: testmodels.TestData{
+				Caller: vm.AccountRef(from),
+				AddrTo: testmodels.Addr1,
+			},
+			Errs: []error{ErrInvalidToAddress},
+			Fn: func(c *testmodels.TestCase) {
+				v := c.TestData.(testmodels.TestData)
+				call(t, processor, v.Caller, v.AddrTo, nil, msg, c.Errs)
+			},
+		},
+		{
+			CaseName: "WithdrawalFromValState: both balances are zero",
+			TestData: testmodels.TestData{
+				Caller: vm.AccountRef(from),
+				AddrTo: to,
+			},
+			Errs: []error{ErrInsufficientFundsForOp},
+			Fn: func(c *testmodels.TestCase) {
+				v := c.TestData.(testmodels.TestData)
+				// balances not set — both zero
+				call(t, processor, v.Caller, v.AddrTo, nil, msg, c.Errs)
+			},
+		},
+		{
+			CaseName: "WithdrawalFromValState: only validators state has balance",
+			TestData: testmodels.TestData{
+				Caller: vm.AccountRef(from),
+				AddrTo: to,
+			},
+			Errs: []error{nil},
+			Fn: func(c *testmodels.TestCase) {
+				v := c.TestData.(testmodels.TestData)
+
+				valsBalance := big.NewInt(1000)
+				processor.state.AddBalance(to, valsBalance)
+
+				dummyBefore := processor.state.GetBalance(dummyAddress)
+
+				call(t, processor, v.Caller, v.AddrTo, nil, msg, c.Errs)
+
+				assertBalance(t, "validators state", big.NewInt(0), processor.state.GetBalance(to))
+				assertBalance(t, "dummy", new(big.Int).Add(dummyBefore, valsBalance), processor.state.GetBalance(dummyAddress))
+				assertBalance(t, "alloc contract", big.NewInt(0), processor.state.GetBalance(allocationContractAddress))
+			},
+		},
+		{
+			CaseName: "WithdrawalFromValState: only alloc contract has balance",
+			TestData: testmodels.TestData{
+				Caller: vm.AccountRef(from),
+				AddrTo: to,
+			},
+			Errs: []error{nil},
+			Fn: func(c *testmodels.TestCase) {
+				v := c.TestData.(testmodels.TestData)
+
+				allocBalance := big.NewInt(2000)
+				processor.state.AddBalance(allocationContractAddress, allocBalance)
+
+				dummyBefore := processor.state.GetBalance(dummyAddress)
+
+				call(t, processor, v.Caller, v.AddrTo, nil, msg, c.Errs)
+
+				assertBalance(t, "validators state", big.NewInt(0), processor.state.GetBalance(to))
+				assertBalance(t, "alloc contract", big.NewInt(0), processor.state.GetBalance(allocationContractAddress))
+				assertBalance(t, "dummy", new(big.Int).Add(dummyBefore, allocBalance), processor.state.GetBalance(dummyAddress))
+			},
+		},
+		{
+			CaseName: "WithdrawalFromValState: both have balance",
+			TestData: testmodels.TestData{
+				Caller: vm.AccountRef(from),
+				AddrTo: to,
+			},
+			Errs: []error{nil},
+			Fn: func(c *testmodels.TestCase) {
+				v := c.TestData.(testmodels.TestData)
+
+				valsBalance := big.NewInt(1500)
+				allocBalance := big.NewInt(2500)
+				processor.state.AddBalance(to, valsBalance)
+				processor.state.AddBalance(allocationContractAddress, allocBalance)
+
+				dummyBefore := processor.state.GetBalance(dummyAddress)
+
+				call(t, processor, v.Caller, v.AddrTo, nil, msg, c.Errs)
+
+				assertBalance(t, "validators state", big.NewInt(0), processor.state.GetBalance(to))
+				assertBalance(t, "alloc contract", big.NewInt(0), processor.state.GetBalance(allocationContractAddress))
+				expected := new(big.Int).Add(dummyBefore, new(big.Int).Add(valsBalance, allocBalance))
+				assertBalance(t, "dummy", expected, processor.state.GetBalance(dummyAddress))
+			},
+		},
+	}
+
+	for _, c := range cases {
+		t.Run(c.CaseName, func(t *testing.T) {
+			c.Fn(c)
+		})
+	}
+}
+
 func call(t *testing.T, processor *Processor, Caller Ref, addrTo common.Address, value *big.Int, msg message, Errs []error) []byte {
 	res, err := processor.Call(Caller, addrTo, value, msg)
 	if !testutils.CheckError(err, Errs) {
@@ -2596,4 +2726,11 @@ func call(t *testing.T, processor *Processor, Caller Ref, addrTo common.Address,
 	}
 
 	return res
+}
+
+func assertBalance(t *testing.T, name string, expected, actual *big.Int) {
+	t.Helper()
+	if expected.Cmp(actual) != 0 {
+		t.Errorf("balance %s: expected %s, got %s", name, expected.String(), actual.String())
+	}
 }
