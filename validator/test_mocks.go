@@ -15,6 +15,7 @@ import (
 	ethdb "gitlab.waterfall.network/waterfall/protocol/gwat/ethdb"
 	params "gitlab.waterfall.network/waterfall/protocol/gwat/params"
 	era "gitlab.waterfall.network/waterfall/protocol/gwat/validator/era"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/operation"
 	storage "gitlab.waterfall.network/waterfall/protocol/gwat/validator/storage"
 )
 
@@ -59,6 +60,10 @@ func (mr *MockRefMockRecorder) Address() *gomock.Call {
 type Mockblockchain struct {
 	ctrl     *gomock.Controller
 	recorder *MockblockchainMockRecorder
+}
+
+func (m *Mockblockchain) FixValidatorSyncOpProcessing(processor *Processor, opData operation.Operation, txHash common.Hash, from, to common.Address) (isApplied bool, ret []byte, err error) {
+	return false, nil, nil
 }
 
 // MockblockchainMockRecorder is the mock recorder for Mockblockchain.

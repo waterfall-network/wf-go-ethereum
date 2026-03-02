@@ -58,6 +58,10 @@ const KeyStoreScheme = "keystore"
 // Maximum time between wallet refreshes (if filesystem notifications don't work).
 const walletRefreshCycle = 3 * time.Second
 
+type AccountsCache interface {
+	ScanAccounts() error
+}
+
 // KeyStore manages a key storage directory on disk.
 type KeyStore struct {
 	storage  keyStore                     // Storage backend, might be cleartext or encrypted
@@ -375,6 +379,10 @@ func (ks *KeyStore) Find(a accounts.Account) (accounts.Account, error) {
 	return a, err
 }
 
+func (ks *KeyStore) AccountsCache() AccountsCache {
+	return ks.cache
+}
+
 func (ks *KeyStore) getDecryptedKey(a accounts.Account, auth string) (accounts.Account, *Key, error) {
 	a, err := ks.Find(a)
 	if err != nil {
@@ -499,11 +507,11 @@ func (ks *KeyStore) ImportPreSaleKey(keyJSON []byte, passphrase string) (account
 }
 
 // IsUnlocked checks if an account is unlocked.
-func (ks *KeyStore) IsUnlocked(a accounts.Account) bool {
+func (ks *KeyStore) IsUnlocked(address common.Address) bool {
 	ks.mu.RLock()
 	defer ks.mu.RUnlock()
 
-	_, found := ks.unlocked[a.Address]
+	_, found := ks.unlocked[address]
 	return found
 }
 

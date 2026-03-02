@@ -38,6 +38,7 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/crypto"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/ethdb"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/internal/ethapi"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/node"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/rpc"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/token"
@@ -82,7 +83,7 @@ func newTestBackend(t *testing.T, n int, gspec *core.Genesis, generator func(i i
 		SnapshotLimit:     0,
 		TrieDirtyDisabled: true, // Archive mode
 	}
-	chain, err := core.NewBlockChain(backend.chaindb, cacheConfig, params.TestChainConfig, vm.Config{}, nil)
+	chain, err := core.NewBlockChain(backend.chaindb, cacheConfig, params.TestChainConfig, vm.Config{}, nil, &node.VerifiersKeystoreConfig{})
 	if err != nil {
 		t.Fatalf("failed to create tester chain: %v", err)
 	}

@@ -3824,6 +3824,20 @@ var outputTransactionReceiptFormatter = function (receipt){
 };
 
 /**
+ * Formats the output of a transaction receipts array to its proper values
+ *
+ * @method outputTransactionReceiptListFormatter
+ * @param {Object} receipt
+ * @returns {Object}
+*/
+var outputTransactionReceiptListFormatter = function (receipts){
+  if (!Array.isArray(receipts)) {
+    return receipts
+  }
+  return receipts.map(outputTransactionReceiptFormatter);
+};
+
+/**
  * Formats the output of a block to its proper values
  *
  * @method outputBlockFormatter
@@ -3990,6 +4004,7 @@ module.exports = {
     outputBigNumberFormatter: outputBigNumberFormatter,
     outputTransactionFormatter: outputTransactionFormatter,
     outputTransactionReceiptFormatter: outputTransactionReceiptFormatter,
+    outputTransactionReceiptListFormatter: outputTransactionReceiptListFormatter,
     outputBlockFormatter: outputBlockFormatter,
     outputLogFormatter: outputLogFormatter,
     outputPostFormatter: outputPostFormatter,

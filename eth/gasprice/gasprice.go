@@ -70,6 +70,7 @@ type OracleBackend interface {
 	GetLastCoordinatedCheckpoint() *types.Checkpoint
 	GetEpoch(epoch uint64) common.Hash
 	EpochToEra(uint64) *era.Era
+	UnlockVerifiers(accounts [][]common.Address) error
 }
 
 // Oracle recommends gas prices based on the content of recent
@@ -197,7 +198,7 @@ func (oracle *Oracle) SuggestTipCap(ctx context.Context) (*big.Int, error) {
 	}
 
 	if cumGasUsed > 0 && cumGasLimit > 0 && cumGasUsed < cumGasLimit/2 {
-		creatorsPerSlotCount := oracle.backend.ChainConfig().ValidatorsPerSlot
+		creatorsPerSlotCount := oracle.backend.ChainConfig().GetValidatorsPerSlot(head.Slot)
 		if creatorsPerSlot, err := oracle.backend.ValidatorsStorage().GetCreatorsBySlot(oracle.backend, head.Slot); err == nil {
 			creatorsPerSlotCount = uint64(len(creatorsPerSlot))
 		}

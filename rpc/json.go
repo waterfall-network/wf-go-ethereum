@@ -74,6 +74,7 @@ func (msg *jsonrpcMessage) isDagApi() bool {
 		msg.Method == "dag_headSync" ||
 		msg.Method == "dag_getOptimisticSpines" ||
 		msg.Method == "dag_validateFinalization" ||
+		msg.Method == "dag_syncSpines" ||
 		msg.Method == "dag_coordinatedState" ||
 		msg.Method == "dag_getDagHashes"
 }
