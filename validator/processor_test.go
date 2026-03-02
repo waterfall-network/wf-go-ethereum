@@ -1108,6 +1108,56 @@ func TestProcessorExit_DelegatingStake(t *testing.T) {
 		},
 
 		{
+			CaseName: "Exit: invalid from address (non-trial period)",
+			TestData: testmodels.TestData{
+				Caller: vm.AccountRef(withdrawalAddress),
+				AddrTo: to,
+			},
+			Errs: []error{ErrSenderRejByDelegate},
+			Fn: func(c *testmodels.TestCase) {
+				v := c.TestData.(testmodels.TestData)
+
+				stateDb, _ = state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
+				bc := NewMockblockchain(ctrl)
+				bc.EXPECT().Config().Return(testmodels.TestChainConfig).AnyTimes()
+				slotInfo := &types.SlotInfo{
+					GenesisTime:    uint64(time.Now().Unix()),
+					SecondsPerSlot: testmodels.TestChainConfig.SecondsPerSlot,
+					SlotsPerEpoch:  testmodels.TestChainConfig.SlotsPerEpoch,
+				}
+				bc.EXPECT().GetSlotInfo().AnyTimes().Return(slotInfo)
+				bc.EXPECT().GetEraInfo().AnyTimes().Return(eraInfo)
+
+				db := rawdb.NewMemoryDatabase()
+				rawdb.WriteEra(db, eraInfo.Number()-1, eraInfo.GetEra())
+				bc.EXPECT().Database().AnyTimes().Return(db)
+
+				processor := NewProcessor(ctx, stateDb, bc)
+				processor.ctx.Era = eraInfo.GetEra().Number
+				// slot is past the trial period end: activation_slot + trial_period + 1
+				processor.ctx.Slot = eraInfo.GetEra().From*slotInfo.SlotsPerEpoch + 322
+				defer func() {
+					processor.ctx.Slot = 0
+					processor.ctx.Era = ctx.Era
+				}()
+
+				//create existed validator
+				delegateData, err := operation.NewDelegatingStakeData(rules, 321, trialRules)
+				testutils.AssertNoError(t, err)
+				depositOp, err := operation.NewDepositOperation(pubKey, testmodels.Addr1, withdrawalAddress, signature, delegateData)
+				testutils.AssertNoError(t, err)
+
+				validator := storage.NewValidator(depositOp.PubKey(), depositOp.CreatorAddress(), &withdrawalAddress)
+				validator.ActivationEra = eraInfo.GetEra().Number - 1
+				validator.DelegatingStake = depositOp.DelegatingStake()
+				err = processor.Storage().SetValidator(processor.state, validator)
+				testutils.AssertNoError(t, err)
+
+				call(t, processor, v.Caller, v.AddrTo, value, msg, c.Errs)
+			},
+		},
+
+		{
 			CaseName: "Exit: OK",
 			TestData: testmodels.TestData{
 				Caller: vm.AccountRef(trialRules.Exit()[0]),
