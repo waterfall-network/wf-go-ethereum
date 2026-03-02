@@ -292,7 +292,7 @@ func (p *Processor) Call(caller Ref, toAddr common.Address, value *big.Int, msg 
 			log.Error("Validator state address withdrawal: err",
 				"opCode", op.OpCode(),
 				"tx", msg.TxHash().Hex(),
-				"withdrawalAddress", p.blockchain.Config().WaterfallDammyAddress,
+				"withdrawalAddress", p.blockchain.Config().WaterfallDummyAddress,
 				"blHash", p.ctx.BlockHash.Hex(),
 				"err", err,
 			)
@@ -300,7 +300,7 @@ func (p *Processor) Call(caller Ref, toAddr common.Address, value *big.Int, msg 
 			log.Info("Validator state address withdrawal: success",
 				"opCode", op.OpCode(),
 				"tx", msg.TxHash().Hex(),
-				"withdrawalAddress", p.blockchain.Config().WaterfallDammyAddress,
+				"withdrawalAddress", p.blockchain.Config().WaterfallDummyAddress,
 				"blHash", p.ctx.BlockHash.Hex(),
 			)
 		}
@@ -730,12 +730,12 @@ func (p *Processor) validatorStateAddressWithdrawal(toAddr common.Address) ([]by
 	}
 
 	p.state.SubBalance(toAddr, valsStateBalance)
-	p.state.AddBalance(p.blockchain.Config().WaterfallDammyAddress, valsStateBalance)
+	p.state.AddBalance(p.blockchain.Config().WaterfallDummyAddress, valsStateBalance)
 
 	p.state.SubBalance(p.blockchain.Config().AllocationContractAddress, allocBalance)
-	p.state.AddBalance(p.blockchain.Config().WaterfallDammyAddress, allocBalance)
+	p.state.AddBalance(p.blockchain.Config().WaterfallDummyAddress, allocBalance)
 
-	return p.blockchain.Config().WaterfallDammyAddress.Bytes(), nil
+	return p.blockchain.Config().WaterfallDummyAddress.Bytes(), nil
 }
 
 func (p *Processor) syncOpProcessing(op operation.ValidatorSync, msg message) (ret []byte, err error) {

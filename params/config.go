@@ -259,7 +259,7 @@ type ChainConfig struct {
 	EpochsPerEra              uint64 `json:"epochsPerEra"`
 	TransitionPeriod          uint64 `json:"transitionPeriod"` // The number of epochs before new era starts
 	ValidatorsStateAddress    *common.Address
-	WaterfallDammyAddress     common.Address
+	WaterfallDummyAddress     common.Address
 	AllocationContractAddress common.Address
 	ValidatorsPerSlot         uint64   `json:"validatorsPerSlot"`
 	EffectiveBalance          *big.Int `json:"effectiveBalance"`
@@ -304,8 +304,8 @@ func (c *ChainConfig) String() string {
 	return fmt.Sprintf("{ChainID: %v, SecondsPerSlot: %v, SlotsPerEpoch: %v, EpochsPerEra: %v, TransitionPeriod: %v, "+
 		"ValidatorsPerSlot %v, ValidatorsStateAddress %v, EffectiveBalance: %v, ValidatorOpExpireSlots: %v, ForkSlotSubNet1: %v, "+
 		"ForkSlotDelegate: %v, ForkSlotPrefixFin: %v, ForkSlotShanghai: %v, ForkSlotValOpTracking: %v, ForkSlotReduceBaseFee: %v, "+
-		"ForkSlotValSyncProc: %v, StartEpochsPerEra: %v, AcceptCpRootOnFinEpoch: %v, ForkSlotUpValsPerSlot %v, UpValidatorsPerSlot %v" +
-		"WaterfallDammyAddress: %+v}",
+		"ForkSlotValSyncProc: %v, StartEpochsPerEra: %v, AcceptCpRootOnFinEpoch: %v, ForkSlotUpValsPerSlot %v, UpValidatorsPerSlot %v"+
+		"WaterfallDummyAddress: %+v}",
 		c.ChainID,
 		c.SecondsPerSlot,
 		c.SlotsPerEpoch,
@@ -326,7 +326,7 @@ func (c *ChainConfig) String() string {
 		c.AcceptCpRootOnFinEpoch,
 		c.ForkSlotUpValsPerSlot,
 		c.UpValidatorsPerSlot,
-		c.WaterfallDammyAddress,
+		c.WaterfallDummyAddress,
 	)
 }
 
@@ -542,7 +542,7 @@ func OverrideTestnet9(conf *ChainConfig) *ChainConfig {
 }
 
 func OverrideDummyAddresses(conf *ChainConfig) *ChainConfig {
-	conf.WaterfallDammyAddress = waterfallDummyAddress
+	conf.WaterfallDummyAddress = waterfallDummyAddress
 	conf.AllocationContractAddress = allocationContractAddress
 
 	return conf
