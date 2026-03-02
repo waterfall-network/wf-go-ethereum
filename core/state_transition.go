@@ -422,7 +422,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 }
 
 func (st *StateTransition) checkTxType(to *common.Address, txType TxType) error {
-	if to != nil && bytes.Equal(to.Bytes(), st.vp.GetValidatorsStateAddress().Bytes()) &&
+	if st.vp != nil && to != nil && bytes.Equal(to.Bytes(), st.vp.GetValidatorsStateAddress().Bytes()) &&
 		txType != ValidatorSyncTxType && txType != ValidatorMethodTxType {
 		return errors.New("invalid validator transaction")
 	}
