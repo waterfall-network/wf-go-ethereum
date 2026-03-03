@@ -68,7 +68,6 @@ func (e *EventEmmiter) NewIndexedAddressLogEntry(address common.Address) *LogEnt
 }
 
 func (e *EventEmmiter) addLog(targetAddr common.Address, signature common.Hash, data []byte, logsEntries ...*LogEntry) {
-	//var data []byte
 	topics := []common.Hash{signature}
 
 	for _, entry := range logsEntries {

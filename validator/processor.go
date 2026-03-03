@@ -702,7 +702,6 @@ func (p *Processor) validatorWithdrawal(caller Ref, toAddr common.Address, op op
 			toAddr,
 			logData,
 			p.eventEmmiter.NewIndexedAddressLogEntry(op.CreatorAddress()),
-			p.eventEmmiter.NewIndexedAddressLogEntry(*validator.WithdrawalAddress),
 		)
 	} else {
 		p.eventEmmiter.WithdrawalRequest(toAddr, logData)
