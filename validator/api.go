@@ -260,11 +260,6 @@ func (s *PublicValidatorAPI) Validator_WithdrawalData(args WithdrawalArgs) (hexu
 	return b, nil
 }
 
-type WithdrawalFromValStateArgs struct {
-	WithdrawalAddress *common.Address `json:"withdrawal_address"`
-	Amount            *hexutil.Big    `json:"amount"`
-}
-
 func (s *PublicValidatorAPI) Validator_WithdrawalFromValStateData() (hexutil.Bytes, error) {
 	op := operation.NewWithdrawalFromValStateOperation()
 

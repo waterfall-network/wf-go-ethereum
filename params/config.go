@@ -304,8 +304,8 @@ func (c *ChainConfig) String() string {
 	return fmt.Sprintf("{ChainID: %v, SecondsPerSlot: %v, SlotsPerEpoch: %v, EpochsPerEra: %v, TransitionPeriod: %v, "+
 		"ValidatorsPerSlot %v, ValidatorsStateAddress %v, EffectiveBalance: %v, ValidatorOpExpireSlots: %v, ForkSlotSubNet1: %v, "+
 		"ForkSlotDelegate: %v, ForkSlotPrefixFin: %v, ForkSlotShanghai: %v, ForkSlotValOpTracking: %v, ForkSlotReduceBaseFee: %v, "+
-		"ForkSlotValSyncProc: %v, StartEpochsPerEra: %v, AcceptCpRootOnFinEpoch: %v, ForkSlotUpValsPerSlot %v, UpValidatorsPerSlot %v"+
-		"WaterfallDummyAddress: %+v}",
+		"ForkSlotValSyncProc: %v, StartEpochsPerEra: %v, AcceptCpRootOnFinEpoch: %v, ForkSlotUpValsPerSlot %v, UpValidatorsPerSlot %v, "+
+		"WaterfallDummyAddress: %+v, AllocationContractAddress: %+v}",
 		c.ChainID,
 		c.SecondsPerSlot,
 		c.SlotsPerEpoch,
@@ -327,6 +327,7 @@ func (c *ChainConfig) String() string {
 		c.ForkSlotUpValsPerSlot,
 		c.UpValidatorsPerSlot,
 		c.WaterfallDummyAddress,
+		c.AllocationContractAddress,
 	)
 }
 

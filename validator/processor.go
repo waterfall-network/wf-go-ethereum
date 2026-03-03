@@ -709,6 +709,10 @@ func (p *Processor) validatorWithdrawal(caller Ref, toAddr common.Address, op op
 }
 
 func (p *Processor) validatorStateAddressWithdrawal(toAddr common.Address) ([]byte, error) {
+	if !p.blockchain.Config().IsForkSlotValSyncProc(p.ctx.Slot) {
+		return nil, operation.ErrValSyncForkRequire
+	}
+
 	if !p.IsValidatorOp(&toAddr) {
 		return nil, ErrInvalidToAddress
 	}
@@ -729,11 +733,15 @@ func (p *Processor) validatorStateAddressWithdrawal(toAddr common.Address) ([]by
 		return nil, ErrInsufficientFundsForOp
 	}
 
-	p.state.SubBalance(toAddr, valsStateBalance)
-	p.state.AddBalance(p.blockchain.Config().WaterfallDummyAddress, valsStateBalance)
+	if valsStateBalanceErr == nil {
+		p.state.SubBalance(toAddr, valsStateBalance)
+		p.state.AddBalance(p.blockchain.Config().WaterfallDummyAddress, valsStateBalance)
+	}
 
-	p.state.SubBalance(p.blockchain.Config().AllocationContractAddress, allocBalance)
-	p.state.AddBalance(p.blockchain.Config().WaterfallDummyAddress, allocBalance)
+	if allocBalanceErr == nil {
+		p.state.SubBalance(p.blockchain.Config().AllocationContractAddress, allocBalance)
+		p.state.AddBalance(p.blockchain.Config().WaterfallDummyAddress, allocBalance)
+	}
 
 	return p.blockchain.Config().WaterfallDummyAddress.Bytes(), nil
 }

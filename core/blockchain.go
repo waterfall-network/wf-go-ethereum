@@ -5749,8 +5749,11 @@ func (bc *BlockChain) CheckValidatorOp(txData []byte, from common.Address, value
 	}
 
 	log.Warn("validator transaction has invalid txData", "txData", string(txData))
-
-	if bc.Config().IsForkSlotValSyncProc(bc.slotInfo.CurrentSlot()) {
+	si := bc.GetSlotInfo()
+	if si == nil {
+		return ErrBadSlotInfo
+	}
+	if bc.Config().IsForkSlotValSyncProc(si.CurrentSlot()) {
 		return errors.New("validator transaction has invalid txData")
 	}
 
@@ -5817,8 +5820,8 @@ func (bc *BlockChain) checkExitOperation(op validatorOp.Exit, from common.Addres
 				expiration := bc.Config().ValidatorOpExpireSlots
 
 				var currSlot uint64
-				if bc.GetSlotInfo() != nil {
-					currSlot = bc.GetSlotInfo().CurrentSlot()
+				if si := bc.GetSlotInfo(); si != nil {
+					currSlot = si.CurrentSlot()
 				}
 				if prevHeader != nil && currSlot < prevHeader.Slot+expiration {
 					return validator.ErrValOpBlocked
@@ -5902,8 +5905,8 @@ func (bc *BlockChain) checkWithdrawalOperation(op validatorOp.Withdrawal, from c
 				expiration := bc.Config().ValidatorOpExpireSlots
 
 				var currSlot uint64
-				if bc.GetSlotInfo() != nil {
-					currSlot = bc.GetSlotInfo().CurrentSlot()
+				if si := bc.GetSlotInfo(); si != nil {
+					currSlot = si.CurrentSlot()
 				}
 				if prevHeader != nil && currSlot < prevHeader.Slot+expiration {
 					return validator.ErrValOpBlocked
@@ -5916,7 +5919,11 @@ func (bc *BlockChain) checkWithdrawalOperation(op validatorOp.Withdrawal, from c
 }
 
 func (bc *BlockChain) checkWithdrawalFromValState() error {
-	if !bc.Config().IsForkSlotValSyncProc(bc.GetSlotInfo().CurrentSlot()) {
+	si := bc.GetSlotInfo()
+	if si == nil {
+		return ErrBadSlotInfo
+	}
+	if !bc.Config().IsForkSlotValSyncProc(si.CurrentSlot()) {
 		return errors.New("current fork does not support withdrawal from validators state address")
 	}
 
@@ -5939,8 +5946,8 @@ func (bc *BlockChain) checkDepositOperation(op validatorOp.Deposit, from common.
 	}
 	//check delegating stake activation fork
 	var curSlot uint64
-	if bc.GetSlotInfo() != nil {
-		curSlot = bc.GetSlotInfo().CurrentSlot()
+	if si := bc.GetSlotInfo(); si != nil {
+		curSlot = si.CurrentSlot()
 	}
 	if op.DelegatingStake() != nil {
 		if !bc.Config().IsForkSlotDelegate(curSlot) {
@@ -5987,8 +5994,8 @@ func (bc *BlockChain) checkDepositOperation(op validatorOp.Deposit, from common.
 				expiration := bc.Config().ValidatorOpExpireSlots
 
 				var currSlot uint64
-				if bc.GetSlotInfo() != nil {
-					currSlot = bc.GetSlotInfo().CurrentSlot()
+				if si := bc.GetSlotInfo(); si != nil {
+					currSlot = si.CurrentSlot()
 				}
 				if prevHeader != nil && currSlot < prevHeader.Slot+expiration {
 					return validator.ErrValOpBlocked
