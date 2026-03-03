@@ -101,7 +101,7 @@ func (oracle *Oracle) processBlock(bf *blockFees, percentiles []float64) {
 		)
 		return
 	}
-	creatorsPerSlotCount := oracle.backend.ChainConfig().ValidatorsPerSlot
+	creatorsPerSlotCount := oracle.backend.ChainConfig().GetValidatorsPerSlot(bf.block.Slot())
 	if creatorsPerSlot, err := bc.ValidatorStorage().GetCreatorsBySlot(bc, bf.header.Slot); err == nil {
 		creatorsPerSlotCount = uint64(len(creatorsPerSlot))
 	}

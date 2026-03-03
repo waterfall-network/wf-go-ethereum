@@ -29,6 +29,7 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/vm"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/crypto"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/ethdb"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/node"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/p2p"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/p2p/enode"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
@@ -80,7 +81,7 @@ func newTestBackendWithGenerator(blocks int, generator func(int, *core.BlockGen)
 		Validators: depositData,
 	}).MustCommit(db)
 
-	chain, _ := core.NewBlockChain(db, nil, params.TestChainConfig, vm.Config{}, nil)
+	chain, _ := core.NewBlockChain(db, nil, params.TestChainConfig, vm.Config{}, nil, &node.VerifiersKeystoreConfig{})
 
 	bs, _ := core.GenerateChain(params.TestChainConfig, chain.Genesis(), db, blocks, generator)
 	for i, bl := range bs {

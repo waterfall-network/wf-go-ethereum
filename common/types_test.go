@@ -1039,3 +1039,32 @@ func BenchmarkHashArray_Unique(b *testing.B) {
 		})
 	}
 }
+
+func TestHashArray_ToBytes(t *testing.T) {
+	testCases := []struct {
+		name           string
+		input          HashArray
+		expectedOutput []byte
+	}{
+		{
+			name:  "Case 1: No duplicates",
+			input: HashArray{{0x01}, {0x02}, {0x03}, {0x04}, {0x05}},
+			expectedOutput: []byte{
+				0x01, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+				0x02, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+				0x03, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+				0x04, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+				0x05, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			res := tc.input.ToBytes()
+			if !reflect.DeepEqual(res, tc.expectedOutput) {
+				t.Errorf("Expected output %v, but got %v", tc.expectedOutput, tc.input)
+			}
+		})
+	}
+}

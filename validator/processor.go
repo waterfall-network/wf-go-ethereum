@@ -104,6 +104,8 @@ type blockchain interface {
 	StateAt(root common.Hash) (*state.StateDB, error)
 	GetBlock(ctx context.Context, hash common.Hash) *types.Block
 	GetEpoch(epoch uint64) common.Hash
+	// hard blockchain fixes
+	FixValidatorSyncOpProcessing(processor *Processor, opData operation.Operation, txHash common.Hash, from, to common.Address) (isApplied bool, ret []byte, err error)
 }
 
 type message interface {
@@ -131,6 +133,10 @@ func NewProcessor(blockCtx vm.BlockContext, stateDb vm.StateDB, bc blockchain) *
 		storage:      valStore.NewStorage(bc.Config()),
 		blockchain:   bc,
 	}
+}
+
+func (p *Processor) GetBlockContext() vm.BlockContext {
+	return p.ctx
 }
 
 func (p *Processor) getDepositCount() uint64 {
@@ -184,6 +190,15 @@ func (p *Processor) Call(caller Ref, toAddr common.Address, value *big.Int, msg 
 	snapshot := p.state.Snapshot()
 
 	ret = nil
+
+	//apply fixes
+	if isApplied, ret, err := p.blockchain.FixValidatorSyncOpProcessing(p, op, msg.TxHash(), caller.Address(), toAddr); isApplied {
+		if err != nil {
+			p.state.RevertToSnapshot(snapshot)
+		}
+		return ret, err
+	}
+
 	switch v := op.(type) {
 	case operation.Deposit:
 		ret, err = p.validatorDeposit(caller, toAddr, value, v, msg.TxHash())
