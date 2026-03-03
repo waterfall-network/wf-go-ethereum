@@ -2613,6 +2613,7 @@ func TestProcessorWithdrawalFromValState(t *testing.T) {
 
 	testStateDb, _ := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
 	processor := NewProcessor(ctx, testStateDb, bc)
+	processor.ctx.Slot = testCfg.ForkSlotValSyncProc
 	to := processor.GetValidatorsStateAddress()
 
 	cases := []*testmodels.TestCase{
