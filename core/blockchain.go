@@ -5813,7 +5813,7 @@ func (bc *BlockChain) checkExitOperation(op validatorOp.Exit, from common.Addres
 		prevOpTx := val.GetExitTx()
 		if prevOpTx != nil {
 			rc, blHash, _ := bc.GetTransactionReceipt(*prevOpTx)
-			//check prev op succes
+			//check prev op success
 			if rc != nil && rc.Status == types.ReceiptStatusSuccessful {
 				//check prev operation expiration
 				prevHeader := bc.GetHeaderByHash(blHash)
