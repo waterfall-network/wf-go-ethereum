@@ -392,7 +392,7 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 
 	// Check whether the init code size has been exceeded.
 	if st.evm.ChainConfig().IsForkSlotValSyncProc(st.evm.Context.Slot) && isContractCreation && len(st.data) > params.MaxInitCodeSize {
-		return nil, fmt.Errorf("%w: code size %v limit %v", ErrMaxInitCodeSizeExceeded, len(st.data), params.MaxInitCodeSize)
+		return nil, fmt.Errorf("%w: code size %v limit %v", vm.ErrMaxInitCodeSizeExceeded, len(st.data), params.MaxInitCodeSize)
 	}
 
 	var (
