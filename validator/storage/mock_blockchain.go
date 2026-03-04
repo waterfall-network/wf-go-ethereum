@@ -124,6 +124,20 @@ func (mr *MockblockchainMockRecorder) StateAt(root interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "StateAt", reflect.TypeOf((*Mockblockchain)(nil).StateAt), root)
 }
 
+// UnlockVerifiers mocks base method.
+func (m *Mockblockchain) UnlockVerifiers(accounts [][]common.Address) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UnlockVerifiers", accounts)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UnlockVerifiers indicates an expected call of UnlockVerifiers.
+func (mr *MockblockchainMockRecorder) UnlockVerifiers(accounts interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UnlockVerifiers", reflect.TypeOf((*Mockblockchain)(nil).UnlockVerifiers), accounts)
+}
+
 // MockStorage is a mock of Storage interface.
 type MockStorage struct {
 	ctrl     *gomock.Controller

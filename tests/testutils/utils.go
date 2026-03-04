@@ -21,6 +21,8 @@ import (
 	"math/rand"
 	"testing"
 	"time"
+
+	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
 )
 
 func CompareBytes(t *testing.T, a, b []byte) {
@@ -78,4 +80,9 @@ func BigIntEquals(haveValue, wantValue *big.Int) bool {
 	}
 
 	return haveValue.Cmp(wantValue) == 0
+}
+
+func RandomHash() *common.Hash {
+	h := common.BytesToHash(RandomData(common.HashLength))
+	return &h
 }

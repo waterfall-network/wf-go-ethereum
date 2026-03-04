@@ -270,7 +270,7 @@ func newHandler(config *handlerConfig) (*handler, error) {
 				"peer", peerId,
 			)
 			// sync unloaded parents
-			err = h.downloader.SyncUnloadedParents(peerId, block.ParentHashes())
+			err = h.downloader.SyncUnloadedParents(peerId, h.chain.GetInsertDelayedParents())
 			//// start sync dag
 			//h.downloader.SynchroniseDagOnly(peerId)
 			return err

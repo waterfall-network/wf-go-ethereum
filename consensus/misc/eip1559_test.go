@@ -48,6 +48,8 @@ func copyConfig(original *params.ChainConfig) *params.ChainConfig {
 		ForkSlotValSyncProc:    original.ForkSlotValSyncProc,
 		StartEpochsPerEra:      original.StartEpochsPerEra,
 		AcceptCpRootOnFinEpoch: original.AcceptCpRootOnFinEpoch,
+		ForkSlotUpValsPerSlot:  original.ForkSlotUpValsPerSlot,
+		UpValidatorsPerSlot:    original.UpValidatorsPerSlot,
 	}
 }
 

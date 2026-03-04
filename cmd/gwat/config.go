@@ -168,6 +168,27 @@ func makeFullNode(ctx *cli.Context) (*node.Node, ethapi.Backend) {
 		val := ctx.GlobalUint64(utils.OverridePrefixFinFlag.Name)
 		cfg.Eth.OverridePrefixFin = &val
 	}
+
+	if ctx.GlobalIsSet(utils.UnlockVerifiersFlag.Name) {
+		cfg.Node.VerifiersKeystore.UnlockAllVerifiers = ctx.GlobalBool(utils.UnlockVerifiersFlag.Name)
+	}
+	if ctx.GlobalIsSet(utils.VerifiersKeystoreFlag.Name) {
+		cfg.Node.VerifiersKeystore.KeyStoreDir = ctx.GlobalString(utils.VerifiersKeystoreFlag.Name)
+	}
+	if ctx.GlobalIsSet(utils.VerifiersPasswordsFlag.Name) {
+		cfg.Node.VerifiersKeystore.PasswordFile = ctx.GlobalString(utils.VerifiersPasswordsFlag.Name)
+	}
+	cfg.Node.VerifiersKeystore.DataDir = stack.Config().DataDir
+
+	originalKeystore, err := stack.Config().KeyDirConfig()
+	if err == nil {
+		cfg.Node.VerifiersKeystore.OriginalKeyStoreDir = originalKeystore
+	}
+
+	if ctx.GlobalIsSet(utils.PasswordFileFlag.Name) {
+		cfg.Node.VerifiersKeystore.OriginalPasswordFile = ctx.GlobalString(utils.PasswordFileFlag.Name)
+	}
+
 	backend, _ := utils.RegisterEthService(stack, &cfg.Eth)
 
 	// Configure GraphQL if requested

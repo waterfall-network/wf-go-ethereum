@@ -17,7 +17,6 @@
 package eth
 
 import (
-	"context"
 	"errors"
 	"fmt"
 	"time"
@@ -168,13 +167,10 @@ func (eth *Ethereum) stateAtTransaction(block *types.Block, txIndex int, reexec 
 	}
 	// Create the parent state database
 	var parent *types.Block
-	ctx := context.Background()
-	for _, h := range block.ParentHashes() {
-		pb := eth.blockchain.GetBlock(ctx, h)
-		if pb != nil && pb.Nr() == pb.Height() {
-			parent = pb
-			break
-		}
+	if block.Nr() > 0 {
+		parent = eth.blockchain.GetBlockByNumber(block.Nr() - 1)
+	} else {
+		return nil, vm.BlockContext{}, nil, fmt.Errorf("block %v is not finalized", block.Hash())
 	}
 	if parent == nil {
 		return nil, vm.BlockContext{}, nil, fmt.Errorf("parent %v not found", block.ParentHashes())
