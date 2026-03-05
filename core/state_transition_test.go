@@ -744,6 +744,10 @@ func (m MockMessage) AccessList() types.AccessList {
 	return []types.AccessTuple{}
 }
 
+func (m MockMessage) SetCodeAuthorizations() []types.SetCodeAuthorization {
+	return nil
+}
+
 func (m MockMessage) setTo(addr *common.Address) {
 	m.to = addr
 }

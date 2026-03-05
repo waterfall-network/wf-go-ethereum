@@ -21,6 +21,7 @@ import (
 
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common/math"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
 )
 
@@ -196,6 +197,54 @@ var (
 	gasDelegateCallEIP2929 = makeCallVariantGasCallEIP2929(gasDelegateCall)
 	gasStaticCallEIP2929   = makeCallVariantGasCallEIP2929(gasStaticCall)
 	gasCallCodeEIP2929     = makeCallVariantGasCallEIP2929(gasCallCode)
+
+	innerGasCallEIP7702    = makeCallVariantGasCallEIP7702(gasCallEIP2929)
+	gasDelegateCallEIP7702 = makeCallVariantGasCallEIP7702(gasDelegateCallEIP2929)
+	gasStaticCallEIP7702   = makeCallVariantGasCallEIP7702(gasStaticCallEIP2929)
+	gasCallCodeEIP7702     = makeCallVariantGasCallEIP7702(gasCallCodeEIP2929)
+)
+
+// gasCallEIP7702 wraps innerGasCallEIP7702 for the CALL opcode.
+func gasCallEIP7702(evm *EVM, contract *Contract, stack *Stack, mem *Memory, memorySize uint64) (uint64, error) {
+	return innerGasCallEIP7702(evm, contract, stack, mem, memorySize)
+}
+
+// makeCallVariantGasCallEIP7702 extends EIP-2929 call gas accounting by also
+// charging for resolution of EIP-7702 delegation designators.
+func makeCallVariantGasCallEIP7702(oldCalculator gasFunc) gasFunc {
+	return func(evm *EVM, contract *Contract, stack *Stack, mem *Memory, memorySize uint64) (uint64, error) {
+		addr := common.Address(stack.Back(1).Bytes20())
+
+		// Check if code is a delegation and charge for accessing the delegate.
+		if target, ok := types.ParseDelegation(evm.StateDB.GetCode(addr)); ok {
+			var cost uint64
+			if evm.StateDB.AddressInAccessList(target) {
+				cost = params.WarmStorageReadCostEIP2929
+			} else {
+				evm.StateDB.AddAddressToAccessList(target)
+				cost = params.ColdAccountAccessCostEIP2929
+			}
+			if !contract.UseGas(cost) {
+				return 0, ErrOutOfGas
+			}
+			// Temporarily restore gas and add delegation cost to the return value
+			// so it is reported correctly as dynamic gas.
+			contract.Gas += cost
+			gas, err := oldCalculator(evm, contract, stack, mem, memorySize)
+			if err != nil {
+				return gas, err
+			}
+			var overflow bool
+			if gas, overflow = math.SafeAdd(gas, cost); overflow {
+				return 0, ErrGasUintOverflow
+			}
+			return gas, nil
+		}
+		return oldCalculator(evm, contract, stack, mem, memorySize)
+	}
+}
+
+var (
 	gasSelfdestructEIP2929 = makeSelfdestructGasFn(true)
 	// gasSelfdestructEIP3529 implements the changes in EIP-2539 (no refunds)
 	gasSelfdestructEIP3529 = makeSelfdestructGasFn(false)

@@ -45,6 +45,9 @@ const (
 	LegacyTxType = iota
 	AccessListTxType
 	DynamicFeeTxType
+	// SetCodeTxType is 0x04; 0x03 (BlobTxType) is intentionally skipped as
+	// blob transactions are incompatible with the Waterfall consensus architecture.
+	SetCodeTxType = 0x04
 )
 
 // Transaction is an Ethereum transaction.
@@ -186,9 +189,22 @@ func (tx *Transaction) decodeTyped(b []byte) (TxData, error) {
 		var inner DynamicFeeTx
 		err := rlp.DecodeBytes(b[1:], &inner)
 		return &inner, err
+	case SetCodeTxType:
+		var inner SetCodeTx
+		err := rlp.DecodeBytes(b[1:], &inner)
+		return &inner, err
 	default:
 		return nil, ErrTxTypeNotSupported
 	}
+}
+
+// SetCodeAuthorizations returns the authorization list of the transaction.
+// It returns nil for non-SetCode transactions.
+func (tx *Transaction) SetCodeAuthorizations() []SetCodeAuthorization {
+	if inner, ok := tx.inner.(*SetCodeTx); ok {
+		return inner.AuthList
+	}
+	return nil
 }
 
 // setDecoded sets the inner transaction and size after decoding.
@@ -572,18 +588,19 @@ func (t *TransactionsByPriceAndNonce) Pop() {
 //
 // NOTE: In a future PR this will be removed.
 type Message struct {
-	to         *common.Address
-	from       common.Address
-	nonce      uint64
-	amount     *big.Int
-	gasLimit   uint64
-	gasPrice   *big.Int
-	gasFeeCap  *big.Int
-	gasTipCap  *big.Int
-	data       []byte
-	accessList AccessList
-	isFake     bool
-	txHash     common.Hash
+	to                    *common.Address
+	from                  common.Address
+	nonce                 uint64
+	amount                *big.Int
+	gasLimit              uint64
+	gasPrice              *big.Int
+	gasFeeCap             *big.Int
+	gasTipCap             *big.Int
+	data                  []byte
+	accessList            AccessList
+	setCodeAuthorizations []SetCodeAuthorization
+	isFake                bool
+	txHash                common.Hash
 }
 
 func NewMessage(from common.Address, to *common.Address, nonce uint64, amount *big.Int, gasLimit uint64, gasPrice, gasFeeCap, gasTipCap *big.Int, data []byte, accessList AccessList, isFake bool) Message {
@@ -622,6 +639,9 @@ func (tx *Transaction) AsMessage(s Signer, baseFee *big.Int) (Message, error) {
 	if baseFee != nil {
 		msg.gasPrice = math.BigMin(msg.gasPrice.Add(msg.gasTipCap, baseFee), msg.gasFeeCap)
 	}
+	if inner, ok := tx.inner.(*SetCodeTx); ok {
+		msg.setCodeAuthorizations = inner.AuthList
+	}
 	var err error
 	msg.from, err = Sender(s, tx)
 	return msg, err
@@ -638,10 +658,11 @@ func (m Message) SetGas(gas uint64) Message {
 	m.gasLimit = gas
 	return m
 }
-func (m Message) Nonce() uint64          { return m.nonce }
-func (m Message) Data() []byte           { return m.data }
-func (m Message) AccessList() AccessList { return m.accessList }
-func (m Message) IsFake() bool           { return m.isFake }
+func (m Message) Nonce() uint64                                 { return m.nonce }
+func (m Message) Data() []byte                                  { return m.data }
+func (m Message) AccessList() AccessList                        { return m.accessList }
+func (m Message) SetCodeAuthorizations() []SetCodeAuthorization { return m.setCodeAuthorizations }
+func (m Message) IsFake() bool                                  { return m.isFake }
 func (m Message) SetFake(isFake bool) Message {
 	m.isFake = isFake
 	return m

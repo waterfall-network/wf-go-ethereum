@@ -4077,6 +4077,7 @@ func (bc *BlockChain) EstimateGas(msg types.Message, header *types.Header) (uint
 	case ValidatorMethodTxType, ValidatorSyncTxType:
 		return IntrinsicGas(msg.Data(),
 			msg.AccessList(),
+			msg.SetCodeAuthorizations(),
 			false,
 			true,
 			bc.chainConfig.IsForkSlotValSyncProc(header.Slot),
@@ -4086,6 +4087,7 @@ func (bc *BlockChain) EstimateGas(msg types.Message, header *types.Header) (uint
 	case TokenCreationTxType, TokenMethodTxType:
 		return IntrinsicGas(msg.Data(),
 			msg.AccessList(),
+			msg.SetCodeAuthorizations(),
 			false,
 			false,
 			bc.chainConfig.IsForkSlotValSyncProc(header.Slot),
