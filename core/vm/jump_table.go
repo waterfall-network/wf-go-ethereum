@@ -82,9 +82,10 @@ func validate(jt JumpTable) JumpTable {
 
 func newCancunInstructionSet() JumpTable {
 	instructionSet := newMergeInstructionSet()
-	enable5656(&instructionSet) // EIP-5656 (MCOPY opcode)
-	enable3860(&instructionSet) // Limit and meter initcode
+	enable3860(&instructionSet) // EIP-3860 Limit and meter initcode
 	enable1153(&instructionSet) // EIP-1153 "Transient Storage"
+	enable5656(&instructionSet) // EIP-5656 (MCOPY opcode)
+	enable6780(&instructionSet) // EIP-6780 SELFDESTRUCT only in same transaction
 	return validate(instructionSet)
 }
 
