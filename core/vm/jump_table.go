@@ -55,6 +55,8 @@ var (
 	berlinInstructionSet           = newBerlinInstructionSet()
 	londonInstructionSet           = newLondonInstructionSet()
 	shanghaiInstructionSet         = newShanghaiInstructionSet()
+	mergeInstructionSet            = newMergeInstructionSet()
+	cancunInstructionSet           = newCancunInstructionSet()
 )
 
 // JumpTable contains the EVM opcodes supported at a given fork.
@@ -76,6 +78,25 @@ func validate(jt JumpTable) JumpTable {
 		}
 	}
 	return jt
+}
+
+func newCancunInstructionSet() JumpTable {
+	instructionSet := newMergeInstructionSet()
+	enable5656(&instructionSet) // EIP-5656 (MCOPY opcode)
+	enable3860(&instructionSet) // Limit and meter initcode
+	enable1153(&instructionSet) // EIP-1153 "Transient Storage"
+	return validate(instructionSet)
+}
+
+func newMergeInstructionSet() JumpTable {
+	instructionSet := newShanghaiInstructionSet()
+	instructionSet[PREVRANDAO] = &operation{
+		execute:     opRandom,
+		constantGas: GasQuickStep,
+		minStack:    minStack(0, 1),
+		maxStack:    maxStack(0, 1),
+	}
+	return validate(instructionSet)
 }
 
 func newShanghaiInstructionSet() JumpTable {

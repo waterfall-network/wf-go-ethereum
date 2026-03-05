@@ -450,7 +450,8 @@ type Rules struct {
 	ChainID                                                 *big.Int
 	IsHomestead, IsEIP150, IsEIP155, IsEIP158               bool
 	IsByzantium, IsConstantinople, IsPetersburg, IsIstanbul bool
-	IsBerlin, IsLondon, IsShanghai                          bool
+	IsBerlin, IsLondon,
+	IsShanghai, IsMerge, IsCancun bool
 }
 
 // Rules ensures c's ChainID is not nil.
@@ -472,6 +473,8 @@ func (c *ChainConfig) Rules(slot uint64) Rules {
 		IsBerlin:         true,
 		IsLondon:         true,
 		IsShanghai:       c.ForkSlotShanghai <= slot,
+		IsMerge:          c.IsForkSlotValSyncProc(slot),
+		IsCancun:         c.IsForkSlotValSyncProc(slot),
 	}
 }
 

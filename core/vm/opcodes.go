@@ -94,6 +94,8 @@ const (
 	TIMESTAMP   OpCode = 0x42
 	NUMBER      OpCode = 0x43
 	DIFFICULTY  OpCode = 0x44
+	RANDOM      OpCode = 0x44 // Same as DIFFICULTY
+	PREVRANDAO  OpCode = 0x44 // Same as DIFFICULTY
 	GASLIMIT    OpCode = 0x45
 	CHAINID     OpCode = 0x46
 	SELFBALANCE OpCode = 0x47
@@ -114,6 +116,9 @@ const (
 	MSIZE    OpCode = 0x59
 	GAS      OpCode = 0x5a
 	JUMPDEST OpCode = 0x5b
+	TLOAD    OpCode = 0x5c
+	TSTORE   OpCode = 0x5d
+	MCOPY    OpCode = 0x5e
 	PUSH0    OpCode = 0x5f
 )
 
@@ -293,6 +298,7 @@ var opCodeToString = [256]string{
 	MSIZE:    "MSIZE",
 	GAS:      "GAS",
 	JUMPDEST: "JUMPDEST",
+	MCOPY:    "MCOPY",
 	PUSH0:    "PUSH0",
 
 	// 0x60 range - pushes.
@@ -371,6 +377,10 @@ var opCodeToString = [256]string{
 	LOG2: "LOG2",
 	LOG3: "LOG3",
 	LOG4: "LOG4",
+
+	// 0xb0 range.
+	TLOAD:  "TLOAD",
+	TSTORE: "TSTORE",
 
 	// 0xf0 range - closures.
 	CREATE:       "CREATE",
@@ -459,7 +469,10 @@ var stringToOp = map[string]OpCode{
 	"MSIZE":          MSIZE,
 	"GAS":            GAS,
 	"JUMPDEST":       JUMPDEST,
+	"MCOPY":          MCOPY,
 	"PUSH0":          PUSH0,
+	"TLOAD":          TLOAD,
+	"TSTORE":         TSTORE,
 	"PUSH1":          PUSH1,
 	"PUSH2":          PUSH2,
 	"PUSH3":          PUSH3,
