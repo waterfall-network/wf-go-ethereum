@@ -110,6 +110,27 @@ var (
 	// ErrCpNotFinalized is returned if the checkpoint is not finalized yet.
 	ErrCpNotFinalized = errors.New("checkpoint is not finalized")
 
+	// ErrSetCodeTxCreate is returned if a set-code transaction has no destination address.
+	ErrSetCodeTxCreate = errors.New("set-code transaction cannot be a create transaction")
+
+	// ErrEmptyAuthList is returned if a set-code transaction has an empty authorization list.
+	ErrEmptyAuthList = errors.New("set-code transaction must have non-empty authorization list")
+
+	// ErrAuthorizationWrongChainID is returned if an authorization has an unexpected chain ID.
+	ErrAuthorizationWrongChainID = errors.New("authorization has wrong chain ID")
+
+	// ErrAuthorizationNonceOverflow is returned if the nonce of an authorization is too large.
+	ErrAuthorizationNonceOverflow = errors.New("authorization nonce exceeds 2^64-1")
+
+	// ErrAuthorizationInvalidSignature is returned if an authorization signature is invalid.
+	ErrAuthorizationInvalidSignature = errors.New("authorization has invalid signature")
+
+	// ErrAuthorizationDestinationHasCode is returned if the authority has non-delegation code.
+	ErrAuthorizationDestinationHasCode = errors.New("authorization destination already has code")
+
+	// ErrAuthorizationNonceMismatch is returned if the nonce in an authorization doesn't match.
+	ErrAuthorizationNonceMismatch = errors.New("authorization nonce mismatch")
+
 	ErrCpBlockNotNotFound = errors.New("checkpoint block not found")
 
 	ErrCpBadFinalization = errors.New("checkpoint bad finalization")

@@ -57,6 +57,7 @@ var (
 	shanghaiInstructionSet         = newShanghaiInstructionSet()
 	mergeInstructionSet            = newMergeInstructionSet()
 	cancunInstructionSet           = newCancunInstructionSet()
+	pragueInstructionSet           = newPragueInstructionSet()
 )
 
 // JumpTable contains the EVM opcodes supported at a given fork.
@@ -78,6 +79,12 @@ func validate(jt JumpTable) JumpTable {
 		}
 	}
 	return jt
+}
+
+func newPragueInstructionSet() JumpTable {
+	instructionSet := newCancunInstructionSet()
+	enable7702(&instructionSet) // EIP-7702 Set code for EOAs (delegation designators)
+	return validate(instructionSet)
 }
 
 func newCancunInstructionSet() JumpTable {

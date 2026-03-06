@@ -153,6 +153,7 @@ func Transaction(ctx *cli.Context) error {
 		// Check intrinsic gas
 		if gas, err := core.IntrinsicGas(tx.Data(),
 			tx.AccessList(),
+			tx.SetCodeAuthorizations(),
 			isContractCreation,
 			isValidatorOp,
 			chainConfig.IsForkSlotValSyncProc(0),
