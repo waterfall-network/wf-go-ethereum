@@ -41,6 +41,87 @@ var cancunConfig = &params.ChainConfig{
 	UpValidatorsPerSlot:    25,
 }
 
+// TestEIP7939CLZ verifies the CLZ opcode (count leading zeros in a 256-bit word).
+func TestEIP7939CLZ(t *testing.T) {
+	// buildCLZCode returns bytecode that pushes `input`, runs CLZ, stores the
+	// result at mem[0] and returns 32 bytes so the caller can inspect the value.
+	buildCLZCode := func(input []byte) []byte {
+		code := []byte{byte(PUSH32)}
+		// Pad input to 32 bytes (big-endian).
+		word := make([]byte, 32)
+		copy(word[32-len(input):], input)
+		code = append(code, word...)
+		code = append(code,
+			byte(CLZ),      // compute CLZ
+			byte(PUSH1), 0, // offset = 0
+			byte(MSTORE),    // mem[0] = result
+			byte(PUSH1), 32, // length = 32
+			byte(PUSH1), 0, // offset = 0
+			byte(RETURN),
+		)
+		return code
+	}
+
+	newTestEVM := func(statedb *state.StateDB) *EVM {
+		blockCtx := BlockContext{
+			CanTransfer: func(db StateDB, addr common.Address, amount *big.Int) bool { return true },
+			Transfer:    func(db StateDB, from, to common.Address, amount *big.Int) {},
+			BaseFee:     new(big.Int),
+		}
+		return NewEVM(blockCtx, TxContext{}, statedb, cancunConfig, Config{})
+	}
+
+	cases := []struct {
+		name    string
+		input   []byte
+		wantCLZ uint64
+	}{
+		{"zero → 256", []byte{0x00}, 256},
+		{"one → 255", []byte{0x01}, 255},
+		{"0xff → 248", []byte{0xff}, 248},
+		{"0x0100 → 247", []byte{0x01, 0x00}, 247},
+		{"MSB set → 0", append([]byte{0x80}, make([]byte, 31)...), 0},
+		{"max uint256 → 0", func() []byte {
+			b := make([]byte, 32)
+			for i := range b {
+				b[i] = 0xff
+			}
+			return b
+		}(), 0},
+	}
+
+	contractAddr := common.HexToAddress("0x00000000000000000000000000000000000000cc")
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			statedb, err := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
+			if err != nil {
+				t.Fatalf("failed to create state: %v", err)
+			}
+			statedb.CreateAccount(contractAddr)
+			statedb.SetCode(contractAddr, buildCLZCode(tc.input))
+
+			evm := newTestEVM(statedb)
+			ret, _, err := evm.Call(AccountRef(common.Address{}), contractAddr, nil, 1_000_000, new(big.Int))
+			if err != nil {
+				t.Fatalf("execution error: %v", err)
+			}
+			if len(ret) != 32 {
+				t.Fatalf("expected 32 bytes return, got %d", len(ret))
+			}
+			// Decode big-endian uint64 from last 8 bytes of the 32-byte word.
+			var result uint64
+			for _, b := range ret[24:] {
+				result = result<<8 | uint64(b)
+			}
+			if result != tc.wantCLZ {
+				t.Errorf("CLZ(%x) = %d, want %d", tc.input, result, tc.wantCLZ)
+			}
+		})
+	}
+}
+
 // TestEIP7702DelegationResolution verifies EIP-7702 delegation behaviour:
 //   - CALL on an EOA with a delegation designator executes the delegate's code
 //     in the context of the EOA (storage writes go to the EOA).
