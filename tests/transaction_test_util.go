@@ -59,6 +59,7 @@ func (tt *TransactionTest) Run(config *params.ChainConfig) error {
 		// Intrinsic gas
 		requiredGas, err := core.IntrinsicGas(tx.Data(),
 			tx.AccessList(),
+			tx.SetCodeAuthorizations(),
 			tx.To() == nil,
 			isValidatorOp,
 			false,
