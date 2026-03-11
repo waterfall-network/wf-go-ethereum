@@ -376,6 +376,27 @@ func (s *StateDB) HasSuicided(addr common.Address) bool {
 	return false
 }
 
+// CreateContract is used whenever a contract is created. This operation sets
+// the 'newContract' flag, which is required to correctly handle EIP-6780
+// 'delete-in-same-transaction' logic.
+func (s *StateDB) CreateContract(addr common.Address) {
+	obj := s.getStateObject(addr)
+	if !obj.newContract {
+		obj.newContract = true
+		s.journal.createContract(addr)
+	}
+}
+
+// IsNewContract reports whether the contract at the given address was deployed
+// during the current transaction.
+func (s *StateDB) IsNewContract(addr common.Address) bool {
+	obj := s.getStateObject(addr)
+	if obj == nil {
+		return false
+	}
+	return obj.newContract
+}
+
 /*
  * SETTERS
  */

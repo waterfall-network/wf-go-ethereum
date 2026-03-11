@@ -26,6 +26,9 @@ import (
 )
 
 var activators = map[int]func(*JumpTable){
+	7939: enable7939,
+	7702: enable7702,
+	6780: enable6780,
 	5656: enable5656,
 	3855: enable3855,
 	3860: enable3860,
@@ -267,4 +270,44 @@ func opMcopy(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]by
 	// (the memorySize function on the opcode).
 	scope.Memory.Copy(dst.Uint64(), src.Uint64(), length.Uint64())
 	return nil, nil
+}
+
+// enable6780 applies EIP-6780 (SELFDESTRUCT only in same transaction)
+// https://eips.ethereum.org/EIPS/eip-6780
+func enable6780(jt *JumpTable) {
+	jt[SELFDESTRUCT] = &operation{
+		execute:     opSelfdestruct6780,
+		dynamicGas:  gasSelfdestructEIP3529,
+		constantGas: params.SelfdestructGasEIP150,
+		minStack:    minStack(1, 0),
+		maxStack:    maxStack(1, 0),
+	}
+}
+
+// opCLZ implements EIP-7939 CLZ opcode: counts leading zero bits in a 256-bit word.
+// Returns 256 for input == 0.
+func opCLZ(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	x := scope.Stack.peek()
+	x.SetUint64(256 - uint64(x.BitLen()))
+	return nil, nil
+}
+
+// enable7939 applies EIP-7939 (CLZ opcode — count leading zeros).
+// https://eips.ethereum.org/EIPS/eip-7939
+func enable7939(jt *JumpTable) {
+	jt[CLZ] = &operation{
+		execute:     opCLZ,
+		constantGas: GasFastStep,
+		minStack:    minStack(1, 1),
+		maxStack:    maxStack(1, 1),
+	}
+}
+
+// enable7702 applies EIP-7702 (set code for EOAs via delegation designators).
+// https://eips.ethereum.org/EIPS/eip-7702
+func enable7702(jt *JumpTable) {
+	jt[CALL].dynamicGas = gasCallEIP7702
+	jt[CALLCODE].dynamicGas = gasCallCodeEIP7702
+	jt[STATICCALL].dynamicGas = gasStaticCallEIP7702
+	jt[DELEGATECALL].dynamicGas = gasDelegateCallEIP7702
 }

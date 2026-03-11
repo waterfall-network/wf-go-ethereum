@@ -830,6 +830,29 @@ func opSelfdestruct(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext
 	return nil, errStopToken
 }
 
+func opSelfdestruct6780(pc *uint64, interpreter *EVMInterpreter, scope *ScopeContext) ([]byte, error) {
+	if interpreter.readOnly {
+		return nil, ErrWriteProtection
+	}
+	beneficiaryVal := scope.Stack.pop()
+	var (
+		this        = scope.Contract.Address()
+		beneficiary = common.Address(beneficiaryVal.Bytes20())
+		balance     = interpreter.evm.StateDB.GetBalance(this)
+		newContract = interpreter.evm.StateDB.IsNewContract(this)
+	)
+	if newContract {
+		// Contract was created in this transaction: full selfdestruct.
+		interpreter.evm.StateDB.AddBalance(beneficiary, balance)
+		interpreter.evm.StateDB.Suicide(this)
+	} else if this != beneficiary {
+		// Contract already existed: only transfer balance, do not delete.
+		interpreter.evm.StateDB.AddBalance(beneficiary, balance)
+		interpreter.evm.StateDB.SubBalance(this, balance)
+	}
+	return nil, errStopToken
+}
+
 // following functions are used by the instruction jump  table
 
 // make log instruction function

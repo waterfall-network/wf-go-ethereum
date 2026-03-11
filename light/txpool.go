@@ -402,6 +402,7 @@ func (pool *TxPool) validateTx(ctx context.Context, tx *types.Transaction) error
 	// Should supply enough intrinsic gas
 	gas, err := core.IntrinsicGas(tx.Data(),
 		tx.AccessList(),
+		tx.SetCodeAuthorizations(),
 		tx.To() == nil,
 		isValidatorOp,
 		pool.config.IsForkSlotValSyncProc(header.Slot),
