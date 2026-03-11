@@ -36,6 +36,55 @@ func newEIP7702StateTransition(t *testing.T, statedb *state.StateDB) *StateTrans
 	return NewStateTransition(evm, nil, nil, msg, new(GasPool).AddGas(0))
 }
 
+// TestEIP7702DelegatedEOACanSend verifies that an EOA with EIP-7702 delegation
+// code is still allowed to send regular transactions (preCheck must not reject
+// it with ErrSenderNoEOA).
+func TestEIP7702DelegatedEOACanSend(t *testing.T) {
+	delegateAddr := common.HexToAddress("0x00000000000000000000000000000000000000bb")
+
+	key, err := crypto.GenerateKey()
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	senderAddr := crypto.PubkeyToAddress(key.PublicKey)
+
+	db, err := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
+	if err != nil {
+		t.Fatalf("create state: %v", err)
+	}
+	db.CreateAccount(senderAddr)
+	// Set EIP-7702 delegation code on the sender — simulates a previously
+	// applied SetCode transaction.
+	db.SetCode(senderAddr, types.AddressToDelegation(delegateAddr))
+
+	toAddr := common.HexToAddress("0x1234")
+	const gasLimit = 21000
+	msg := types.NewMessage(
+		senderAddr, &toAddr,
+		0,            // nonce matches state nonce (0)
+		new(big.Int), // value
+		gasLimit,
+		new(big.Int), // gasPrice
+		new(big.Int), // gasFeeCap
+		new(big.Int), // gasTipCap
+		nil,          // data
+		nil,          // accessList
+		false,        // isFake = false → triggers preCheck validation
+	)
+
+	evm := vm.NewEVM(vm.BlockContext{
+		CanTransfer: func(db vm.StateDB, addr common.Address, amount *big.Int) bool { return true },
+		Transfer:    func(db vm.StateDB, a, b common.Address, v *big.Int) {},
+		BaseFee:     new(big.Int),
+	}, vm.TxContext{}, db, eip3860Config, vm.Config{NoBaseFee: true})
+
+	st := NewStateTransition(evm, nil, nil, msg, new(GasPool).AddGas(gasLimit))
+	if err := st.preCheck(); err != nil {
+		// This is the bug: delegated EOA incorrectly rejected as "sender not an eoa"
+		t.Errorf("preCheck rejected delegated EOA: %v", err)
+	}
+}
+
 // TestApplyAuthorization covers the EIP-7702 applyAuthorization logic.
 func TestApplyAuthorization(t *testing.T) {
 	delegateAddr := common.HexToAddress("0x00000000000000000000000000000000000000bb")

@@ -297,8 +297,12 @@ func (st *StateTransition) preCheck() error {
 
 		if !isValOp {
 			if codeHash := st.state.GetCodeHash(st.msg.From()); codeHash != emptyCodeHash && codeHash != (common.Hash{}) && !st.state.IsValidatorAddress(st.msg.From()) {
-				return fmt.Errorf("%w: address %v, codehash: %s", ErrSenderNoEOA,
-					st.msg.From().Hex(), codeHash)
+				// EIP-7702: an EOA with a delegation (0xef0100 ++ addr) is still
+				// considered an EOA and must be allowed to send transactions.
+				if _, isDelegation := types.ParseDelegation(st.state.GetCode(st.msg.From())); !isDelegation {
+					return fmt.Errorf("%w: address %v, codehash: %s", ErrSenderNoEOA,
+						st.msg.From().Hex(), codeHash)
+				}
 			}
 		}
 	}
