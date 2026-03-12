@@ -20,6 +20,7 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/vm"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/crypto"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
+	valStore "gitlab.waterfall.network/waterfall/protocol/gwat/validator/storage"
 )
 
 // newEIP7702StateTransition builds a minimal StateTransition for testing
@@ -297,4 +298,70 @@ func TestApplyAuthorization(t *testing.T) {
 			t.Errorf("expected ErrAuthorizationDestinationHasCode, got %v", err)
 		}
 	})
+}
+
+// TestEIP7702ValidatorDataProtected verifies that an EIP-7702 authorization
+// targeting a validator address is rejected and the validator data is preserved.
+// Validator state is stored as account code (via SetCode), so applying a
+// SetCode delegation transaction must not overwrite it.
+func TestEIP7702ValidatorDataProtected(t *testing.T) {
+	delegateAddr := common.HexToAddress("0x00000000000000000000000000000000000000bb")
+
+	key, err := crypto.GenerateKey()
+	if err != nil {
+		t.Fatalf("generate key: %v", err)
+	}
+	validatorAddr := crypto.PubkeyToAddress(key.PublicKey)
+
+	// Build minimal validator data and marshal it to binary (same as SetValidator).
+	var pubKey common.BlsPubKey
+	val := valStore.NewValidator(pubKey, validatorAddr, nil)
+	val.ActivationEra = 42
+	val.Index = 7
+	valData, err := val.MarshalBinary()
+	if err != nil {
+		t.Fatalf("marshal validator: %v", err)
+	}
+
+	db, err := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
+	if err != nil {
+		t.Fatalf("create state: %v", err)
+	}
+	db.CreateAccount(validatorAddr)
+	// Store validator data as code — exactly what storage.SetValidator does.
+	db.SetCode(validatorAddr, valData)
+
+	auth, err := types.SignSetCode(key, types.SetCodeAuthorization{
+		ChainID: big.NewInt(1337),
+		Address: delegateAddr,
+		Nonce:   0,
+	})
+	if err != nil {
+		t.Fatalf("SignSetCode: %v", err)
+	}
+
+	st := newEIP7702StateTransition(t, db)
+
+	// The authorization must be rejected because the account holds validator data (non-delegation code).
+	if err := st.applyAuthorization(&auth); !errors.Is(err, ErrAuthorizationDestinationHasCode) {
+		t.Errorf("expected ErrAuthorizationDestinationHasCode for validator address, got %v", err)
+	}
+
+	// Validator data must be intact.
+	gotCode := db.GetCode(validatorAddr)
+	if string(gotCode) != string(valData) {
+		t.Errorf("validator code was modified by EIP-7702 authorization")
+	}
+
+	// The code must still parse as a valid validator.
+	gotVal, err := valStore.ValidatorBinary(gotCode).ToValidator()
+	if err != nil {
+		t.Fatalf("validator data corrupted after EIP-7702 attempt: %v", err)
+	}
+	if gotVal.ActivationEra != 42 {
+		t.Errorf("ActivationEra: got %d, want 42", gotVal.ActivationEra)
+	}
+	if gotVal.Index != 7 {
+		t.Errorf("Index: got %d, want 7", gotVal.Index)
+	}
 }
