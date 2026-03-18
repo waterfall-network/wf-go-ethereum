@@ -44,12 +44,11 @@ func NewDelegatingStakeRules(
 	stakeShare map[common.Address]uint8,
 	exit []common.Address,
 	withdrawal []common.Address,
-) (*DelegatingStakeRules, error) {
+) *DelegatingStakeRules {
 	dsr := DelegatingStakeRules{}
-	if err := dsr.init(profitShare, stakeShare, exit, withdrawal); err != nil {
-		return nil, err
-	}
-	return &dsr, nil
+	dsr.init(profitShare, stakeShare, exit, withdrawal)
+
+	return &dsr
 }
 
 func (dr *DelegatingStakeRules) init(
@@ -57,7 +56,7 @@ func (dr *DelegatingStakeRules) init(
 	stakeShare map[common.Address]uint8,
 	exit []common.Address,
 	withdrawal []common.Address,
-) error {
+) {
 	type adrInfo struct {
 		Profit   uint8
 		Stake    uint8
@@ -128,7 +127,6 @@ func (dr *DelegatingStakeRules) init(
 			dr.withdrawal.SetBitAt(uint64(i), true)
 		}
 	}
-	return nil
 }
 
 // Validate checks that all rules are correctly configured.

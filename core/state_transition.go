@@ -488,7 +488,10 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		reward = new(big.Int).Add(reward, tips)
 	}
 
-	st.state.AddBalance(st.evm.Context.Coinbase, reward)
+	err = st.processRewards(st.evm.Context.Coinbase, reward)
+	if err != nil {
+		return nil, err
+	}
 
 	return &ExecutionResult{
 		UsedGas:    st.gasUsed(),
@@ -549,6 +552,45 @@ func (st *StateTransition) checkTxType(to *common.Address, txType TxType) error 
 	if st.vp != nil && to != nil && bytes.Equal(to.Bytes(), st.vp.GetValidatorsStateAddress().Bytes()) &&
 		txType != ValidatorSyncTxType && txType != ValidatorMethodTxType {
 		return errors.New("invalid validator transaction")
+	}
+
+	return nil
+}
+
+func (st *StateTransition) processRewards(creatorAddress common.Address, reward *big.Int) error {
+	if !st.evm.ChainConfig().IsForkSlotValSyncProc(st.evm.Context.Slot) {
+		st.state.AddBalance(creatorAddress, reward)
+
+		return nil
+	}
+
+	val, err := st.vp.Storage().GetValidator(st.state, creatorAddress)
+	if err != nil {
+		return err
+	}
+	if val.DelegatingStake != nil {
+		var delegateRules = &val.DelegatingStake.Rules
+		isTrial, err := st.vp.IsValidatorTrialPeriod(val)
+		if err != nil {
+			return err
+		}
+		if isTrial {
+			delegateRules = &val.DelegatingStake.TrialRules
+		}
+
+		for address, percent := range delegateRules.ProfitShare() {
+			amount := new(big.Int).Mul(reward, big.NewInt(int64(percent)))
+			amount = new(big.Int).Div(amount, big.NewInt(100))
+			st.state.AddBalance(address, amount)
+		}
+
+		return nil
+	}
+
+	if val.WithdrawalAddress == nil {
+		st.state.AddBalance(creatorAddress, reward)
+	} else {
+		st.state.AddBalance(*val.WithdrawalAddress, reward)
 	}
 
 	return nil

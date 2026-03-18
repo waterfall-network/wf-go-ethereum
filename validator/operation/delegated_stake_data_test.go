@@ -27,10 +27,8 @@ func TestDelegatingStakeData_NewDelegatingStakeData(t *testing.T) {
 	profitShare, stakeShare, exit, withdrawal := TestParamsDelegatingStakeRules()
 	trialPeriod := uint64(321)
 
-	rules, err := NewDelegatingStakeRules(profitShare, stakeShare, exit, withdrawal)
-	testutils.AssertNoError(t, err)
-	trialRules, err := NewDelegatingStakeRules(profitShare, stakeShare, exit, withdrawal)
-	testutils.AssertNoError(t, err)
+	rules := NewDelegatingStakeRules(profitShare, stakeShare, exit, withdrawal)
+	trialRules := NewDelegatingStakeRules(profitShare, stakeShare, exit, withdrawal)
 
 	dsr, err := NewDelegatingStakeData(rules, trialPeriod, trialRules)
 	testutils.AssertNoError(t, err)
@@ -68,10 +66,8 @@ func TestDelegatingStakeData_Marshaling(t *testing.T) {
 	profitShare, stakeShare, exit, withdrawal := TestParamsDelegatingStakeRules()
 	trialPeriod := uint64(321)
 
-	rules, err := NewDelegatingStakeRules(profitShare, stakeShare, exit, withdrawal)
-	testutils.AssertNoError(t, err)
-	trialRules, err := NewDelegatingStakeRules(profitShare, stakeShare, exit, withdrawal)
-	testutils.AssertNoError(t, err)
+	rules := NewDelegatingStakeRules(profitShare, stakeShare, exit, withdrawal)
+	trialRules := NewDelegatingStakeRules(profitShare, stakeShare, exit, withdrawal)
 
 	dsr, err := NewDelegatingStakeData(rules, trialPeriod, trialRules)
 	testutils.AssertNoError(t, err)
@@ -116,10 +112,8 @@ func TestDelegatingStakeData_NewDelegatingStakeDataFromBinary(t *testing.T) {
 	profitShare, stakeShare, exit, withdrawal := TestParamsDelegatingStakeRules()
 	trialPeriod := uint64(321)
 
-	rules, err := NewDelegatingStakeRules(profitShare, stakeShare, exit, withdrawal)
-	testutils.AssertNoError(t, err)
-	trialRules, err := NewDelegatingStakeRules(profitShare, stakeShare, exit, withdrawal)
-	testutils.AssertNoError(t, err)
+	rules := NewDelegatingStakeRules(profitShare, stakeShare, exit, withdrawal)
+	trialRules := NewDelegatingStakeRules(profitShare, stakeShare, exit, withdrawal)
 
 	dsr, err := NewDelegatingStakeData(rules, trialPeriod, trialRules)
 	testutils.AssertNoError(t, err)
