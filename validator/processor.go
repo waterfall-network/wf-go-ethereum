@@ -420,7 +420,13 @@ func (p *Processor) validatorDeposit(caller Ref, toAddr common.Address, value *b
 	}
 
 	logData := txlog.PackDepositLogData(op.PubKey(), op.CreatorAddress(), op.WithdrawalAddress(), value, op.Signature(), p.getDepositCount())
-	p.eventEmmiter.Deposit(toAddr, logData)
+
+	if p.blockchain.Config().IsForkSlotValSyncProc(p.ctx.Slot) {
+		p.eventEmmiter.Deposit(toAddr, logData, p.eventEmmiter.NewIndexedAddressLogEntry(op.CreatorAddress()))
+	} else {
+		p.eventEmmiter.Deposit(toAddr, logData)
+	}
+
 	p.incrDepositCount()
 	// burn value from sender balance
 	p.state.SubBalance(from, value)
@@ -534,7 +540,12 @@ func (p *Processor) validatorExit(caller Ref, toAddr common.Address, op operatio
 	}
 
 	logData := txlog.PackExitRequestLogData(op.PubKey(), op.CreatorAddress(), validator.GetIndex(), op.ExitAfterEpoch())
-	p.eventEmmiter.ExitRequest(toAddr, logData)
+
+	if p.blockchain.Config().IsForkSlotValSyncProc(p.ctx.Slot) {
+		p.eventEmmiter.ExitRequest(toAddr, logData, p.eventEmmiter.NewIndexedAddressLogEntry(op.CreatorAddress()))
+	} else {
+		p.eventEmmiter.ExitRequest(toAddr, logData)
+	}
 
 	return op.CreatorAddress().Bytes(), nil
 }
@@ -684,7 +695,16 @@ func (p *Processor) validatorWithdrawal(caller Ref, toAddr common.Address, op op
 	// create tx log
 	amtGwei := new(big.Int).Div(opAmount, common.BigGwei).Uint64()
 	logData := txlog.PackWithdrawalLogData(validator.GetPubKey(), op.CreatorAddress(), validator.GetIndex(), amtGwei)
-	p.eventEmmiter.WithdrawalRequest(toAddr, logData)
+
+	if p.blockchain.Config().IsForkSlotValSyncProc(p.ctx.Slot) {
+		p.eventEmmiter.WithdrawalRequest(
+			toAddr,
+			logData,
+			p.eventEmmiter.NewIndexedAddressLogEntry(op.CreatorAddress()),
+		)
+	} else {
+		p.eventEmmiter.WithdrawalRequest(toAddr, logData)
+	}
 
 	return op.CreatorAddress().Bytes(), nil
 }

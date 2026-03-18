@@ -33,7 +33,7 @@ var (
 	EvtDelegatingStakeSignature  = crypto.Keccak256Hash([]byte("delegating-stake"))
 )
 
-type logEntry struct {
+type LogEntry struct {
 	// name string
 	//entryType string
 	indexed bool
@@ -48,24 +48,26 @@ func NewEventEmmiter(state vm.StateDB) *EventEmmiter {
 	return &EventEmmiter{state: state}
 }
 
-func (e *EventEmmiter) Deposit(evtAddr common.Address, data []byte) {
-	e.addLog(
-		evtAddr,
-		EvtDepositLogSignature,
-		data,
-	)
+func (e *EventEmmiter) Deposit(evtAddr common.Address, data []byte, logsEntries ...*LogEntry) {
+	e.addLog(evtAddr, EvtDepositLogSignature, data, logsEntries...)
 }
 
-func (e *EventEmmiter) ExitRequest(evtAddr common.Address, data []byte) {
-	e.addLog(evtAddr, EvtExitReqLogSignature, data)
+func (e *EventEmmiter) ExitRequest(evtAddr common.Address, data []byte, logsEntries ...*LogEntry) {
+	e.addLog(evtAddr, EvtExitReqLogSignature, data, logsEntries...)
 }
 
-func (e *EventEmmiter) WithdrawalRequest(evtAddr common.Address, data []byte) {
-	e.addLog(evtAddr, EvtWithdrawalLogSignature, data)
+func (e *EventEmmiter) WithdrawalRequest(evtAddr common.Address, data []byte, logsEntries ...*LogEntry) {
+	e.addLog(evtAddr, EvtWithdrawalLogSignature, data, logsEntries...)
 }
 
-func (e *EventEmmiter) addLog(targetAddr common.Address, signature common.Hash, data []byte, logsEntries ...logEntry) {
-	//var data []byte
+func (e *EventEmmiter) NewIndexedAddressLogEntry(address common.Address) *LogEntry {
+	return &LogEntry{
+		indexed: true,
+		data:    address.Hash().Bytes(),
+	}
+}
+
+func (e *EventEmmiter) addLog(targetAddr common.Address, signature common.Hash, data []byte, logsEntries ...*LogEntry) {
 	topics := []common.Hash{signature}
 
 	for _, entry := range logsEntries {

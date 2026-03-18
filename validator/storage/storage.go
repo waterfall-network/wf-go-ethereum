@@ -50,8 +50,8 @@ type Storage interface {
 	SetValidator(stateDb vm.StateDB, val *Validator) error
 	GetValidator(stateDb vm.StateDB, address common.Address) (*Validator, error)
 
-	SetValidatorsList(stateDb vm.StateDB, list []common.Address)
 	GetValidatorsList(stateDb vm.StateDB) []common.Address
+	SetValidatorsList(stateDb vm.StateDB, list []common.Address)
 	AddValidatorToList(stateDB vm.StateDB, index uint64, validator common.Address)
 
 	GetValidatorsStateAddress() *common.Address
