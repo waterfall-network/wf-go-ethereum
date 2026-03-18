@@ -3050,8 +3050,8 @@ func TestProcessorCheckAndFixActivationStatus(t *testing.T) {
 
 	// activations tests with delegating rules
 	dsProfitShare, dsStakeShare, dsExit, dsWithdrawal := operation.TestParamsDelegatingStakeRules()
-	rules, _ := operation.NewDelegatingStakeRules(dsProfitShare, dsStakeShare, dsExit, dsWithdrawal)
-	trialRules, _ := operation.NewDelegatingStakeRules(dsProfitShare, dsStakeShare, dsExit, dsWithdrawal)
+	rules := operation.NewDelegatingStakeRules(dsProfitShare, dsStakeShare, dsExit, dsWithdrawal)
+	trialRules := operation.NewDelegatingStakeRules(dsProfitShare, dsStakeShare, dsExit, dsWithdrawal)
 	//add delegation data
 	delegateData, err := operation.NewDelegatingStakeData(
 		rules,
