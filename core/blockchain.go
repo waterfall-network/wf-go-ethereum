@@ -5788,7 +5788,9 @@ func (bc *BlockChain) checkExitOperation(op validatorOp.Exit, from common.Addres
 	if val.GetExitEra() != math.MaxUint64 {
 		return validator.ErrValidatorIsOut
 	}
-	if val.GetActivationEra() == math.MaxUint64 {
+
+	currentEra := bc.GetEraInfo().Number()
+	if val.GetActivationEra() == math.MaxUint64 || val.GetActivationEra() >= currentEra {
 		return validator.ErrNotActivatedValidator
 	}
 	if val.HasDelegatingStake() {
