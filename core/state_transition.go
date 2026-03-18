@@ -558,7 +558,7 @@ func (st *StateTransition) checkTxType(to *common.Address, txType TxType) error 
 }
 
 func (st *StateTransition) processRewards(creatorAddress common.Address, reward *big.Int) error {
-	if !st.evm.ChainConfig().IsForkSlotValSyncProc(st.evm.Context.Slot) {
+	if !st.evm.ChainConfig().IsForkSlotValSyncProc(st.evm.Context.Slot) || st.vp == nil {
 		st.state.AddBalance(creatorAddress, reward)
 
 		return nil

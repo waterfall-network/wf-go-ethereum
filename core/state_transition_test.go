@@ -1061,31 +1061,19 @@ func (m MockMessage) SetCodeAuthorizations() []types.SetCodeAuthorization {
 	return nil
 }
 
-func (m MockMessage) SetGas(_ uint64) types.Message {
-	panic("SetGas: implement me")
-}
-
-func (m MockMessage) SetFake(_ bool) types.Message {
-	panic("SetFake: implement me")
-}
-
-func (m MockMessage) TxHash() common.Hash {
-	return common.Hash{}
-}
-
 func (m MockMessage) setTo(addr *common.Address) {
 	m.to = addr
 }
 
-func (m *MockMessage) SetGas(gas uint64) types.Message {
+func (m MockMessage) SetGas(gas uint64) types.Message {
 	return types.NewMessage(m.from, m.to, 0, m.value, gas, gasPrice, gasFreeCap, gasTipCap, m.data, nil, true)
 }
 
-func (m *MockMessage) SetFake(isFake bool) types.Message {
+func (m MockMessage) SetFake(isFake bool) types.Message {
 	return types.NewMessage(m.from, m.to, 0, m.value, m.gas, gasPrice, gasFreeCap, gasTipCap, m.data, nil, isFake)
 }
 
-func (m *MockMessage) TxHash() common.Hash {
+func (m MockMessage) TxHash() common.Hash {
 	return common.Hash{}
 }
 
