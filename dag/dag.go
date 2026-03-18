@@ -104,6 +104,10 @@ type blockChain interface {
 	WriteCurrentTips()
 	GetBlockHashesBySlot(slot uint64) common.HashArray
 	HaveEpochBlocks(epoch uint64) (bool, error)
+	GetTxBlockHash(txHash common.Hash) common.Hash
+	RestoreTxLookupEntries(blHash common.Hash) error
+	GetValidatorSyncData(initTxHash common.Hash) *types.ValidatorSync
+	SetValidatorSyncData(validatorSync *types.ValidatorSync)
 	HandleEra(cp *types.Checkpoint) error
 
 	CleanInvalidNotProcessedValidatorSync(validator func(bc *core.BlockChain, stateHash common.Hash, slot uint64, valSyncOp *types.ValidatorSync) (bool, error))
@@ -250,6 +254,9 @@ func (d *Dag) HandleFinalize(data *types.FinalizationParams) *types.Finalization
 		return res
 	}
 
+	//fix bad validators state
+	valSyncData := core.FixValidatorSyncOps(d.bc, data.Checkpoint.FinEpoch, data.ValSyncData)
+
 	switch data.SyncMode {
 	case types.NoSync:
 		if err = d.handleSyncUnloadedBlocks(baseSpine, spines, data.Checkpoint); err != nil {
@@ -259,11 +266,11 @@ func (d *Dag) HandleFinalize(data *types.FinalizationParams) *types.Finalization
 			return res
 		}
 	case types.MainSync:
-		for i, vs := range data.ValSyncData {
+		for i, vs := range valSyncData {
 			log.Info("Handle Finalize: valSync: main sync append", "i", i, "valSyncData", vs.Print())
 		}
 		// handle validator sync data
-		d.bc.AppendNotProcessedValidatorSyncData(data.ValSyncData)
+		d.bc.AppendNotProcessedValidatorSyncData(valSyncData)
 		if err = d.downloader.MainSync(baseSpine, spines); err != nil {
 			strErr := err.Error()
 			res.Error = &strErr
@@ -271,11 +278,11 @@ func (d *Dag) HandleFinalize(data *types.FinalizationParams) *types.Finalization
 			return res
 		}
 	case types.HeadSync:
-		for i, vs := range data.ValSyncData {
+		for i, vs := range valSyncData {
 			log.Info("Handle Finalize: valSync: head sync append", "i", i, "valSyncData", vs.Print())
 		}
 		// handle validator sync data
-		d.bc.AppendNotProcessedValidatorSyncData(data.ValSyncData)
+		d.bc.AppendNotProcessedValidatorSyncData(valSyncData)
 		if err = d.downloader.DagSync(data.Checkpoint.Spine, spines); err != nil {
 			strErr := err.Error()
 			res.Error = &strErr
@@ -319,10 +326,11 @@ func (d *Dag) HandleFinalize(data *types.FinalizationParams) *types.Finalization
 
 	// handle validator sync data
 	if data.SyncMode == types.NoSync {
-		for i, vs := range data.ValSyncData {
+		for i, vs := range valSyncData {
 			log.Info("Handle Finalize: valSync", "i", i, "valSyncData", vs.Print())
 		}
-		d.bc.AppendNotProcessedValidatorSyncData(data.ValSyncData)
+		// handle validator sync data
+		d.bc.AppendNotProcessedValidatorSyncData(valSyncData)
 	}
 
 	lfHeader := d.bc.GetLastFinalizedHeader()

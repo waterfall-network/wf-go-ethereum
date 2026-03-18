@@ -131,6 +131,9 @@ func (h Hash) MarshalText() ([]byte, error) {
 	return hexutil.Bytes(h[:]).MarshalText()
 }
 
+// Ptr returns a pointer to a copy of h.
+func (h Hash) Ptr() *Hash { return &h }
+
 // SetBytes sets the hash to the value of b.
 // If b is larger than len(h), b will be cropped from the left.
 func (h *Hash) SetBytes(b []byte) {

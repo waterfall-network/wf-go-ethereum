@@ -134,6 +134,16 @@ type MockblockChain struct {
 	recorder *MockblockChainMockRecorder
 }
 
+func (m *MockblockChain) GetTxBlockHash(txHash common.Hash) common.Hash {
+	//TODO implement me
+	panic("implement me")
+}
+
+func (m *MockblockChain) RestoreTxLookupEntries(blHash common.Hash) error {
+	//TODO implement me
+	panic("implement me")
+}
+
 func (m *MockblockChain) CleanInvalidNotProcessedValidatorSync(validator func(bc *core.BlockChain, stateHash common.Hash, slot uint64, valSyncOp *types.ValidatorSync) (bool, error)) {
 	//TODO implement me
 	panic("implement me")
@@ -727,6 +737,32 @@ func (m *MockblockChain) WriteCurrentTips() {
 func (mr *MockblockChainMockRecorder) WriteCurrentTips() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WriteCurrentTips", reflect.TypeOf((*MockblockChain)(nil).WriteCurrentTips))
+}
+
+// GetValidatorSyncData mocks base method.
+func (m *MockblockChain) GetValidatorSyncData(initTxHash common.Hash) *types.ValidatorSync {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetValidatorSyncData", initTxHash)
+	ret0, _ := ret[0].(*types.ValidatorSync)
+	return ret0
+}
+
+// GetValidatorSyncData indicates an expected call of GetValidatorSyncData.
+func (mr *MockblockChainMockRecorder) GetValidatorSyncData(initTxHash interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetValidatorSyncData", reflect.TypeOf((*MockblockChain)(nil).GetValidatorSyncData), initTxHash)
+}
+
+// SetValidatorSyncData mocks base method.
+func (m *MockblockChain) SetValidatorSyncData(validatorSync *types.ValidatorSync) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetValidatorSyncData", validatorSync)
+}
+
+// SetValidatorSyncData indicates an expected call of SetValidatorSyncData.
+func (mr *MockblockChainMockRecorder) SetValidatorSyncData(validatorSync interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetValidatorSyncData", reflect.TypeOf((*MockblockChain)(nil).SetValidatorSyncData), validatorSync)
 }
 
 // MockethDownloader is a mock of ethDownloader interface.

@@ -18,6 +18,7 @@ package core
 
 import (
 	"context"
+	"fmt"
 
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/rawdb"
@@ -476,6 +477,23 @@ func (bc *BlockChain) GetTxBlockHash(txHash common.Hash) common.Hash {
 		return lookup.(*rawdb.LegacyTxLookupEntry).BlockHash
 	}
 	return rawdb.ReadTxLookupEntry(bc.db, txHash)
+}
+
+// RestoreTxLookupEntries re-indexes all transactions in blHash by writing TxLookup
+// entries for each transaction. Used to recover entries purged by txLookupLimit cleanup.
+func (bc *BlockChain) RestoreTxLookupEntries(blHash common.Hash) error {
+	block := bc.GetBlockByHash(blHash)
+	if block == nil {
+		return fmt.Errorf("restore tx lookup entries: block not found blHash=%#x", blHash)
+	}
+	receipts := bc.GetReceiptsByHash(blHash)
+	for i, tx := range block.Transactions() {
+		if i >= len(receipts) || receipts[i] == nil {
+			return fmt.Errorf("restore tx lookup entries: no receipt blNr=%d txI=%d txHash=%#x blHash=%#x", block.Nr(), i, tx.Hash(), blHash)
+		}
+		bc.WriteTxLookupEntry(i, tx.Hash(), blHash, receipts[i].Status)
+	}
+	return nil
 }
 
 // SubscribeRemovedLogsEvent registers a subscription of RemovedLogsEvent.

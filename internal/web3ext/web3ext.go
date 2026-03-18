@@ -1177,6 +1177,12 @@ web3._extend({
 			inputFormatter: [web3._extend.formatters.inputBlockNumberFormatter],
 			outputFormatter: web3._extend.formatters.outputTransactionReceiptListFormatter
 		}),
+		new web3._extend.Method({
+			name: 'validator.getValSyncOp',
+			call: 'wat_validator_GetValSyncOp',
+			params: 1,
+			inputFormatter: [null],
+		}),
 		new web3._extend.Property({
 		  name: 'info',
 		  getter: 'wat_info'
