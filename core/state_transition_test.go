@@ -841,18 +841,6 @@ func (m MockMessage) AccessList() types.AccessList {
 	return []types.AccessTuple{}
 }
 
-func (m MockMessage) SetGas(_ uint64) types.Message {
-	panic("SetGas: implement me")
-}
-
-func (m MockMessage) SetFake(_ bool) types.Message {
-	panic("SetFake: implement me")
-}
-
-func (m MockMessage) TxHash() common.Hash {
-	return common.Hash{}
-}
-
 func (m MockMessage) SetCodeAuthorizations() []types.SetCodeAuthorization {
 	return nil
 }
