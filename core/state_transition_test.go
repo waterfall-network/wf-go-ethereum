@@ -853,12 +853,102 @@ func (m MockMessage) TxHash() common.Hash {
 	return common.Hash{}
 }
 
+func (m MockMessage) SetCodeAuthorizations() []types.SetCodeAuthorization {
+	return nil
+}
+
 func (m MockMessage) setTo(addr *common.Address) {
 	m.to = addr
+}
+
+func (m *MockMessage) SetGas(gas uint64) types.Message {
+	return types.NewMessage(m.from, m.to, 0, m.value, gas, gasPrice, gasFreeCap, gasTipCap, m.data, nil, true)
+}
+
+func (m *MockMessage) SetFake(isFake bool) types.Message {
+	return types.NewMessage(m.from, m.to, 0, m.value, m.gas, gasPrice, gasFreeCap, gasTipCap, m.data, nil, isFake)
+}
+
+func (m *MockMessage) TxHash() common.Hash {
+	return common.Hash{}
 }
 
 func NewMockMessage(from common.Address, to *common.Address, value *big.Int, gas uint64, data []byte) *MockMessage {
 	return &MockMessage{
 		from, to, value, gas, data,
 	}
+}
+
+// eip3860Config is identical to TestChainConfig but with ForkSlotValSyncProc = 0
+// so that EIP-3860 initcode size validation is active from slot 0.
+var eip3860Config = &params.ChainConfig{
+	ChainID:                big.NewInt(1337),
+	SecondsPerSlot:         4,
+	SlotsPerEpoch:          32,
+	EpochsPerEra:           8,
+	TransitionPeriod:       2,
+	ValidatorsStateAddress: &common.Address{'1', '2', '3', '4'},
+	ValidatorsPerSlot:      6,
+	EffectiveBalance:       big.NewInt(3200),
+	ValidatorOpExpireSlots: 14400,
+	ForkSlotSubNet1:        math.MaxUint64,
+	ForkSlotDelegate:       0,
+	ForkSlotPrefixFin:      0,
+	ForkSlotShanghai:       0,
+	ForkSlotValOpTracking:  0,
+	ForkSlotReduceBaseFee:  0,
+	ForkSlotValSyncProc:    0,
+	ForkSlotUpValsPerSlot:  math.MaxUint64,
+	UpValidatorsPerSlot:    6,
+}
+
+func TestEIP3860MaxInitCodeSizeCheck(t *testing.T) {
+	const gasLimit = 10_000_000
+
+	senderAddr := common.HexToAddress("0xaaaa000000000000000000000000000000000000")
+
+	newTestEVM := func(cfg *params.ChainConfig) *vm.EVM {
+		db, err := state.New(common.Hash{}, state.NewDatabase(rawdb.NewMemoryDatabase()), nil)
+		if err != nil {
+			t.Fatalf("failed to create state: %v", err)
+		}
+		db.CreateAccount(senderAddr)
+		db.SetBalance(senderAddr, big.NewInt(1e15))
+		blockCtx := vm.BlockContext{
+			CanTransfer: CanTransfer,
+			Transfer:    Transfer,
+			BaseFee:     big.NewInt(0),
+		}
+		return vm.NewEVM(blockCtx, vm.TxContext{}, db, cfg, vm.Config{NoBaseFee: true})
+	}
+
+	t.Run("oversized initcode returns ErrMaxInitCodeSizeExceeded", func(t *testing.T) {
+		msg := NewMockMessage(senderAddr, nil, big.NewInt(0), gasLimit, make([]byte, params.MaxInitCodeSize+1))
+		st := NewStateTransition(newTestEVM(eip3860Config), tokenProcessor, nil, msg, new(GasPool).AddGas(gasLimit))
+		_, err := st.TransitionDb()
+		assert.ErrorIs(t, err, vm.ErrMaxInitCodeSizeExceeded)
+	})
+
+	t.Run("exact max initcode size passes the check", func(t *testing.T) {
+		msg := NewMockMessage(senderAddr, nil, big.NewInt(0), gasLimit, make([]byte, params.MaxInitCodeSize))
+		st := NewStateTransition(newTestEVM(eip3860Config), tokenProcessor, nil, msg, new(GasPool).AddGas(gasLimit))
+		_, err := st.TransitionDb()
+		assert.NotErrorIs(t, err, vm.ErrMaxInitCodeSizeExceeded)
+	})
+
+	t.Run("oversized initcode before fork is not checked", func(t *testing.T) {
+		// TestChainConfig has ForkSlotValSyncProc = math.MaxUint64 — fork inactive.
+		msg := NewMockMessage(senderAddr, nil, big.NewInt(0), gasLimit, make([]byte, params.MaxInitCodeSize+1))
+		st := NewStateTransition(newTestEVM(params.TestChainConfig), tokenProcessor, nil, msg, new(GasPool).AddGas(gasLimit))
+		_, err := st.TransitionDb()
+		assert.NotErrorIs(t, err, vm.ErrMaxInitCodeSizeExceeded)
+	})
+
+	t.Run("oversized data in regular call is not checked", func(t *testing.T) {
+		toAddr := common.HexToAddress("0xbbbb000000000000000000000000000000000000")
+		msg := NewMockMessage(senderAddr, &toAddr, big.NewInt(0), gasLimit, make([]byte, params.MaxInitCodeSize+1))
+		st := NewStateTransition(newTestEVM(eip3860Config), tokenProcessor, nil, msg, new(GasPool).AddGas(gasLimit))
+		_, err := st.TransitionDb()
+		assert.NotErrorIs(t, err, vm.ErrMaxInitCodeSizeExceeded)
+	})
 }

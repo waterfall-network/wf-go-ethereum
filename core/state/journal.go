@@ -84,6 +84,12 @@ func (j *journal) length() int {
 	return len(j.entries)
 }
 
+// createContract marks the given address as having been created as a contract
+// in the current transaction. This is used for EIP-6780 SELFDESTRUCT tracking.
+func (j *journal) createContract(addr common.Address) {
+	j.append(createContractChange{account: addr})
+}
+
 type (
 	// Changes to the account trie.
 	createObjectChange struct {
@@ -137,6 +143,17 @@ type (
 	accessListAddSlotChange struct {
 		address *common.Address
 		slot    *common.Hash
+	}
+
+	transientStorageChange struct {
+		account       *common.Address
+		key, prevalue common.Hash
+	}
+	// createContractChange represents an account becoming a contract-account.
+	// This event happens prior to executing initcode. The journal-event simply
+	// manages the created-flag, in order to allow same-tx destruction.
+	createContractChange struct {
+		account common.Address
 	}
 )
 
@@ -213,6 +230,14 @@ func (ch storageChange) dirtied() *common.Address {
 	return ch.account
 }
 
+func (ch transientStorageChange) revert(s *StateDB) {
+	s.setTransientState(*ch.account, ch.key, ch.prevalue)
+}
+
+func (ch transientStorageChange) dirtied() *common.Address {
+	return nil
+}
+
 func (ch refundChange) revert(s *StateDB) {
 	s.refund = ch.prev
 }
@@ -265,5 +290,13 @@ func (ch accessListAddSlotChange) revert(s *StateDB) {
 }
 
 func (ch accessListAddSlotChange) dirtied() *common.Address {
+	return nil
+}
+
+func (ch createContractChange) revert(s *StateDB) {
+	s.getStateObject(ch.account).newContract = false
+}
+
+func (ch createContractChange) dirtied() *common.Address {
 	return nil
 }

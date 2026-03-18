@@ -88,6 +88,7 @@ type Message interface {
 	SetFake(IsFake bool) types.Message
 	Data() []byte
 	AccessList() types.AccessList
+	SetCodeAuthorizations() []types.SetCodeAuthorization
 	TxHash() common.Hash
 }
 
@@ -127,7 +128,7 @@ func (result *ExecutionResult) Revert() []byte {
 }
 
 // IntrinsicGas computes the 'intrinsic gas' for a message with the given data.
-func IntrinsicGas(data []byte, accessList types.AccessList, isContractCreation, isValidatorOp bool) (uint64, error) {
+func IntrinsicGas(data []byte, accessList types.AccessList, authList []types.SetCodeAuthorization, isContractCreation, isValidatorOp, isCancun bool) (uint64, error) {
 	// Set the starting gas for the raw transaction
 	var gas uint64
 	if isContractCreation {
@@ -146,8 +147,10 @@ func IntrinsicGas(data []byte, accessList types.AccessList, isContractCreation, 
 	} else {
 		gas = params.TxGas
 	}
+
+	dataLen := uint64(len(data))
 	// Bump the required gas by the amount of transactional data
-	if len(data) > 0 {
+	if dataLen > 0 {
 		// Zero and non-zero bytes are priced differently
 		var nz uint64
 		for _, byt := range data {
@@ -162,17 +165,41 @@ func IntrinsicGas(data []byte, accessList types.AccessList, isContractCreation, 
 		}
 		gas += nz * nonZeroGas
 
-		z := uint64(len(data)) - nz
+		z := dataLen - nz
 		if (math.MaxUint64-gas)/params.TxDataZeroGas < z {
 			return 0, ErrGasUintOverflow
 		}
 		gas += z * params.TxDataZeroGas
+
+		if isContractCreation && isCancun {
+			lenWords := toWordSize(dataLen)
+			if (math.MaxUint64-gas)/params.InitCodeWordGas < lenWords {
+				return 0, ErrGasUintOverflow
+			}
+			gas += lenWords * params.InitCodeWordGas
+		}
 	}
 	if accessList != nil {
 		gas += uint64(len(accessList)) * params.TxAccessListAddressGas
 		gas += uint64(accessList.StorageKeys()) * params.TxAccessListStorageKeyGas
 	}
+	if authList != nil {
+		authGas := uint64(len(authList)) * params.TxAuthTupleGas
+		if (math.MaxUint64 - gas) < authGas {
+			return 0, ErrGasUintOverflow
+		}
+		gas += authGas
+	}
 	return gas, nil
+}
+
+// toWordSize returns the ceiled word size required for init code payment calculation.
+func toWordSize(size uint64) uint64 {
+	if size > math.MaxUint64-31 {
+		return math.MaxUint64/32 + 1
+	}
+
+	return (size + 31) / 32
 }
 
 // NewStateTransition initialises and returns a new state transition object.
@@ -270,9 +297,23 @@ func (st *StateTransition) preCheck() error {
 
 		if !isValOp {
 			if codeHash := st.state.GetCodeHash(st.msg.From()); codeHash != emptyCodeHash && codeHash != (common.Hash{}) && !st.state.IsValidatorAddress(st.msg.From()) {
-				return fmt.Errorf("%w: address %v, codehash: %s", ErrSenderNoEOA,
-					st.msg.From().Hex(), codeHash)
+				// EIP-7702: an EOA with a delegation (0xef0100 ++ addr) is still
+				// considered an EOA and must be allowed to send transactions.
+				if _, isDelegation := types.ParseDelegation(st.state.GetCode(st.msg.From())); !isDelegation {
+					return fmt.Errorf("%w: address %v, codehash: %s", ErrSenderNoEOA,
+						st.msg.From().Hex(), codeHash)
+				}
 			}
+		}
+	}
+
+	// Validate EIP-7702 set-code transaction constraints.
+	if authList := st.msg.SetCodeAuthorizations(); authList != nil {
+		if st.msg.To() == nil {
+			return fmt.Errorf("%w (sender %v)", ErrSetCodeTxCreate, st.msg.From().Hex())
+		}
+		if len(authList) == 0 {
+			return fmt.Errorf("%w (sender %v)", ErrEmptyAuthList, st.msg.From().Hex())
 		}
 	}
 
@@ -342,7 +383,14 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	isContractCreation := txType == ContractCreationTxType
 
 	// Check clauses 4-5, subtract intrinsic gas if everything is correct
-	gas, err := IntrinsicGas(st.data, st.msg.AccessList(), isContractCreation, isValidatorOp)
+
+	gas, err := IntrinsicGas(st.data,
+		st.msg.AccessList(),
+		st.msg.SetCodeAuthorizations(),
+		isContractCreation,
+		isValidatorOp,
+		st.evm.ChainConfig().IsForkSlotValSyncProc(st.evm.Context.Slot),
+	)
 	if err != nil {
 		if st.evm.ChainConfig().IsForkSlotValSyncProc(st.evm.Context.Slot) {
 			// Increment the nonce for the error
@@ -371,10 +419,17 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		return nil, fmt.Errorf("%w: address %v", ErrInsufficientFundsForTransfer, msg.From().Hex())
 	}
 
-	// Set up the initial access list.
-	if rules := st.evm.ChainConfig().Rules(st.evm.Context.Slot); rules.IsBerlin {
-		st.state.PrepareAccessList(msg.From(), msg.To(), vm.ActivePrecompiles(rules), msg.AccessList())
+	// Execute the preparatory steps for state transition which includes:
+	// - prepare accessList(post-berlin)
+	// - reset transient storage(eip 1153)
+	rules := st.evm.ChainConfig().Rules(st.evm.Context.Slot)
+	st.state.Prepare(msg.From(), msg.To(), vm.ActivePrecompiles(rules), msg.AccessList())
+
+	// Check whether the init code size has been exceeded.
+	if st.evm.ChainConfig().IsForkSlotValSyncProc(st.evm.Context.Slot) && isContractCreation && len(st.data) > params.MaxInitCodeSize {
+		return nil, fmt.Errorf("%w: code size %v limit %v", vm.ErrMaxInitCodeSizeExceeded, len(st.data), params.MaxInitCodeSize)
 	}
+
 	var (
 		ret   []byte
 		vmerr error // vm errors do not effect consensus and are therefore not assigned to err
@@ -395,6 +450,11 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		} else {
 			// Increment the nonce for the next transaction
 			st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
+
+			// Apply EIP-7702 authorizations (errors are ignored; invalid auths are skipped).
+			for _, auth := range msg.SetCodeAuthorizations() {
+				st.applyAuthorization(&auth)
+			}
 
 			ret, st.gas, vmerr = st.evm.Call(sender, st.to(), st.data, st.gas, st.value)
 		}
@@ -423,6 +483,54 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		Err:        vmerr,
 		ReturnData: ret,
 	}, nil
+}
+
+// validateAuthorization validates an EIP-7702 authorization against the state.
+func (st *StateTransition) validateAuthorization(auth *types.SetCodeAuthorization) (authority common.Address, err error) {
+	// Verify chain ID is zero (wildcard) or matches the current chain.
+	if auth.ChainID != nil && auth.ChainID.Sign() != 0 && auth.ChainID.Cmp(st.evm.ChainConfig().ChainID) != 0 {
+		return authority, ErrAuthorizationWrongChainID
+	}
+	// Limit nonce to 2^64-1 per EIP-2681.
+	if auth.Nonce+1 < auth.Nonce {
+		return authority, ErrAuthorizationNonceOverflow
+	}
+	// Validate signature and recover authority.
+	authority, err = auth.Authority()
+	if err != nil {
+		return authority, fmt.Errorf("%w: %v", ErrAuthorizationInvalidSignature, err)
+	}
+	// Add to access list regardless of validity.
+	st.state.AddAddressToAccessList(authority)
+	code := st.state.GetCode(authority)
+	if _, ok := types.ParseDelegation(code); len(code) != 0 && !ok {
+		return authority, ErrAuthorizationDestinationHasCode
+	}
+	if have := st.state.GetNonce(authority); have != auth.Nonce {
+		return authority, ErrAuthorizationNonceMismatch
+	}
+	return authority, nil
+}
+
+// applyAuthorization applies an EIP-7702 code delegation to the state.
+func (st *StateTransition) applyAuthorization(auth *types.SetCodeAuthorization) error {
+	authority, err := st.validateAuthorization(auth)
+	if err != nil {
+		return err
+	}
+	// If the account already exists, refund the new-account cost charged in intrinsic gas.
+	if st.state.Exist(authority) {
+		st.state.AddRefund(params.CallNewAccountGas - params.TxAuthTupleGas)
+	}
+	// Update nonce.
+	st.state.SetNonce(authority, auth.Nonce+1)
+	// Set code: zero address means clear delegation.
+	if auth.Address == (common.Address{}) {
+		st.state.SetCode(authority, nil)
+		return nil
+	}
+	st.state.SetCode(authority, types.AddressToDelegation(auth.Address))
+	return nil
 }
 
 func (st *StateTransition) refundGas(refundQuotient uint64) {

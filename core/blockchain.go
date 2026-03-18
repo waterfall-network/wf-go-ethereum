@@ -3962,7 +3962,7 @@ func (bc *BlockChain) CommitBlockTransactions(block *types.Block, statedb *state
 	for i, tx := range block.Transactions() {
 		from, _ := types.Sender(signer, tx)
 		// Start executing the transaction
-		statedb.Prepare(tx.Hash(), i)
+		statedb.SetTxContext(tx.Hash(), i)
 
 		header := block.Header()
 
@@ -4075,11 +4075,23 @@ func (bc *BlockChain) EstimateGas(msg types.Message, header *types.Header) (uint
 
 	switch txType {
 	case ValidatorMethodTxType, ValidatorSyncTxType:
-		return IntrinsicGas(msg.Data(), msg.AccessList(), false, true)
+		return IntrinsicGas(msg.Data(),
+			msg.AccessList(),
+			msg.SetCodeAuthorizations(),
+			false,
+			true,
+			bc.chainConfig.IsForkSlotValSyncProc(header.Slot),
+		)
 	case ContractMethodTxType, ContractCreationTxType:
 		return bc.EstimateGasByEvm(msg, header, stateDb, tokenProcessor, validatorProcessor)
 	case TokenCreationTxType, TokenMethodTxType:
-		return IntrinsicGas(msg.Data(), msg.AccessList(), false, false)
+		return IntrinsicGas(msg.Data(),
+			msg.AccessList(),
+			msg.SetCodeAuthorizations(),
+			false,
+			false,
+			bc.chainConfig.IsForkSlotValSyncProc(header.Slot),
+		)
 	default:
 		return 0, ErrTxTypeNotSupported
 	}

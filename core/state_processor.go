@@ -69,7 +69,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 	validatorProcessor := validator.NewProcessor(blockContext, statedb, p.bc)
 	// Iterate over and process the individual transactions
 	for i, tx := range block.Transactions() {
-		statedb.Prepare(tx.Hash(), i)
+		statedb.SetTxContext(tx.Hash(), i)
 		receipt, err := applyTransaction(tx, p.config, header, statedb, gp, usedGas, vmenv, tokenProcessor, validatorProcessor)
 		if err != nil {
 			log.Error(fmt.Errorf("could not apply tx %d [%v]: %w", i, tx.Hash().Hex(), err).Error())
