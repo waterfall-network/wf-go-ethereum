@@ -783,6 +783,12 @@ func (pool *TxPool) validateTx(tx *types.Transaction, local bool) error {
 	if tx.GasFeeCapIntCmp(tx.GasTipCap()) < 0 {
 		return ErrTipAboveFeeCap
 	}
+	//check gas price
+	curBaseFee := pool.chain.GetLastFinalizedHeader().BaseFee
+	_, err := tx.EffectiveGasTip(curBaseFee)
+	if err != nil {
+		return err
+	}
 	// EIP-7702: set-code transactions must have a destination and non-empty auth list.
 	if tx.Type() == types.SetCodeTxType {
 		if tx.To() == nil {

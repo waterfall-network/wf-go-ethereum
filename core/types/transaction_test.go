@@ -308,7 +308,7 @@ func testTransactionPriceNonceSort(t *testing.T, baseFee *big.Int) {
 					GasTipCap: big.NewInt(int64(rand.Intn(gasFeeCap + 1))),
 					Data:      nil,
 				})
-				if count == 25 && int64(gasFeeCap) < baseFee.Int64() {
+				if count == 25 && int64(gasFeeCap) < MinerBaseFeeWithTolerance(baseFee).Int64() {
 					count = i
 				}
 			}
@@ -345,8 +345,9 @@ func testTransactionPriceNonceSort(t *testing.T, baseFee *big.Int) {
 		if i+1 < len(txs) {
 			next := txs[i+1]
 			fromNext, _ := Sender(signer, next)
-			tip, err := txi.EffectiveGasTip(baseFee)
-			nextTip, nextErr := next.EffectiveGasTip(baseFee)
+			minerBaseFee := MinerBaseFeeWithTolerance(baseFee)
+			tip, err := txi.EffectiveGasTip(minerBaseFee)
+			nextTip, nextErr := next.EffectiveGasTip(minerBaseFee)
 			if err != nil || nextErr != nil {
 				t.Errorf("error calculating effective tip")
 			}
