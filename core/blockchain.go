@@ -5944,8 +5944,19 @@ func (bc *BlockChain) checkWithdrawalFromValState() error {
 
 func (bc *BlockChain) checkDepositOperation(op validatorOp.Deposit, from common.Address, amount *big.Int) error {
 	// validate deposit signature
+	var curSlot uint64
+	if si := bc.GetSlotInfo(); si != nil {
+		curSlot = si.CurrentSlot()
+	}
+
 	if err := validatorOp.VerifyDepositSig(op.Signature(), op.PubKey(), op.CreatorAddress(), op.WithdrawalAddress()); err != nil {
-		return err
+		if !bc.Config().IsForkSlotValSyncProc(curSlot) {
+			return err
+		}
+		err = validatorOp.VerifyDepositSigWithDelegate(op.Signature(), op.PubKey(), op.CreatorAddress(), op.WithdrawalAddress(), op.DelegatingStake())
+		if err != nil {
+			return err
+		}
 	}
 
 	// check amount can add to log
@@ -5957,10 +5968,6 @@ func (bc *BlockChain) checkDepositOperation(op validatorOp.Deposit, from common.
 		return fmt.Errorf("too low value (min deposit = %s wei)", validator.MinDepositVal.String())
 	}
 	//check delegating stake activation fork
-	var curSlot uint64
-	if si := bc.GetSlotInfo(); si != nil {
-		curSlot = si.CurrentSlot()
-	}
 	if op.DelegatingStake() != nil {
 		if !bc.Config().IsForkSlotDelegate(curSlot) {
 			return validatorOp.ErrDelegateForkRequire
