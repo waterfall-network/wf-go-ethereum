@@ -18,6 +18,7 @@ package core
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"math"
 	"math/big"
@@ -448,6 +449,13 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 		} else if isValidatorOp {
 			ret, vmerr = st.vp.Call(sender, st.to(), st.value, st.msg)
 		} else {
+			if st.evm.ChainConfig().IsForkSlotValSyncProc(st.evm.Context.Slot) {
+				err = st.checkTxType(msg.To(), txType)
+				if err != nil {
+					return nil, err
+				}
+			}
+
 			// Increment the nonce for the next transaction
 			st.state.SetNonce(msg.From(), st.state.GetNonce(sender.Address())+1)
 
@@ -530,6 +538,15 @@ func (st *StateTransition) applyAuthorization(auth *types.SetCodeAuthorization) 
 		return nil
 	}
 	st.state.SetCode(authority, types.AddressToDelegation(auth.Address))
+	return nil
+}
+
+func (st *StateTransition) checkTxType(to *common.Address, txType TxType) error {
+	if st.vp != nil && to != nil && bytes.Equal(to.Bytes(), st.vp.GetValidatorsStateAddress().Bytes()) &&
+		txType != ValidatorSyncTxType && txType != ValidatorMethodTxType {
+		return errors.New("invalid validator transaction")
+	}
+
 	return nil
 }
 

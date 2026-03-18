@@ -274,6 +274,9 @@ func SetupGenesisBlockWithOverride(
 	if isTestnet9 {
 		params.OverrideTestnet9(newcfg)
 	}
+
+	params.OverrideDummyAddresses(newcfg)
+
 	if delegatingStakeSlot != nil {
 		newcfg.ForkSlotDelegate = *delegatingStakeSlot
 	}
@@ -299,6 +302,8 @@ func SetupGenesisBlockWithOverride(
 		if isTestnet9 {
 			params.OverrideTestnet9(storedcfg)
 		}
+		params.OverrideDummyAddresses(storedcfg)
+
 		if storedcfg.ForkSlotDelegate == 0 {
 			storedcfg.ForkSlotDelegate = newcfg.ForkSlotDelegate
 		}

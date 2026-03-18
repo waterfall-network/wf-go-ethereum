@@ -4056,6 +4056,10 @@ func (bc *BlockChain) CommitBlockTransactions(block *types.Block, statedb *state
 
 func (bc *BlockChain) EstimateGas(msg types.Message, header *types.Header) (uint64, error) {
 	if len(msg.Data()) == 0 {
+		if msg.To() != nil && bc.ValidatorStorage().GetValidatorsStateAddress() != nil &&
+			bytes.Equal(msg.To().Bytes(), bc.ValidatorStorage().GetValidatorsStateAddress().Bytes()) {
+			return 0, errors.New("validator transaction has empty txData")
+		}
 		return params.TxGas, nil
 	}
 
@@ -4075,6 +4079,10 @@ func (bc *BlockChain) EstimateGas(msg types.Message, header *types.Header) (uint
 
 	switch txType {
 	case ValidatorMethodTxType, ValidatorSyncTxType:
+		err = bc.CheckValidatorOp(msg.Data(), msg.From(), msg.Value())
+		if err != nil {
+			return 0, err
+		}
 		return IntrinsicGas(msg.Data(),
 			msg.AccessList(),
 			msg.SetCodeAuthorizations(),
@@ -5730,6 +5738,314 @@ func (bc *BlockChain) verifyHibernateModeBlock(block *types.Block) (bool, error)
 
 func (bc *BlockChain) SetLastFinalisedHeader(head *types.Header, lastFinNr uint64) {
 	bc.hc.SetLastFinalisedHeader(head, lastFinNr)
+}
+
+// CheckValidatorOp validates validator transactions
+func (bc *BlockChain) CheckValidatorOp(txData []byte, from common.Address, value *big.Int) error {
+	if len(txData) > 0 {
+		op, err := validatorOp.DecodeBytes(txData)
+		if err != nil {
+			return err
+		}
+
+		switch v := op.(type) {
+		case validatorOp.Exit:
+			return bc.checkExitOperation(v, from)
+		case validatorOp.Withdrawal:
+			return bc.checkWithdrawalOperation(v, from)
+		case validatorOp.Deposit:
+			return bc.checkDepositOperation(v, from, value)
+		case validatorOp.WithdrawalFromValState:
+			return bc.checkWithdrawalFromValState()
+		}
+	}
+
+	log.Warn("validator transaction has invalid txData", "txData", string(txData))
+	si := bc.GetSlotInfo()
+	if si == nil {
+		return ErrBadSlotInfo
+	}
+	if bc.Config().IsForkSlotValSyncProc(si.CurrentSlot()) {
+		return errors.New("validator transaction has invalid txData")
+	}
+
+	return nil
+}
+
+func (bc *BlockChain) checkExitOperation(op validatorOp.Exit, from common.Address) error {
+	stateDb, err := bc.State()
+	if err != nil {
+		return err
+	}
+
+	val, err := bc.ValidatorStorage().GetValidator(stateDb, op.CreatorAddress())
+	if err != nil {
+		return err
+	}
+	if val == nil {
+		return validator.ErrUnknownValidator
+	}
+	if val.GetExitEra() != math.MaxUint64 {
+		return validator.ErrValidatorIsOut
+	}
+	if val.GetActivationEra() == math.MaxUint64 {
+		return validator.ErrNotActivatedValidator
+	}
+	if val.HasDelegatingStake() {
+		//check delegating roles
+		//retrieve actual rules
+		var actualRules = &val.DelegatingStake.Rules
+		isTrial, err := bc.isValidatorTrialPeriod(val)
+		if err != nil {
+			return err
+		}
+		if isTrial {
+			actualRules = &val.DelegatingStake.TrialRules
+		}
+		allowedAddrs := actualRules.Exit()
+		var isAllowed bool
+		for _, adr := range allowedAddrs {
+			if adr == from {
+				isAllowed = true
+				break
+			}
+		}
+		if !isAllowed {
+			return validator.ErrSenderRejByDelegate
+		}
+	} else {
+		withdrawalAddress := val.GetWithdrawalAddress()
+		if from != *withdrawalAddress {
+			return validator.ErrInvalidFromAddresses
+		}
+	}
+
+	if val.Version() >= valStore.Ver1 {
+		//if operation already has been requested, check it expiration
+		prevOpTx := val.GetExitTx()
+		if prevOpTx != nil {
+			rc, blHash, _ := bc.GetTransactionReceipt(*prevOpTx)
+			//check prev op success
+			if rc != nil && rc.Status == types.ReceiptStatusSuccessful {
+				//check prev operation expiration
+				prevHeader := bc.GetHeaderByHash(blHash)
+				expiration := bc.Config().ValidatorOpExpireSlots
+
+				var currSlot uint64
+				if si := bc.GetSlotInfo(); si != nil {
+					currSlot = si.CurrentSlot()
+				}
+				if prevHeader != nil && currSlot < prevHeader.Slot+expiration {
+					return validator.ErrValOpBlocked
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func (bc *BlockChain) checkWithdrawalOperation(op validatorOp.Withdrawal, from common.Address) error {
+	stateDb, err := bc.State()
+	if err != nil {
+		return err
+	}
+
+	// check amount can add to log
+	if !common.BnCanCastToUint64(new(big.Int).Div(op.Amount(), common.BigGwei)) {
+		return validator.ErrInvalidAmount
+	}
+	val, err := bc.ValidatorStorage().GetValidator(stateDb, op.CreatorAddress())
+	if err != nil {
+		return err
+	}
+	if val == nil {
+		return validator.ErrUnknownValidator
+	}
+	// if total deposited amount is less than the effective balance
+	// - deposit is insufficient to activate validator.
+	effectiveBalanceWei := new(big.Int).Mul(bc.Config().EffectiveBalance, common.BigWat)
+	if stake := val.TotalStake(); val.GetActivationEra() == math.MaxUint64 &&
+		stake != nil && stake.Cmp(effectiveBalanceWei) < 0 {
+		stakeByAddr := val.StakeByAddress(from)
+		//withdrawal address must be one of the depositors
+		if stakeByAddr == nil {
+			return validator.ErrInvalidFromAddresses
+		}
+		// check amount
+		if stakeByAddr.Cmp(op.Amount()) < 0 {
+			return validator.ErrInsufficientFundsForOp
+		}
+	} else if val.HasDelegatingStake() {
+		//check delegating roles
+		//retrieve actual rules
+		var actualRules = &val.DelegatingStake.Rules
+		isTrial, err := bc.isValidatorTrialPeriod(val)
+		if err != nil {
+			return err
+		}
+		if isTrial {
+			actualRules = &val.DelegatingStake.TrialRules
+		}
+		allowedAddrs := actualRules.Withdrawal()
+		var isAllowed bool
+		for _, adr := range allowedAddrs {
+			if adr == from {
+				isAllowed = true
+				break
+			}
+		}
+		if !isAllowed {
+			return validator.ErrSenderRejByDelegate
+		}
+	} else {
+		withdrawalAddress := val.GetWithdrawalAddress()
+		if from != *withdrawalAddress {
+			return validator.ErrInvalidFromAddresses
+		}
+	}
+
+	if val.Version() >= valStore.Ver1 {
+		//if operation already has been requested, check it expiration
+		prevOpTx := val.GetWithdrawalTx()
+		if prevOpTx != nil {
+			rc, blHash, _ := bc.GetTransactionReceipt(*prevOpTx)
+			//check prev op succes
+			if rc != nil && rc.Status == types.ReceiptStatusSuccessful {
+				//check prev operation expiration
+				prevHeader := bc.GetHeaderByHash(blHash)
+				expiration := bc.Config().ValidatorOpExpireSlots
+
+				var currSlot uint64
+				if si := bc.GetSlotInfo(); si != nil {
+					currSlot = si.CurrentSlot()
+				}
+				if prevHeader != nil && currSlot < prevHeader.Slot+expiration {
+					return validator.ErrValOpBlocked
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func (bc *BlockChain) checkWithdrawalFromValState() error {
+	si := bc.GetSlotInfo()
+	if si == nil {
+		return ErrBadSlotInfo
+	}
+	if !bc.Config().IsForkSlotValSyncProc(si.CurrentSlot()) {
+		return errors.New("current fork does not support withdrawal from validators state address")
+	}
+
+	return nil
+}
+
+func (bc *BlockChain) checkDepositOperation(op validatorOp.Deposit, from common.Address, amount *big.Int) error {
+	// validate deposit signature
+	if err := validatorOp.VerifyDepositSig(op.Signature(), op.PubKey(), op.CreatorAddress(), op.WithdrawalAddress()); err != nil {
+		return err
+	}
+
+	// check amount can add to log
+	if !common.BnCanCastToUint64(new(big.Int).Div(amount, common.BigGwei)) {
+		return validator.ErrInvalidAmount
+	}
+	// check minimal acceptable amount
+	if amount.Cmp(validator.MinDepositVal) < 0 {
+		return fmt.Errorf("too low value (min deposit = %s wei)", validator.MinDepositVal.String())
+	}
+	//check delegating stake activation fork
+	var curSlot uint64
+	if si := bc.GetSlotInfo(); si != nil {
+		curSlot = si.CurrentSlot()
+	}
+	if op.DelegatingStake() != nil {
+		if !bc.Config().IsForkSlotDelegate(curSlot) {
+			return validatorOp.ErrDelegateForkRequire
+		}
+	}
+
+	stateDb, err := bc.State()
+	if err != nil {
+		return err
+	}
+
+	val, err := bc.ValidatorStorage().GetValidator(stateDb, op.CreatorAddress())
+	if err != nil {
+		if errors.Is(err, valStore.ErrNoStateValidatorInfo) {
+			return nil
+		}
+		return err
+	}
+	// check is activated
+	if val.GetActivationEra() != math.MaxUint64 {
+		return fmt.Errorf("validator passed activation (activation era is %d)", val.GetActivationEra())
+	}
+	// check is fully deposited
+	effectiveBalanceWei := new(big.Int).Mul(bc.Config().EffectiveBalance, common.BigWat)
+	if stake := val.TotalStake(); stake != nil && stake.Cmp(effectiveBalanceWei) >= 0 {
+		return fmt.Errorf("required amount of stake reached (req=%s deposited=%s wei)", effectiveBalanceWei.String(), stake.String())
+	}
+	// check op data conforms to validator data
+	if err := validator.ValidatePartialDepositOp(val, op); err != nil {
+		return err
+	}
+
+	if val.Version() >= valStore.Ver1 {
+		//if has active withdrawal operation - deposit is blocked
+		//check it expiration
+		prevOpTx := val.GetWithdrawalTx()
+		if prevOpTx != nil {
+			rc, blHash, _ := bc.GetTransactionReceipt(*prevOpTx)
+			//check prev op succes
+			if rc != nil && rc.Status == types.ReceiptStatusSuccessful {
+				//check prev operation expiration
+				prevHeader := bc.GetHeaderByHash(blHash)
+				expiration := bc.Config().ValidatorOpExpireSlots
+
+				var currSlot uint64
+				if si := bc.GetSlotInfo(); si != nil {
+					currSlot = si.CurrentSlot()
+				}
+				if prevHeader != nil && currSlot < prevHeader.Slot+expiration {
+					return validator.ErrValOpBlocked
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+func (bc *BlockChain) isValidatorTrialPeriod(validator *valStore.Validator) (bool, error) {
+	curEra := bc.GetEraInfo().GetEra().Number
+	if validator.GetActivationEra() > curEra {
+		return true, nil
+	}
+
+	activationEra := rawdb.ReadEra(bc.Database(), validator.GetActivationEra())
+	activationSlot, err := bc.GetSlotInfo().SlotOfEpochStart(activationEra.From)
+	if err != nil {
+		return false, err
+	}
+	endTrialSlot := activationSlot + validator.DelegatingStake.TrialPeriod
+	if endTrialSlot > bc.GetSlotInfo().CurrentSlot() {
+		return true, nil
+	}
+	// if validator deactivated while trial period - trial period
+	if validator.GetExitEra() <= curEra {
+		exitEra := rawdb.ReadEra(bc.Database(), validator.GetExitEra())
+		exitSlot, err := bc.GetSlotInfo().SlotOfEpochStart(exitEra.From)
+		if err != nil {
+			return false, err
+		}
+		if exitSlot <= endTrialSlot {
+			return true, nil
+		}
+	}
+	return false, nil
 }
 
 // HandleEra manages transitions between eras in the blockchain.

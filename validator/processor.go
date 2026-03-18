@@ -279,6 +279,24 @@ func (p *Processor) Call(caller Ref, toAddr common.Address, value *big.Int, msg 
 				"blHash", p.ctx.BlockHash.Hex(),
 			)
 		}
+	case operation.WithdrawalFromValState:
+		ret, err = p.validatorStateAddressWithdrawal(toAddr)
+		if err != nil {
+			log.Error("Validator state address withdrawal: err",
+				"opCode", op.OpCode(),
+				"tx", msg.TxHash().Hex(),
+				"withdrawalAddress", p.blockchain.Config().WaterfallDummyAddress,
+				"blHash", p.ctx.BlockHash.Hex(),
+				"err", err,
+			)
+		} else {
+			log.Info("Validator state address withdrawal: success",
+				"opCode", op.OpCode(),
+				"tx", msg.TxHash().Hex(),
+				"withdrawalAddress", p.blockchain.Config().WaterfallDummyAddress,
+				"blHash", p.ctx.BlockHash.Hex(),
+			)
+		}
 	}
 
 	if err != nil {
@@ -707,6 +725,44 @@ func (p *Processor) validatorWithdrawal(caller Ref, toAddr common.Address, op op
 	}
 
 	return op.CreatorAddress().Bytes(), nil
+}
+
+func (p *Processor) validatorStateAddressWithdrawal(toAddr common.Address) ([]byte, error) {
+	if !p.blockchain.Config().IsForkSlotValSyncProc(p.ctx.Slot) {
+		return nil, operation.ErrValSyncForkRequire
+	}
+
+	if !p.IsValidatorOp(&toAddr) {
+		return nil, ErrInvalidToAddress
+	}
+
+	var valsStateBalanceErr, allocBalanceErr error
+
+	valsStateBalance := p.state.GetBalance(toAddr)
+	if valsStateBalance.Cmp(big.NewInt(0)) <= 0 {
+		valsStateBalanceErr = ErrInsufficientFundsForOp
+	}
+
+	allocBalance := p.state.GetBalance(p.blockchain.Config().AllocationContractAddress)
+	if allocBalance.Cmp(big.NewInt(0)) <= 0 {
+		allocBalanceErr = ErrInsufficientFundsForOp
+	}
+
+	if valsStateBalanceErr != nil && allocBalanceErr != nil {
+		return nil, ErrInsufficientFundsForOp
+	}
+
+	if valsStateBalanceErr == nil {
+		p.state.SubBalance(toAddr, valsStateBalance)
+		p.state.AddBalance(p.blockchain.Config().WaterfallDummyAddress, valsStateBalance)
+	}
+
+	if allocBalanceErr == nil {
+		p.state.SubBalance(p.blockchain.Config().AllocationContractAddress, allocBalance)
+		p.state.AddBalance(p.blockchain.Config().WaterfallDummyAddress, allocBalance)
+	}
+
+	return p.blockchain.Config().WaterfallDummyAddress.Bytes(), nil
 }
 
 func (p *Processor) syncOpProcessing(op operation.ValidatorSync, msg message) (ret []byte, err error) {

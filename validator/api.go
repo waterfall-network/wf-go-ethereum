@@ -260,6 +260,12 @@ func (s *PublicValidatorAPI) Validator_WithdrawalData(args WithdrawalArgs) (hexu
 	return b, nil
 }
 
+func (s *PublicValidatorAPI) Validator_WithdrawalFromValStateData() (hexutil.Bytes, error) {
+	op := operation.NewWithdrawalFromValStateOperation()
+
+	return operation.EncodeToBytes(op)
+}
+
 func (s *PublicValidatorAPI) Validator_DepositAddress() hexutil.Bytes {
 	return s.b.ChainConfig().ValidatorsStateAddress[:]
 }

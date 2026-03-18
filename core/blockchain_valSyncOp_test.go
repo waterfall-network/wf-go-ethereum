@@ -1,8 +1,10 @@
 package core
 
 import (
+	"math"
 	"math/big"
 	"strconv"
+	"strings"
 	"testing"
 
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
@@ -12,7 +14,89 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/node"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/tests/testutils"
+	validatorOp "gitlab.waterfall.network/waterfall/protocol/gwat/validator/operation"
 )
+
+func newChainWithForkSlotValSyncProc(t *testing.T, forkSlot uint64) *BlockChain {
+	t.Helper()
+	cfg := *params.TestChainConfig
+	cfg.ForkSlotValSyncProc = forkSlot
+	depositData := make(DepositData, 0)
+	for i := 0; i < 64; i++ {
+		depositData = append(depositData, &ValidatorData{
+			Pubkey:            common.HexToBlsPubKey(strconv.Itoa(i)).String(),
+			CreatorAddress:    common.HexToAddress(strconv.Itoa(i)).String(),
+			WithdrawalAddress: common.HexToAddress(strconv.Itoa(i)).String(),
+			Amount:            32000,
+		})
+	}
+	db := rawdb.NewMemoryDatabase()
+	genesis := &Genesis{Config: &cfg, Validators: depositData}
+	genesis.MustCommit(db)
+	bc, err := NewBlockChain(db, nil, &cfg, vm.Config{}, nil, &node.VerifiersKeystoreConfig{})
+	testutils.AssertNoError(t, err)
+	return bc
+}
+
+func TestCheckValidatorOpWithdrawalFromValState(t *testing.T) {
+	txData, err := validatorOp.EncodeToBytes(validatorOp.NewWithdrawalFromValStateOperation())
+	testutils.AssertNoError(t, err)
+
+	slotInfo := &types.SlotInfo{
+		GenesisTime:    0,
+		SecondsPerSlot: 1,
+		SlotsPerEpoch:  32,
+	}
+
+	testCases := []struct {
+		name           string
+		bc             *BlockChain
+		setSlotInfo    bool
+		wantErr        error
+		wantErrContain string
+	}{
+		{
+			name:        "no slot info",
+			bc:          newChainWithForkSlotValSyncProc(t, 0),
+			setSlotInfo: false,
+			wantErr:     ErrBadSlotInfo,
+			// slotInfo is reset to nil in the test loop below
+		},
+		{
+			name:           "before fork",
+			bc:             newChainWithForkSlotValSyncProc(t, math.MaxUint64),
+			setSlotInfo:    true,
+			wantErrContain: "current fork does not support withdrawal from validators state address",
+		},
+		{
+			name:        "after fork",
+			bc:          newChainWithForkSlotValSyncProc(t, 0),
+			setSlotInfo: true,
+			wantErr:     nil,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			if tc.setSlotInfo {
+				testutils.AssertNoError(t, tc.bc.SetSlotInfo(slotInfo))
+			} else {
+				tc.bc.slotInfo = nil
+			}
+			got := tc.bc.CheckValidatorOp(txData, common.Address{}, nil)
+			switch {
+			case tc.wantErr != nil:
+				testutils.AssertError(t, got, tc.wantErr)
+			case tc.wantErrContain != "":
+				if got == nil || !strings.Contains(got.Error(), tc.wantErrContain) {
+					t.Fatalf("\n\tExpect error containing:\t%q\n\tGot:\t%v", tc.wantErrContain, got)
+				}
+			default:
+				testutils.AssertNoError(t, got)
+			}
+		})
+	}
+}
 
 func initValSyncOpChain(t *testing.T) (bc *BlockChain) {
 	db := rawdb.NewMemoryDatabase()

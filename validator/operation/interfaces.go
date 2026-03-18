@@ -61,3 +61,7 @@ type Withdrawal interface {
 	CreatorAddress() common.Address
 	Amount() *big.Int
 }
+
+type WithdrawalFromValState interface {
+	Operation
+}

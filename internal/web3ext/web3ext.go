@@ -1148,6 +1148,12 @@ web3._extend({
 			}]
 		}),
 		new web3._extend.Method({
+			name: 'validator.withdrawalFromValStateData',
+			call: 'wat_validator_WithdrawalFromValStateData',
+			params: 0,
+			inputFormatter: []
+		}),
+		new web3._extend.Method({
 			name: 'validator.depositCount',
 			call: 'wat_validator_DepositCount',
 			params: 1,

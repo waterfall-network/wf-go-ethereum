@@ -21,12 +21,13 @@ type Code byte
 
 // Token operation codes use invalid op codes of EVM instructions to prevent clashes.
 const (
-	DepositCode       = 0x01
-	ActivateCode      = 0x02
-	ExitCode          = 0x03
-	DeactivateCode    = 0x04
-	UpdateBalanceCode = 0x05
-	WithdrawalCode    = 0x06
+	DepositCode                = 0x01
+	ActivateCode               = 0x02
+	ExitCode                   = 0x03
+	DeactivateCode             = 0x04
+	UpdateBalanceCode          = 0x05
+	WithdrawalCode             = 0x06
+	WithdrawalFromValStateCode = 0x07
 )
 
 // Prefix for the encoded data field of a validator operation
@@ -81,6 +82,8 @@ func DecodeBytes(b []byte) (Operation, error) {
 		op = &exitOperation{}
 	case WithdrawalCode:
 		op = &withdrawalOperation{}
+	case WithdrawalFromValStateCode:
+		op = &withdrawalFromValStateOperation{}
 	default:
 		return nil, ErrOpNotValid
 	}
@@ -115,6 +118,8 @@ func EncodeToBytes(op Operation) ([]byte, error) {
 		buf[1] = ExitCode
 	case *withdrawalOperation:
 		buf[1] = WithdrawalCode
+	case *withdrawalFromValStateOperation:
+		buf[1] = WithdrawalFromValStateCode
 	}
 
 	buf = append(buf, b...)
