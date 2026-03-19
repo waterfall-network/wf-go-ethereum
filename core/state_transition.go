@@ -558,15 +558,21 @@ func (st *StateTransition) checkTxType(to *common.Address, txType TxType) error 
 }
 
 func (st *StateTransition) processRewards(creatorAddress common.Address, reward *big.Int) error {
-	if !st.evm.ChainConfig().IsForkSlotValSyncProc(st.evm.Context.Slot) || st.vp == nil {
+	if !st.evm.ChainConfig().IsForkSlotValSyncProc(st.evm.Context.Slot) {
 		st.state.AddBalance(creatorAddress, reward)
-
 		return nil
+	}
+
+	if st.vp == nil {
+		return errors.New("validator processor is required after ValSyncProc fork")
 	}
 
 	val, err := st.vp.Storage().GetValidator(st.state, creatorAddress)
 	if err != nil {
 		return err
+	}
+	if val == nil {
+		return validator.ErrUnknownValidator
 	}
 	if val.DelegatingStake != nil {
 		var delegateRules = &val.DelegatingStake.Rules
