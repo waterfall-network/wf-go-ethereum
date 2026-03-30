@@ -25,6 +25,7 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/cmd/utils"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/internal/debug"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/internal/flags"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/internal/gwatapp"
 	"gopkg.in/urfave/cli.v1"
 )
 
@@ -33,7 +34,7 @@ var AppHelpFlagGroups = []flags.FlagGroup{
 	{
 		Name: "WATERFALL",
 		Flags: []cli.Flag{
-			configFileFlag,
+			gwatapp.ConfigFileFlag,
 			utils.DataDirFlag,
 			utils.AncientFlag,
 			utils.MinFreeDiskSpaceFlag,
@@ -203,7 +204,7 @@ var AppHelpFlagGroups = []flags.FlagGroup{
 	},
 	{
 		Name:  "METRICS AND STATS",
-		Flags: metricsFlags,
+		Flags: gwatapp.MetricsFlags,
 	},
 	{
 		Name: "ALIASED (deprecated)",

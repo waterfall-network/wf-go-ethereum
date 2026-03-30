@@ -25,14 +25,11 @@ import (
 	"unicode"
 
 	"github.com/naoina/toml"
-	"gitlab.waterfall.network/waterfall/protocol/gwat/accounts/external"
-	"gitlab.waterfall.network/waterfall/protocol/gwat/accounts/keystore"
-	"gitlab.waterfall.network/waterfall/protocol/gwat/accounts/scwallet"
-	"gitlab.waterfall.network/waterfall/protocol/gwat/accounts/usbwallet"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/cmd/utils"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/eth/downloader"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/eth/ethconfig"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/internal/ethapi"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/internal/gwatapp"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/log"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/metrics"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/node"
@@ -46,14 +43,9 @@ var (
 		Name:        "dumpconfig",
 		Usage:       "Show configuration values",
 		ArgsUsage:   "",
-		Flags:       append(nodeFlags, rpcFlags...),
+		Flags:       append(gwatapp.NodeFlags, gwatapp.RPCFlags...),
 		Category:    "MISCELLANEOUS COMMANDS",
 		Description: `The dumpconfig command shows configuration values.`,
-	}
-
-	configFileFlag = cli.StringFlag{
-		Name:  "config",
-		Usage: "TOML configuration file",
 	}
 )
 
@@ -125,7 +117,7 @@ func makeConfigNode(ctx *cli.Context) (*node.Node, gethConfig) {
 	}
 
 	// Load config file.
-	if file := ctx.GlobalString(configFileFlag.Name); file != "" {
+	if file := ctx.GlobalString(gwatapp.ConfigFileFlag.Name); file != "" {
 		if err := loadConfig(file, &cfg); err != nil {
 			utils.Fatalf("%v", err)
 		}
@@ -138,7 +130,7 @@ func makeConfigNode(ctx *cli.Context) (*node.Node, gethConfig) {
 		utils.Fatalf("Failed to create the protocol stack: %v", err)
 	}
 	// Node doesn't by default populate account manager backends
-	if err := setAccountManagerBackends(stack); err != nil {
+	if err := gwatapp.SetAccountManagerBackends(stack); err != nil {
 		utils.Fatalf("Failed to set account manager backends: %v", err)
 	}
 
@@ -285,63 +277,4 @@ func deprecated(field string) bool {
 	default:
 		return false
 	}
-}
-
-func setAccountManagerBackends(stack *node.Node) error {
-	conf := stack.Config()
-	am := stack.AccountManager()
-	keydir := stack.KeyStoreDir()
-	scryptN := keystore.StandardScryptN
-	scryptP := keystore.StandardScryptP
-	if conf.UseLightweightKDF {
-		scryptN = keystore.LightScryptN
-		scryptP = keystore.LightScryptP
-	}
-
-	// Assemble the supported backends
-	if len(conf.ExternalSigner) > 0 {
-		log.Info("Using external signer", "url", conf.ExternalSigner)
-		if extapi, err := external.NewExternalBackend(conf.ExternalSigner); err == nil {
-			am.AddBackend(extapi)
-			return nil
-		} else {
-			return fmt.Errorf("error connecting to external signer: %v", err)
-		}
-	}
-
-	// For now, we're using EITHER external signer OR local signers.
-	// If/when we implement some form of lockfile for USB and keystore wallets,
-	// we can have both, but it's very confusing for the user to see the same
-	// accounts in both externally and locally, plus very racey.
-	am.AddBackend(keystore.NewKeyStore(keydir, scryptN, scryptP))
-	if conf.USB {
-		// Start a USB hub for Ledger hardware wallets
-		if ledgerhub, err := usbwallet.NewLedgerHub(); err != nil {
-			log.Warn(fmt.Sprintf("Failed to start Ledger hub, disabling: %v", err))
-		} else {
-			am.AddBackend(ledgerhub)
-		}
-		// Start a USB hub for Trezor hardware wallets (HID version)
-		if trezorhub, err := usbwallet.NewTrezorHubWithHID(); err != nil {
-			log.Warn(fmt.Sprintf("Failed to start HID Trezor hub, disabling: %v", err))
-		} else {
-			am.AddBackend(trezorhub)
-		}
-		// Start a USB hub for Trezor hardware wallets (WebUSB version)
-		if trezorhub, err := usbwallet.NewTrezorHubWithWebUSB(); err != nil {
-			log.Warn(fmt.Sprintf("Failed to start WebUSB Trezor hub, disabling: %v", err))
-		} else {
-			am.AddBackend(trezorhub)
-		}
-	}
-	if len(conf.SmartCardDaemonPath) > 0 {
-		// Start a smart card hub
-		if schub, err := scwallet.NewHub(conf.SmartCardDaemonPath, scwallet.Scheme, keydir); err != nil {
-			log.Warn(fmt.Sprintf("Failed to start smart card hub, disabling: %v", err))
-		} else {
-			am.AddBackend(schub)
-		}
-	}
-
-	return nil
 }

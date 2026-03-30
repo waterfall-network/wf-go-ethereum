@@ -36,6 +36,7 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/internal/debug"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/internal/ethapi"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/internal/flags"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/internal/gwatapp"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/log"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/metrics"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/node"
@@ -52,148 +53,6 @@ var (
 	gitDate   = ""
 	// The app that holds all commands and flags.
 	app = flags.NewApp(gitCommit, gitDate, "the gwat command line interface")
-	// flags that configure the node
-	nodeFlags = []cli.Flag{
-		utils.IdentityFlag,
-		utils.UnlockedAccountFlag,
-		utils.PasswordFileFlag,
-		utils.BootnodesFlag,
-		utils.DataDirFlag,
-		utils.AncientFlag,
-		utils.MinFreeDiskSpaceFlag,
-		utils.KeyStoreDirFlag,
-		utils.UnlockVerifiersFlag,
-		utils.VerifiersKeystoreFlag,
-		utils.VerifiersPasswordsFlag,
-		utils.ExternalSignerFlag,
-		utils.NoUSBFlag,
-		utils.USBFlag,
-		utils.SmartCardDaemonPathFlag,
-		utils.OverrideDelegatingStakeFlag,
-		utils.OverridePrefixFinFlag,
-		utils.TxPoolLocalsFlag,
-		utils.TxPoolNoLocalsFlag,
-		utils.TxPoolJournalFlag,
-		utils.TxPoolRejournalFlag,
-		utils.TxPoolPriceLimitFlag,
-		utils.TxPoolPriceBumpFlag,
-		utils.TxPoolAccountSlotsFlag,
-		utils.TxPoolGlobalSlotsFlag,
-		utils.TxPoolAccountQueueFlag,
-		utils.TxPoolGlobalQueueFlag,
-		utils.TxPoolLifetimeFlag,
-		utils.TxPoolDroppedFlag,
-		utils.SyncModeFlag,
-		utils.ExitWhenSyncedFlag,
-		utils.GCModeFlag,
-		utils.SnapshotFlag,
-		utils.TxLookupLimitFlag,
-		// TODO: uncomment when light client is ready
-		//utils.LightServeFlag,
-		//utils.LightIngressFlag,
-		//utils.LightEgressFlag,
-		//utils.LightMaxPeersFlag,
-		//utils.LightNoPruneFlag,
-		//utils.LightKDFFlag,
-		//utils.UltraLightServersFlag,
-		//utils.UltraLightFractionFlag,
-		//utils.UltraLightOnlyAnnounceFlag,
-		//utils.LightNoSyncServeFlag,
-		utils.WhitelistFlag,
-		utils.BloomFilterSizeFlag,
-		utils.CacheFlag,
-		utils.CacheDatabaseFlag,
-		utils.CacheTrieFlag,
-		utils.CacheTrieJournalFlag,
-		utils.CacheTrieRejournalFlag,
-		utils.CacheGCFlag,
-		utils.CacheSnapshotFlag,
-		utils.CacheNoPrefetchFlag,
-		utils.CachePreimagesFlag,
-		utils.ListenPortFlag,
-		utils.MaxPeersFlag,
-		utils.MaxPendingPeersFlag,
-		utils.MinerEnabledFlag,
-		utils.MinerThreadsFlag,
-		utils.MinerNotifyFlag,
-		utils.LegacyMinerGasTargetFlag,
-		utils.MinerGasLimitFlag,
-		utils.MinerGasLimitForceFlag,
-		utils.MinerGasPriceFlag,
-		utils.MinerExtraDataFlag,
-		utils.MinerRecommitIntervalFlag,
-		utils.MinerNoVerifyFlag,
-		utils.NATFlag,
-		utils.NoDiscoverFlag,
-		utils.DiscoveryV5Flag,
-		utils.NetrestrictFlag,
-		utils.NodeKeyFileFlag,
-		utils.NodeKeyHexFlag,
-		utils.DNSDiscoveryFlag,
-		utils.MainnetFlag,
-		utils.TestNet8Flag,
-		utils.DeveloperFlag,
-		utils.Testnet5Flag,
-		utils.Testnet9Flag,
-		utils.VMEnableDebugFlag,
-		utils.NetworkIdFlag,
-		utils.EthStatsURLFlag,
-		utils.FakePoWFlag,
-		utils.NoCompactionFlag,
-		utils.GpoBlocksFlag,
-		utils.GpoPercentileFlag,
-		utils.GpoMaxGasPriceFlag,
-		utils.GpoIgnoreGasPriceFlag,
-		utils.MinerNotifyFullFlag,
-		configFileFlag,
-	}
-
-	rpcFlags = []cli.Flag{
-		utils.HTTPEnabledFlag,
-		utils.HTTPListenAddrFlag,
-		utils.HTTPPortFlag,
-		utils.HTTPCORSDomainFlag,
-		utils.HTTPVirtualHostsFlag,
-		utils.GraphQLEnabledFlag,
-		utils.GraphQLCORSDomainFlag,
-		utils.GraphQLVirtualHostsFlag,
-		utils.HTTPApiFlag,
-		utils.HTTPPathPrefixFlag,
-		utils.WSEnabledFlag,
-		utils.WSListenAddrFlag,
-		utils.WSPortFlag,
-		utils.WSApiFlag,
-		utils.WSAllowedOriginsFlag,
-		utils.WSPathPrefixFlag,
-		utils.IPCDisabledFlag,
-		utils.IPCPathFlag,
-		utils.InsecureUnlockAllowedFlag,
-		utils.RPCGlobalGasCapFlag,
-		utils.RPCGlobalEVMTimeoutFlag,
-		utils.RPCGlobalTxFeeCapFlag,
-		utils.AllowUnprotectedTxs,
-		utils.AuthListenFlag,
-		utils.AuthPortFlag,
-		utils.AuthVirtualHostsFlag,
-		utils.JWTSecretFlag,
-	}
-
-	metricsFlags = []cli.Flag{
-		utils.MetricsEnabledFlag,
-		utils.MetricsEnabledExpensiveFlag,
-		utils.MetricsHTTPFlag,
-		utils.MetricsPortFlag,
-		utils.MetricsEnableInfluxDBFlag,
-		utils.MetricsInfluxDBEndpointFlag,
-		utils.MetricsInfluxDBDatabaseFlag,
-		utils.MetricsInfluxDBUsernameFlag,
-		utils.MetricsInfluxDBPasswordFlag,
-		utils.MetricsInfluxDBTagsFlag,
-		utils.MetricsEnableInfluxDBV2Flag,
-		utils.MetricsInfluxDBTokenFlag,
-		utils.MetricsInfluxDBBucketFlag,
-		utils.MetricsInfluxDBOrganizationFlag,
-	}
 )
 
 func init() {
@@ -233,11 +92,11 @@ func init() {
 	}
 	sort.Sort(cli.CommandsByName(app.Commands))
 
-	app.Flags = append(app.Flags, nodeFlags...)
-	app.Flags = append(app.Flags, rpcFlags...)
+	app.Flags = append(app.Flags, gwatapp.NodeFlags...)
+	app.Flags = append(app.Flags, gwatapp.RPCFlags...)
 	app.Flags = append(app.Flags, consoleFlags...)
 	app.Flags = append(app.Flags, debug.Flags...)
-	app.Flags = append(app.Flags, metricsFlags...)
+	app.Flags = append(app.Flags, gwatapp.MetricsFlags...)
 
 	app.Before = func(ctx *cli.Context) error {
 		return debug.Setup(ctx)

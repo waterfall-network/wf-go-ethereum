@@ -24,6 +24,7 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/accounts/keystore"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/cmd/utils"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/crypto"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/internal/gwatapp"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/log"
 	"gopkg.in/urfave/cli.v1"
 )
@@ -262,7 +263,7 @@ func ambiguousAddrRecovery(ks *keystore.KeyStore, err *keystore.AmbiguousAddrErr
 func accountCreate(ctx *cli.Context) error {
 	cfg := gethConfig{Node: defaultNodeConfig()}
 	// Load config file.
-	if file := ctx.GlobalString(configFileFlag.Name); file != "" {
+	if file := ctx.GlobalString(gwatapp.ConfigFileFlag.Name); file != "" {
 		if err := loadConfig(file, &cfg); err != nil {
 			utils.Fatalf("%v", err)
 		}
