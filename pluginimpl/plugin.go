@@ -20,10 +20,10 @@ import (
 	"fmt"
 
 	"gitlab.waterfall.network/waterfall/protocol/gwat/eth"
-	"gitlab.waterfall.network/waterfall/protocol/gwat/eth/ethconfig"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/internal/gwatapp"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/node"
-	"gitlab.waterfall.network/waterfall/protocol/gwat/p2p"
 	"gitlab.waterfall.network/waterfall/protocol/wf-types/blockdag/iface"
+	"gopkg.in/urfave/cli.v1"
 )
 
 // GwatPluginImpl is the concrete implementation of iface.GwatPlugin exported
@@ -32,6 +32,7 @@ import (
 type GwatPluginImpl struct {
 	stack    *node.Node
 	ethereum *eth.Ethereum
+	cliCtx   *cli.Context // retained for UnlockAccounts in Start()
 	devMode  bool
 }
 
@@ -40,53 +41,38 @@ type GwatPluginImpl struct {
 func New() *GwatPluginImpl { return &GwatPluginImpl{} }
 
 // Init configures and creates the gwat node and Ethereum backend from the
-// provided NodeConfig. It must be called exactly once before Start.
+// provided NodeConfig.Args, which are forwarded verbatim to gwat's own CLI
+// flag parser. Must be called exactly once before Start.
 func (p *GwatPluginImpl) Init(cfg *iface.NodeConfig) error {
 	if cfg == nil {
 		return fmt.Errorf("pluginimpl: Init: nil config")
 	}
 
-	nodeCfg := node.Config{
-		Name:     "gwat",
-		DataDir:  cfg.DataDir,
-		IPCPath:  cfg.IPCPath,
-		HTTPHost: cfg.HTTPHost,
-		HTTPPort: cfg.HTTPPort,
-		P2P: p2p.Config{
-			NoDiscovery: true,
-			NoDial:      true,
-		},
-	}
-
-	stack, err := node.New(&nodeCfg)
+	stack, ethereum, cliCtx, err := gwatapp.MakeNode(cfg.Args)
 	if err != nil {
-		return fmt.Errorf("pluginimpl: Init: create node: %w", err)
-	}
-
-	ethCfg := ethconfig.Defaults
-	if cfg.NetworkID != 0 {
-		ethCfg.NetworkId = cfg.NetworkID
-	}
-	ethCfg.IsDevMode = cfg.DevMode
-
-	ethereum, err := eth.New(stack, &ethCfg)
-	if err != nil {
-		_ = stack.Close()
-		return fmt.Errorf("pluginimpl: Init: create eth backend: %w", err)
+		return fmt.Errorf("pluginimpl: Init: %w", err)
 	}
 
 	p.stack = stack
 	p.ethereum = ethereum
+	p.cliCtx = cliCtx
 	p.devMode = cfg.DevMode
 	return nil
 }
 
-// Start starts gwat's background services (P2P networking, DAG work, etc.).
+// Start starts gwat's background services (P2P networking, DAG work, etc.)
+// and unlocks any accounts requested via --unlock / --password.
 func (p *GwatPluginImpl) Start() error {
 	if p.stack == nil {
 		return fmt.Errorf("pluginimpl: Start: plugin not initialized")
 	}
-	return p.stack.Start()
+	if err := p.stack.Start(); err != nil {
+		return err
+	}
+	if p.cliCtx != nil {
+		gwatapp.UnlockAccounts(p.cliCtx, p.stack)
+	}
+	return nil
 }
 
 // Stop shuts down the gwat node gracefully.
