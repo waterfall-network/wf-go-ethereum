@@ -34,6 +34,8 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/operation"
 	valStore "gitlab.waterfall.network/waterfall/protocol/gwat/validator/storage"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/txlog"
+	"gitlab.waterfall.network/waterfall/protocol/wf-types/blockdag/iface"
+	wfcommon "gitlab.waterfall.network/waterfall/protocol/wf-types/common"
 )
 
 var (
@@ -96,7 +98,7 @@ type blockchain interface {
 	GetBlock(ctx context.Context, hash common.Hash) *types.Block
 	GetEpoch(epoch uint64) common.Hash
 	// hard blockchain fixes
-	FixValidatorSyncOpProcessing(processor *Processor, opData operation.Operation, txHash common.Hash, from, to common.Address) (isApplied bool, ret []byte, err error)
+	FixValidatorSyncOpProcessing(ctx iface.ProcessorCtx, opData iface.ValidatorSyncOpFix, txHash common.Hash, from, to common.Address) (isApplied bool, ret []byte, err error)
 }
 
 type message interface {
@@ -126,8 +128,28 @@ func NewProcessor(blockCtx vm.BlockContext, stateDb vm.StateDB, bc blockchain) *
 	}
 }
 
-func (p *Processor) GetBlockContext() vm.BlockContext {
-	return p.ctx
+// GetBlockContext returns the block context for the current block, converting
+// from gwat's vm.BlockContext to the wf-types iface.BlockContext.
+// This satisfies the iface.ProcessorCtx interface used by chain_fixes.
+func (p *Processor) GetBlockContext() iface.BlockContext {
+	var random *[32]byte
+	if p.ctx.Random != nil {
+		r := [32]byte(*p.ctx.Random)
+		random = &r
+	}
+	return iface.BlockContext{
+		Coinbase:    [20]byte(p.ctx.Coinbase),
+		GasLimit:    p.ctx.GasLimit,
+		BlockHeight: p.ctx.BlockHeight,
+		BlockNumber: p.ctx.BlockNumber,
+		Time:        p.ctx.Time,
+		Difficulty:  p.ctx.Difficulty,
+		BaseFee:     p.ctx.BaseFee,
+		Random:      random,
+		Slot:        p.ctx.Slot,
+		Era:         p.ctx.Era,
+		BlockHash:   wfcommon.Hash(p.ctx.BlockHash),
+	}
 }
 
 func (p *Processor) getDepositCount() uint64 {
@@ -183,11 +205,13 @@ func (p *Processor) Call(caller Ref, toAddr common.Address, value *big.Int, msg 
 	ret = nil
 
 	//apply fixes
-	if isApplied, ret, err := p.blockchain.FixValidatorSyncOpProcessing(p, op, msg.TxHash(), caller.Address(), toAddr); isApplied {
-		if err != nil {
-			p.state.RevertToSnapshot(snapshot)
+	if vs, ok := op.(operation.ValidatorSync); ok {
+		if isApplied, ret, err := p.blockchain.FixValidatorSyncOpProcessing(p, operation.WrapForIface(vs), msg.TxHash(), caller.Address(), toAddr); isApplied {
+			if err != nil {
+				p.state.RevertToSnapshot(snapshot)
+			}
+			return ret, err
 		}
-		return ret, err
 	}
 
 	switch v := op.(type) {

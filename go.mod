@@ -53,8 +53,8 @@ require (
 	github.com/rs/cors v1.7.0
 	github.com/shirou/gopsutil v3.21.4-0.20210419000835-c7a38de76ee5+incompatible
 	github.com/status-im/keycard-go v0.2.0
-	github.com/stretchr/testify v1.8.4
-	github.com/supranational/blst v0.3.11
+	github.com/stretchr/testify v1.11.1
+	github.com/supranational/blst v0.3.16
 	github.com/syndtr/goleveldb v1.0.1-0.20210819022825-2ae1ddf74ef7
 	github.com/tyler-smith/go-bip39 v1.1.0
 	github.com/waterfall-network/fastssz v0.1.4
@@ -90,7 +90,7 @@ require (
 	github.com/go-ole/go-ole v1.3.0 // indirect
 	github.com/go-sourcemap/sourcemap v2.1.3+incompatible // indirect
 	github.com/goccy/go-json v0.10.2 // indirect
-	github.com/google/go-cmp v0.5.9 // indirect
+	github.com/google/go-cmp v0.7.0 // indirect
 	github.com/google/go-querystring v1.1.0 // indirect
 	github.com/google/pprof v0.0.0-20230207041349-798e818bf904 // indirect
 	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
@@ -119,3 +119,8 @@ require (
 	gotest.tools/v3 v3.5.1 // indirect
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
+
+require gitlab.waterfall.network/waterfall/protocol/wf-types v0.0.0-00010101000000-000000000000
+
+// TODO: remove after wf-types is published with a real tag (e.g. v0.1.0)
+replace gitlab.waterfall.network/waterfall/protocol/wf-types => ../wf-types

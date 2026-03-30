@@ -475,6 +475,7 @@ func (s *Ethereum) Synced() bool                       { return atomic.LoadUint3
 func (s *Ethereum) ArchiveMode() bool                  { return s.config.NoPruning }
 func (s *Ethereum) BloomIndexer() *core.ChainIndexer   { return s.bloomIndexer }
 func (s *Ethereum) IsDevMode() bool                    { return s.config.IsDevMode }
+func (s *Ethereum) Dag() *dag.Dag                      { return s.dag }
 
 // Protocols returns all the currently configured
 // network protocols to start.

@@ -1,0 +1,127 @@
+// Copyright 2024 Blue Wave Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+// Package pluginimpl wires gwat's concrete types to the wf-types/iface interfaces
+// so that gwat can be loaded as a plugin by wf-engine.
+package pluginimpl
+
+import (
+	"fmt"
+
+	"gitlab.waterfall.network/waterfall/protocol/gwat/eth"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/eth/ethconfig"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/node"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/p2p"
+	"gitlab.waterfall.network/waterfall/protocol/wf-types/blockdag/iface"
+)
+
+// GwatPluginImpl is the concrete implementation of iface.GwatPlugin exported
+// from the gwat shared library. The exported plugin symbol in cmd/gwat-plugin/main.go
+// holds a pointer to this type.
+type GwatPluginImpl struct {
+	stack    *node.Node
+	ethereum *eth.Ethereum
+	devMode  bool
+}
+
+// New returns a zero-value GwatPluginImpl. The caller must call Init before
+// using any other method.
+func New() *GwatPluginImpl { return &GwatPluginImpl{} }
+
+// Init configures and creates the gwat node and Ethereum backend from the
+// provided NodeConfig. It must be called exactly once before Start.
+func (p *GwatPluginImpl) Init(cfg *iface.NodeConfig) error {
+	if cfg == nil {
+		return fmt.Errorf("pluginimpl: Init: nil config")
+	}
+
+	nodeCfg := node.Config{
+		Name:     "gwat",
+		DataDir:  cfg.DataDir,
+		IPCPath:  cfg.IPCPath,
+		HTTPHost: cfg.HTTPHost,
+		HTTPPort: cfg.HTTPPort,
+		P2P: p2p.Config{
+			NoDiscovery: true,
+			NoDial:      true,
+		},
+	}
+
+	stack, err := node.New(&nodeCfg)
+	if err != nil {
+		return fmt.Errorf("pluginimpl: Init: create node: %w", err)
+	}
+
+	ethCfg := ethconfig.Defaults
+	if cfg.NetworkID != 0 {
+		ethCfg.NetworkId = cfg.NetworkID
+	}
+	ethCfg.IsDevMode = cfg.DevMode
+
+	ethereum, err := eth.New(stack, &ethCfg)
+	if err != nil {
+		_ = stack.Close()
+		return fmt.Errorf("pluginimpl: Init: create eth backend: %w", err)
+	}
+
+	p.stack = stack
+	p.ethereum = ethereum
+	p.devMode = cfg.DevMode
+	return nil
+}
+
+// Start starts gwat's background services (P2P networking, DAG work, etc.).
+func (p *GwatPluginImpl) Start() error {
+	if p.stack == nil {
+		return fmt.Errorf("pluginimpl: Start: plugin not initialized")
+	}
+	return p.stack.Start()
+}
+
+// Stop shuts down the gwat node gracefully.
+func (p *GwatPluginImpl) Stop() error {
+	if p.stack == nil {
+		return nil
+	}
+	return p.stack.Close()
+}
+
+// BlockChain returns an iface.BlockChain adapter over gwat's *core.BlockChain.
+func (p *GwatPluginImpl) BlockChain() iface.BlockChain {
+	return &blockChainWrapper{inner: p.ethereum.BlockChain()}
+}
+
+// ValidatorChain returns an iface.ValidatorChain adapter — the same underlying
+// wrapper as BlockChain since gwat's *core.BlockChain satisfies both interfaces.
+func (p *GwatPluginImpl) ValidatorChain() iface.ValidatorChain {
+	return &blockChainWrapper{inner: p.ethereum.BlockChain()}
+}
+
+// TxPool returns an iface.TxPool adapter over gwat's *core.TxPool.
+func (p *GwatPluginImpl) TxPool() iface.TxPool {
+	return &txPoolWrapper{inner: p.ethereum.TxPool()}
+}
+
+// Downloader returns an iface.Downloader adapter over gwat's eth/downloader.
+func (p *GwatPluginImpl) Downloader() iface.Downloader {
+	return &downloaderWrapper{inner: p.ethereum.Downloader()}
+}
+
+// Creator returns an iface.BlockCreator adapter over gwat's dag/creator.
+func (p *GwatPluginImpl) Creator() iface.BlockCreator {
+	return &creatorWrapper{inner: p.ethereum.Dag().Creator()}
+}
+
+// IsDevMode reports whether the plugin was started in development mode.
+func (p *GwatPluginImpl) IsDevMode() bool { return p.devMode }
