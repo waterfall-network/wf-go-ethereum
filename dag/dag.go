@@ -134,8 +134,9 @@ type Dag struct {
 
 	lastFinApiSlot uint64
 
-	exitChan chan struct{}
-	enddChan chan struct{}
+	exitChan    chan struct{}
+	enddChan    chan struct{}
+	skipCleanup bool // set by StopWorkLoop to skip creator/downloader cleanup
 
 	checkpoint *types.Checkpoint
 }
@@ -712,9 +713,21 @@ func (d *Dag) StopWork() {
 	close(d.enddChan)
 }
 
+// StopWorkLoop stops only the slot-ticker workloop without stopping the creator
+// or downloader. Used when the workloop is handed off to an external dag (e.g.
+// wf-engine) that needs to keep using creator and downloader.
+func (d *Dag) StopWorkLoop() {
+	d.skipCleanup = true
+	d.exitChan <- struct{}{}
+	<-d.enddChan
+	close(d.enddChan)
+}
+
 func (d *Dag) exitProcedurre() {
-	d.creator.Stop()
-	d.downloader.Terminate()
+	if !d.skipCleanup {
+		d.creator.Stop()
+		d.downloader.Terminate()
+	}
 	d.bc.DagMuLock()
 	d.bc.DagMuUnlock()
 	close(d.exitChan)

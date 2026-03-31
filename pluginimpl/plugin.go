@@ -106,8 +106,15 @@ func (p *GwatPluginImpl) Downloader() iface.Downloader {
 
 // Creator returns an iface.BlockCreator adapter over gwat's dag/creator.
 func (p *GwatPluginImpl) Creator() iface.BlockCreator {
-	return &creatorWrapper{inner: p.ethereum.Dag().Creator()}
+	return &creatorWrapper{inner: p.ethereum.DagCreator()}
 }
 
 // IsDevMode reports whether the plugin was started in development mode.
 func (p *GwatPluginImpl) IsDevMode() bool { return p.devMode }
+
+// SetDag replaces gwat's internal dag workloop with the provided wf-engine dag.
+// Must be called after Start(). gwat stops its own dag and routes all coordinator
+// IPC calls to d via a thin type-conversion adapter.
+func (p *GwatPluginImpl) SetDag(d iface.Dag) {
+	p.ethereum.SetDagServicer(&wfDagAdapter{inner: d})
+}

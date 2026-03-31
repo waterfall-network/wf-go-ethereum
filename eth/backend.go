@@ -34,6 +34,7 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/vm"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/dag"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/dag/creator"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/eth/downloader"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/eth/ethconfig"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/eth/filters"
@@ -84,7 +85,9 @@ type Ethereum struct {
 	gasPrice  *big.Int
 	etherbase common.Address
 
-	dag *dag.Dag
+	dag        *dag.Dag
+	dagSvc     ethapi.DagServicer // active dag service; replaced by SetDagServicer
+	dagStopped bool               // true after internal dag.StopWork() has been called
 
 	networkID     uint64
 	netRPCService *ethapi.PublicNetAPI
@@ -268,6 +271,7 @@ func New(stack *node.Node, config *ethconfig.Config) (*Ethereum, error) {
 	}
 
 	eth.dag = dag.New(eth, eth.EventMux(), &config.Creator)
+	eth.dagSvc = eth.dag
 
 	go eth.dag.StartWork()
 
@@ -475,7 +479,17 @@ func (s *Ethereum) Synced() bool                       { return atomic.LoadUint3
 func (s *Ethereum) ArchiveMode() bool                  { return s.config.NoPruning }
 func (s *Ethereum) BloomIndexer() *core.ChainIndexer   { return s.bloomIndexer }
 func (s *Ethereum) IsDevMode() bool                    { return s.config.IsDevMode }
-func (s *Ethereum) Dag() *dag.Dag                      { return s.dag }
+func (s *Ethereum) Dag() ethapi.DagServicer            { return s.dagSvc }
+func (s *Ethereum) DagCreator() *creator.Creator       { return s.dag.Creator() }
+
+// SetDagServicer replaces gwat's internal dag workloop with svc.
+// The internal dag is stopped and all coordinator API calls are forwarded to svc.
+// Must be called after Start() and before the external dag begins its own workloop.
+func (s *Ethereum) SetDagServicer(svc ethapi.DagServicer) {
+	s.dag.StopWorkLoop()
+	s.dagStopped = true
+	s.dagSvc = svc
+}
 
 // Protocols returns all the currently configured
 // network protocols to start.
@@ -522,7 +536,9 @@ func (s *Ethereum) Stop() error {
 	log.Info("Terminate: handler", "elapsed", common.PrettyDuration(time.Since(start)))
 
 	// Then stop everything else.
-	s.dag.StopWork()
+	if !s.dagStopped {
+		s.dag.StopWork()
+	}
 	log.Info("Terminate: dag", "elapsed", common.PrettyDuration(time.Since(start)))
 	s.txPool.Stop()
 	log.Info("Terminate: txPool", "elapsed", common.PrettyDuration(time.Since(start)))

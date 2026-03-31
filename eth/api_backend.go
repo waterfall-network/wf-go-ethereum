@@ -30,11 +30,11 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/state"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/vm"
-	"gitlab.waterfall.network/waterfall/protocol/gwat/dag"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/eth/gasprice"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/ethdb"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/event"
 	ethereum "gitlab.waterfall.network/waterfall/protocol/gwat/interfaces"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/internal/ethapi"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/rpc"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/token"
@@ -79,9 +79,9 @@ func (b *EthAPIBackend) EpochToEra(u uint64) *era.Era {
 	return b.eth.blockchain.EpochToEra(u)
 }
 
-// Dag retrieves current instance of Dag.
-func (b *EthAPIBackend) Dag() *dag.Dag {
-	return b.eth.dag
+// Dag returns the active dag service.
+func (b *EthAPIBackend) Dag() ethapi.DagServicer {
+	return b.eth.Dag()
 }
 
 // GetLastFinalizedNumber retrieves current last finalized number.

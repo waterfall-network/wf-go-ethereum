@@ -29,7 +29,6 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/state"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/vm"
-	"gitlab.waterfall.network/waterfall/protocol/gwat/dag"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/ethdb"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/event"
 	ethereum "gitlab.waterfall.network/waterfall/protocol/gwat/interfaces"
@@ -79,7 +78,7 @@ type Backend interface {
 	BlockHashesBySlot(ctx context.Context, slot uint64) common.HashArray
 
 	// Dag API
-	Dag() *dag.Dag
+	Dag() DagServicer
 
 	// Transaction pool API
 	SendTx(ctx context.Context, signedTx *types.Transaction) error
