@@ -123,6 +123,10 @@ func (w *blockChainWrapper) FinalizeBlock(blockHash wfcommon.Hash, finNr uint64,
 	if stateBlock == nil {
 		return fmt.Errorf("pluginimpl: FinalizeBlock: state block not found: %s", stateBlockHash)
 	}
+	// SetNumber must be called before UpdateFinalizingState so that NewEVMBlockContext
+	// can safely dereference header.Number (e.g. at the ForkSlotValSyncProc fork point).
+	// This mirrors gwat's internal finalizer (dag/finalizer/finalizer.go:156-157).
+	block.SetNumber(&finNr)
 	if err := w.inner.UpdateFinalizingState(block, stateBlock); err != nil {
 		return err
 	}
