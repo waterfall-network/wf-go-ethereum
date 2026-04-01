@@ -60,8 +60,9 @@ func (p *GwatPluginImpl) Init(cfg *iface.NodeConfig) error {
 	return nil
 }
 
-// Start starts gwat's background services (P2P networking, DAG work, etc.)
-// and unlocks any accounts requested via --unlock / --password.
+// Start starts gwat's background services (P2P networking, DAG work, etc.),
+// unlocks any accounts requested via --unlock / --password, and starts the
+// block creator so that wf-engine's dag can call Creator().RunBlockCreation.
 func (p *GwatPluginImpl) Start() error {
 	if p.stack == nil {
 		return fmt.Errorf("pluginimpl: Start: plugin not initialized")
@@ -71,6 +72,9 @@ func (p *GwatPluginImpl) Start() error {
 	}
 	if p.cliCtx != nil {
 		gwatapp.UnlockAccounts(p.cliCtx, p.stack)
+	}
+	if err := p.ethereum.StartMining(0); err != nil {
+		return fmt.Errorf("pluginimpl: Start: %w", err)
 	}
 	return nil
 }
