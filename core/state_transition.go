@@ -17,7 +17,6 @@
 package core
 
 import (
-	"bytes"
 	"errors"
 	"fmt"
 	"math"
@@ -29,10 +28,9 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/vm"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/crypto"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
-	"gitlab.waterfall.network/waterfall/protocol/gwat/token"
 	tokenOp "gitlab.waterfall.network/waterfall/protocol/gwat/token/operation"
-	"gitlab.waterfall.network/waterfall/protocol/gwat/validator"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/operation"
+	"gitlab.waterfall.network/waterfall/protocol/wf-types/blockdag/iface"
 )
 
 var emptyCodeHash = crypto.Keccak256Hash(nil)
@@ -58,8 +56,8 @@ The state transitioning model does all the necessary work to work out a valid ne
 */
 type StateTransition struct {
 	gp         *GasPool
-	tp         *token.Processor
-	vp         *validator.Processor
+	tp         iface.TokenProcessor
+	vp         iface.ValidatorProcessor
 	msg        Message
 	gas        uint64
 	gasPrice   *big.Int
@@ -204,7 +202,7 @@ func toWordSize(size uint64) uint64 {
 }
 
 // NewStateTransition initialises and returns a new state transition object.
-func NewStateTransition(evm *vm.EVM, tokenProcessor *token.Processor, validatorProcessor *validator.Processor, msg Message, gp *GasPool) *StateTransition {
+func NewStateTransition(evm *vm.EVM, tokenProcessor iface.TokenProcessor, validatorProcessor iface.ValidatorProcessor, msg Message, gp *GasPool) *StateTransition {
 	return &StateTransition{
 		gp:        gp,
 		evm:       evm,
@@ -227,7 +225,7 @@ func NewStateTransition(evm *vm.EVM, tokenProcessor *token.Processor, validatorP
 // the gas used (which includes gas refunds) and an error if it failed. An error always
 // indicates a core error meaning that the message would always fail for that particular
 // state and would never be accepted within a block.
-func ApplyMessage(evm *vm.EVM, tokenProcessor *token.Processor, validatorProcessor *validator.Processor, msg Message, gp *GasPool) (*ExecutionResult, error) {
+func ApplyMessage(evm *vm.EVM, tokenProcessor iface.TokenProcessor, validatorProcessor iface.ValidatorProcessor, msg Message, gp *GasPool) (*ExecutionResult, error) {
 	return NewStateTransition(evm, tokenProcessor, validatorProcessor, msg, gp).TransitionDb()
 }
 
@@ -281,7 +279,7 @@ func (st *StateTransition) preCheck() error {
 	// Only check transactions that are not fake
 	var isValOp bool
 	if st.msg.To() != nil &&
-		bytes.Equal(st.evm.ChainConfig().ValidatorsStateAddress.Bytes(), st.msg.To().Bytes()) &&
+		*st.evm.ChainConfig().ValidatorsStateAddress == *st.msg.To() &&
 		st.state.IsValidatorAddress(st.msg.From()) {
 		isValOp = true
 	}
@@ -444,14 +442,9 @@ func (st *StateTransition) TransitionDb() (*ExecutionResult, error) {
 	} else {
 		// check if "to" address belongs to token, otherwise it's a contract
 		if isTokenOp {
-			// perform token operation if its valid op code
-			op, err := tokenOp.DecodeBytes(msg.Data())
-			if err != nil {
-				return nil, err
-			}
-			ret, vmerr = st.tp.Call(sender, st.to(), st.value, op)
+			ret, vmerr = st.tp.Call(iface.AccountRef(sender.Address()), [20]byte(st.to()), st.value, msg.Data())
 		} else if isValidatorOp {
-			ret, vmerr = st.vp.Call(sender, st.to(), st.value, st.msg)
+			ret, vmerr = st.vp.Call(iface.AccountRef(sender.Address()), [20]byte(st.to()), st.value, msg.Data(), [32]byte(msg.TxHash()))
 		} else {
 			if st.evm.ChainConfig().IsForkSlotValSyncProc(st.evm.Context.Slot) {
 				err = st.checkTxType(msg.To(), txType)
@@ -549,7 +542,7 @@ func (st *StateTransition) applyAuthorization(auth *types.SetCodeAuthorization) 
 }
 
 func (st *StateTransition) checkTxType(to *common.Address, txType TxType) error {
-	if st.vp != nil && to != nil && bytes.Equal(to.Bytes(), st.vp.GetValidatorsStateAddress().Bytes()) &&
+	if st.vp != nil && to != nil && *to == common.Address(st.vp.GetValidatorsStateAddress()) &&
 		txType != ValidatorSyncTxType && txType != ValidatorMethodTxType {
 		return errors.New("invalid validator transaction")
 	}
@@ -567,39 +560,7 @@ func (st *StateTransition) processRewards(creatorAddress common.Address, reward 
 		return errors.New("validator processor is required after ValSyncProc fork")
 	}
 
-	val, err := st.vp.Storage().GetValidator(st.state, creatorAddress)
-	if err != nil {
-		return err
-	}
-	if val == nil {
-		return validator.ErrUnknownValidator
-	}
-	if val.DelegatingStake != nil {
-		var delegateRules = &val.DelegatingStake.Rules
-		isTrial, err := st.vp.IsValidatorTrialPeriod(val)
-		if err != nil {
-			return err
-		}
-		if isTrial {
-			delegateRules = &val.DelegatingStake.TrialRules
-		}
-
-		for address, percent := range delegateRules.ProfitShare() {
-			amount := new(big.Int).Mul(reward, big.NewInt(int64(percent)))
-			amount = new(big.Int).Div(amount, big.NewInt(100))
-			st.state.AddBalance(address, amount)
-		}
-
-		return nil
-	}
-
-	if val.WithdrawalAddress == nil {
-		st.state.AddBalance(creatorAddress, reward)
-	} else {
-		st.state.AddBalance(*val.WithdrawalAddress, reward)
-	}
-
-	return nil
+	return st.vp.ProcessRewards([20]byte(creatorAddress), reward)
 }
 
 func (st *StateTransition) refundGas(refundQuotient uint64) {
@@ -637,7 +598,7 @@ const (
 
 type TxType uint64
 
-func GetTxType(msg Message, vp *validator.Processor, tp *token.Processor) TxType {
+func GetTxType(msg Message, vp iface.ValidatorProcessor, tp iface.TokenProcessor) TxType {
 	if len(msg.Data()) == 0 {
 		return DefaultTxType
 	}
@@ -650,11 +611,12 @@ func GetTxType(msg Message, vp *validator.Processor, tp *token.Processor) TxType
 		return ContractCreationTxType
 	}
 
-	if tp != nil && tp.IsToken(*msg.To()) {
+	if tp != nil && tp.IsToken([20]byte(*msg.To())) {
 		return TokenMethodTxType
 	}
 
-	if vp != nil && vp.IsValidatorOp(msg.To()) {
+	toBytes := [20]byte(*msg.To())
+	if vp != nil && vp.IsValidatorOp(&toBytes) {
 		valOp, err := operation.DecodeBytes(msg.Data())
 		if err != nil {
 			return UnknownTxType

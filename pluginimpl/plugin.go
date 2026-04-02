@@ -116,6 +116,13 @@ func (p *GwatPluginImpl) Creator() iface.BlockCreator {
 // IsDevMode reports whether the plugin was started in development mode.
 func (p *GwatPluginImpl) IsDevMode() bool { return p.devMode }
 
+// SetProcessorFactories injects external token and validator processor factories
+// into gwat's BlockChain. After this call, every block execution will use the
+// provided factories instead of gwat's default implementations.
+func (p *GwatPluginImpl) SetProcessorFactories(tp iface.TokenProcessorFactory, vp iface.ValidatorProcessorFactory) {
+	p.ethereum.BlockChain().SetProcessorFactories(tp, vp)
+}
+
 // SetDag replaces gwat's internal dag workloop with the provided wf-engine dag.
 // Must be called after Start(). gwat stops its own dag and routes all coordinator
 // IPC calls to d via a thin type-conversion adapter.

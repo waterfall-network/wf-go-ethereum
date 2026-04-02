@@ -170,8 +170,8 @@ func (pre *Prestate) Apply(vmConfig vm.Config, chainConfig *params.ChainConfig,
 		txContext := core.NewEVMTxContext(msg)
 		snapshot := statedb.Snapshot()
 		evm := vm.NewEVM(vmContext, txContext, statedb, chainConfig, vmConfig)
-		tp := token.NewProcessor(vmContext, statedb)
-		vp := validator.NewProcessor(vmContext, statedb, nil)
+		tp := core.NewTokenProcessorAdapter(token.NewProcessor(vmContext, statedb))
+		vp := core.NewValidatorProcessorAdapter(validator.NewProcessor(vmContext, statedb, nil))
 
 		// (ret []byte, usedGas uint64, failed bool, err error)
 		msgResult, err := core.ApplyMessage(evm, tp, vp, msg, gaspool)

@@ -227,8 +227,8 @@ func (t *StateTest) RunNoVerify(subtest StateSubtest, vmconfig vm.Config, snapsh
 		context.Difficulty = big.NewInt(0)
 	}
 	evm := vm.NewEVM(context, txContext, statedb, config, vmconfig)
-	tp := token.NewProcessor(context, statedb)
-	vp := validator.NewProcessor(context, statedb, nil)
+	tp := core.NewTokenProcessorAdapter(token.NewProcessor(context, statedb))
+	vp := core.NewValidatorProcessorAdapter(validator.NewProcessor(context, statedb, nil))
 
 	// Execute the message.
 	snapshot := statedb.Snapshot()

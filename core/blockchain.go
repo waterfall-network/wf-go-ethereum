@@ -56,6 +56,7 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/era"
 	validatorOp "gitlab.waterfall.network/waterfall/protocol/gwat/validator/operation"
 	valStore "gitlab.waterfall.network/waterfall/protocol/gwat/validator/storage"
+	"gitlab.waterfall.network/waterfall/protocol/wf-types/blockdag/iface"
 )
 
 var (
@@ -236,6 +237,9 @@ type BlockChain struct {
 
 	validatorStorage  valStore.Storage
 	verifiersKeyStore valStore.VerifiersKeystore
+
+	tokenProcessorFactory     iface.TokenProcessorFactory
+	validatorProcessorFactory iface.ValidatorProcessorFactory
 
 	insBlockCache []*types.Block // Cache for blocks to insert late
 
@@ -4073,8 +4077,7 @@ func (bc *BlockChain) EstimateGas(msg types.Message, header *types.Header) (uint
 		return 0, err
 	}
 
-	tokenProcessor := token.NewProcessor(blockContext, stateDb)
-	validatorProcessor := validator.NewProcessor(blockContext, stateDb, bc)
+	tokenProcessor, validatorProcessor := bc.newProcessors(blockContext, stateDb)
 	txType := GetTxType(msg, validatorProcessor, tokenProcessor)
 
 	switch txType {
@@ -4136,8 +4139,8 @@ func (bc *BlockChain) EstimateGas(msg types.Message, header *types.Header) (uint
 func (bc *BlockChain) EstimateGasByEvm(msg Message,
 	header *types.Header,
 	stateDb *state.StateDB,
-	tp *token.Processor,
-	vp *validator.Processor,
+	tp iface.TokenProcessor,
+	vp iface.ValidatorProcessor,
 ) (uint64, error) {
 	// Binary search the gas requirement, as it may be higher than the amount used
 	var (
@@ -4889,6 +4892,30 @@ func (bc *BlockChain) ValidatorStorage() valStore.Storage {
 	return bc.validatorStorage
 }
 
+// SetProcessorFactories injects external token and validator processor factories.
+// When set, gwat uses the provided factories to create processors for each block
+// instead of its own default implementations. Must be called before block processing
+// starts (typically right after Start()).
+func (bc *BlockChain) SetProcessorFactories(tp iface.TokenProcessorFactory, vp iface.ValidatorProcessorFactory) {
+	bc.tokenProcessorFactory = tp
+	bc.validatorProcessorFactory = vp
+}
+
+// newProcessors creates token and validator processors for the given block context
+// and state. If external factories have been injected via SetProcessorFactories,
+// they are used; otherwise gwat's own implementations are returned wrapped in adapters.
+func (bc *BlockChain) newProcessors(blockCtx vm.BlockContext, statedb *state.StateDB) (iface.TokenProcessor, iface.ValidatorProcessor) {
+	if bc.tokenProcessorFactory != nil && bc.validatorProcessorFactory != nil {
+		ifaceCtx := vmBlockContextToIface(blockCtx)
+		ifaceState := newStateDBIfaceAdapter(statedb)
+		return bc.tokenProcessorFactory.New(ifaceCtx, ifaceState),
+			bc.validatorProcessorFactory.New(ifaceCtx, ifaceState)
+	}
+	tp := token.NewProcessor(blockCtx, statedb)
+	vp := validator.NewProcessor(blockCtx, statedb, bc)
+	return NewTokenProcessorAdapter(tp), NewValidatorProcessorAdapter(vp)
+}
+
 func (bc *BlockChain) GetEraInfo() *era.EraInfo {
 	return bc.eraInfo
 }
@@ -5537,20 +5564,22 @@ func (bc *BlockChain) GetEVM(msg Message, state *state.StateDB, header *types.He
 }
 
 // GetTP retrieves the token processor.
-func (bc *BlockChain) GetTP(state *state.StateDB, header *types.Header) (*token.Processor, func() error, error) {
-	tpError := func() error { return nil }
+func (bc *BlockChain) GetTP(statedb *state.StateDB, header *types.Header) (iface.TokenProcessor, func() error, error) {
+	noop := func() error { return nil }
 	ctx := NewEVMBlockContext(header, bc, nil)
-	return token.NewProcessor(ctx, state), tpError, nil
+	tp, _ := bc.newProcessors(ctx, statedb)
+	return tp, noop, nil
 }
 
 // GetVP retrieves the validator processor.
-func (bc *BlockChain) GetVP(state *state.StateDB, header *types.Header) (*validator.Processor, func() error, error) {
-	tpError := func() error { return nil }
-	context := NewEVMBlockContext(header, bc, nil)
-	return validator.NewProcessor(context, state, bc), tpError, nil
+func (bc *BlockChain) GetVP(statedb *state.StateDB, header *types.Header) (iface.ValidatorProcessor, func() error, error) {
+	noop := func() error { return nil }
+	ctx := NewEVMBlockContext(header, bc, nil)
+	_, vp := bc.newProcessors(ctx, statedb)
+	return vp, noop, nil
 }
 
-func (bc *BlockChain) doCall(msg Message, header *types.Header, tp *token.Processor, vp *validator.Processor) (*ExecutionResult, error) {
+func (bc *BlockChain) doCall(msg Message, header *types.Header, tp iface.TokenProcessor, vp iface.ValidatorProcessor) (*ExecutionResult, error) {
 	defer func(start time.Time) { log.Info("Executing EVM call finished", "runtime", time.Since(start)) }(time.Now())
 
 	state, err := bc.StateAt(header.Root)

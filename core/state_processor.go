@@ -26,8 +26,7 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/crypto"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/log"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
-	"gitlab.waterfall.network/waterfall/protocol/gwat/token"
-	"gitlab.waterfall.network/waterfall/protocol/gwat/validator"
+	"gitlab.waterfall.network/waterfall/protocol/wf-types/blockdag/iface"
 )
 
 // StateProcessor is a basic Processor, which takes care of transitioning
@@ -65,8 +64,7 @@ func (p *StateProcessor) Process(block *types.Block, statedb *state.StateDB, cfg
 	)
 	blockContext := NewEVMBlockContext(header, p.bc, nil)
 	vmenv := vm.NewEVM(blockContext, vm.TxContext{}, statedb, p.config, cfg)
-	tokenProcessor := token.NewProcessor(blockContext, statedb)
-	validatorProcessor := validator.NewProcessor(blockContext, statedb, p.bc)
+	tokenProcessor, validatorProcessor := p.bc.newProcessors(blockContext, statedb)
 	// Iterate over and process the individual transactions
 	for i, tx := range block.Transactions() {
 		statedb.SetTxContext(tx.Hash(), i)
@@ -93,8 +91,8 @@ func applyTransaction(
 	gp *GasPool,
 	usedGas *uint64,
 	evm *vm.EVM,
-	tokenProcessor *token.Processor,
-	validatorProcessor *validator.Processor,
+	tokenProcessor iface.TokenProcessor,
+	validatorProcessor iface.ValidatorProcessor,
 ) (*types.Receipt, error) {
 	txMsg, err := tx.AsMessage(types.MakeSigner(config), header.BaseFee)
 	if err != nil {
@@ -180,7 +178,6 @@ func ApplyTransaction(config *params.ChainConfig,
 	blockContext := NewEVMBlockContext(header, bc, author)
 	vmenv := vm.NewEVM(blockContext, vm.TxContext{}, statedb, config, cfg)
 
-	tokenProcessor := token.NewProcessor(blockContext, statedb)
-	validatorProcessor := validator.NewProcessor(blockContext, statedb, chain)
+	tokenProcessor, validatorProcessor := chain.newProcessors(blockContext, statedb)
 	return applyTransaction(tx, config, header, statedb, gp, usedGas, vmenv, tokenProcessor, validatorProcessor)
 }

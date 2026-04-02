@@ -329,17 +329,17 @@ func (b *EthAPIBackend) GetEVM(ctx context.Context, msg core.Message, state *sta
 }
 
 // GetTP retrieves the token processor.
-func (b *EthAPIBackend) GetTP(ctx context.Context, state *state.StateDB, header *types.Header) (*token.Processor, func() error, error) {
-	tpError := func() error { return nil }
-	context := core.NewEVMBlockContext(header, b.eth.BlockChain(), nil)
-	return token.NewProcessor(context, state), tpError, nil
+func (b *EthAPIBackend) GetTP(ctx context.Context, statedb *state.StateDB, header *types.Header) (*token.Processor, func() error, error) {
+	noop := func() error { return nil }
+	blockCtx := core.NewEVMBlockContext(header, b.eth.BlockChain(), nil)
+	return token.NewProcessor(blockCtx, statedb), noop, nil
 }
 
 // GetVP retrieves the validator processor.
-func (b *EthAPIBackend) GetVP(ctx context.Context, state *state.StateDB, header *types.Header) (*validator.Processor, func() error, error) {
-	tpError := func() error { return nil }
-	context := core.NewEVMBlockContext(header, b.eth.BlockChain(), nil)
-	return validator.NewProcessor(context, state, b.BlockChain()), tpError, nil
+func (b *EthAPIBackend) GetVP(ctx context.Context, statedb *state.StateDB, header *types.Header) (*validator.Processor, func() error, error) {
+	noop := func() error { return nil }
+	blockCtx := core.NewEVMBlockContext(header, b.eth.BlockChain(), nil)
+	return validator.NewProcessor(blockCtx, statedb, b.BlockChain()), noop, nil
 }
 
 func (b *EthAPIBackend) SubscribeRemovedLogsEvent(ch chan<- core.RemovedLogsEvent) event.Subscription {

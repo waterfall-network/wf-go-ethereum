@@ -38,6 +38,7 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/era"
 	valOperation "gitlab.waterfall.network/waterfall/protocol/gwat/validator/operation"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/storage"
+	"gitlab.waterfall.network/waterfall/protocol/wf-types/blockdag/iface"
 )
 
 func TestProcessRewards(t *testing.T) {
@@ -239,7 +240,7 @@ func TestProcessRewards(t *testing.T) {
 			evm := vm.NewEVM(vm.BlockContext{Slot: testCase.currentSlot}, vm.TxContext{}, stateDb, chainConfig, vm.Config{})
 			vp := validator.NewProcessor(vm.BlockContext{Slot: testCase.currentSlot}, stateDb, bc)
 
-			stTransition := NewStateTransition(evm, nil, vp, msg, nil)
+			stTransition := NewStateTransition(evm, nil, NewValidatorProcessorAdapter(vp), msg, nil)
 			err = vp.Storage().SetValidator(stateDb, testCase.validator)
 			testutils.AssertNoError(t, err)
 
@@ -253,7 +254,8 @@ func TestProcessRewards(t *testing.T) {
 
 var (
 	stateTransition                        *StateTransition
-	tokenProcessor                         *token.Processor
+	rawTokenProcessor                      *token.Processor // concrete processor for test helpers that need direct access
+	tokenProcessor                         iface.TokenProcessor
 	stateDB                                vm.StateDB
 	owner, spender, to                     common.Address
 	WRC20Address, WRC721Address            common.Address
@@ -303,7 +305,8 @@ func init() {
 	db.CreateAccount(to)
 	db.SetBalance(to, big.NewInt(10000000000000000))
 	stateDB = db
-	tokenProcessor = token.NewProcessor(vm.BlockContext{}, stateDB)
+	rawTokenProcessor = token.NewProcessor(vm.BlockContext{}, stateDB)
+	tokenProcessor = NewTokenProcessorAdapter(rawTokenProcessor)
 }
 
 func TestTransitionDb(t *testing.T) {
@@ -327,7 +330,7 @@ func TestTransitionDb(t *testing.T) {
 
 				result, _ := st.TransitionDb()
 				WRC20Address.SetBytes(result.ReturnData)
-				balance := checkBalance(t, st.tp, WRC20Address, owner)
+				balance := checkBalance(t, rawTokenProcessor, WRC20Address, owner)
 
 				assert.NoError(t, result.Err)
 				assert.NotNil(t, result.ReturnData)
@@ -354,7 +357,7 @@ func TestTransitionDb(t *testing.T) {
 
 				result, _ := st.TransitionDb()
 				WRC721Address.SetBytes(result.ReturnData)
-				balance := checkBalance(t, st.tp, WRC721Address, owner)
+				balance := checkBalance(t, rawTokenProcessor, WRC721Address, owner)
 
 				assert.NoError(t, result.Err)
 				assert.NotNil(t, result.ReturnData)
@@ -626,7 +629,7 @@ func TestTransitionDb(t *testing.T) {
 				})
 
 				result, _ := st.TransitionDb()
-				spenderBalance := checkBalance(t, st.tp, WRC20Address, spender)
+				spenderBalance := checkBalance(t, rawTokenProcessor, WRC20Address, spender)
 
 				assert.NoError(t, result.Err)
 				assert.NotNil(t, result.ReturnData)
@@ -662,7 +665,7 @@ func TestTransitionDb(t *testing.T) {
 				})
 
 				result, _ := st.TransitionDb()
-				spenderBalance := checkBalance(t, st.tp, WRC721Address, spender)
+				spenderBalance := checkBalance(t, rawTokenProcessor, WRC721Address, spender)
 
 				assert.NoError(t, result.Err)
 				assert.NotNil(t, result.ReturnData)
@@ -688,7 +691,7 @@ func TestTransitionDb(t *testing.T) {
 				}, nil)
 
 				result, _ := st.TransitionDb()
-				currentPrice, _ := checkCost(st.tp, WRC20Address, nil)
+				currentPrice, _ := checkCost(rawTokenProcessor, WRC20Address, nil)
 
 				assert.NoError(t, result.Err)
 				assert.NotNil(t, result.ReturnData)
@@ -721,7 +724,7 @@ func TestTransitionDb(t *testing.T) {
 				})
 
 				result, _ := st.TransitionDb()
-				currentPrice, _ := checkCost(st.tp, WRC721Address, tokenID)
+				currentPrice, _ := checkCost(rawTokenProcessor, WRC721Address, tokenID)
 
 				assert.NoError(t, result.Err)
 				assert.NotNil(t, result.ReturnData)
@@ -918,7 +921,7 @@ func TestTransitionDbNonceOnFailure(t *testing.T) {
 func initStateTransition(m func(token common.Address) Message, init func(tp *token.Processor) common.Address) *StateTransition {
 	t := func(init func(tp *token.Processor) common.Address) common.Address {
 		if init != nil {
-			return init(tokenProcessor)
+			return init(rawTokenProcessor)
 		}
 
 		return common.Address{}

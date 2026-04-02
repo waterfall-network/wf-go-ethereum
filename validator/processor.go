@@ -1375,6 +1375,50 @@ func (p *Processor) IsValidatorTrialPeriod(validator *valStore.Validator) (bool,
 	return false, nil
 }
 
+// ProcessRewards distributes the block reward for coinbase, respecting
+// delegating stake profit-share rules where applicable.
+// It implements iface.ValidatorProcessor so that state_transition can delegate
+// reward distribution without knowing the concrete validator type.
+func (p *Processor) ProcessRewards(coinbase [20]byte, reward *big.Int) error {
+	creatorAddress := common.Address(coinbase)
+
+	if !p.blockchain.Config().IsForkSlotValSyncProc(p.ctx.Slot) {
+		p.state.AddBalance(creatorAddress, reward)
+		return nil
+	}
+
+	val, err := p.storage.GetValidator(p.state, creatorAddress)
+	if err != nil {
+		return err
+	}
+	if val == nil {
+		return ErrUnknownValidator
+	}
+	if val.DelegatingStake != nil {
+		delegateRules := &val.DelegatingStake.Rules
+		isTrial, err := p.IsValidatorTrialPeriod(val)
+		if err != nil {
+			return err
+		}
+		if isTrial {
+			delegateRules = &val.DelegatingStake.TrialRules
+		}
+		for address, percent := range delegateRules.ProfitShare() {
+			amount := new(big.Int).Mul(reward, big.NewInt(int64(percent)))
+			amount = new(big.Int).Div(amount, big.NewInt(100))
+			p.state.AddBalance(address, amount)
+		}
+		return nil
+	}
+
+	if val.WithdrawalAddress == nil {
+		p.state.AddBalance(creatorAddress, reward)
+	} else {
+		p.state.AddBalance(*val.WithdrawalAddress, reward)
+	}
+	return nil
+}
+
 // ValidateValidatorSyncOp validate validator sync op data with context of apply.
 func ValidateValidatorSyncOp(bc blockchain, valSyncOp operation.ValidatorSync, applySlot uint64, txHash common.Hash) error {
 	savedValSync := bc.GetValidatorSyncData(valSyncOp.InitTxHash())
