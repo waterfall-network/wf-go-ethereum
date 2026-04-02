@@ -332,7 +332,7 @@ func (b *EthAPIBackend) GetEVM(ctx context.Context, msg core.Message, state *sta
 func (b *EthAPIBackend) GetTP(ctx context.Context, state *state.StateDB, header *types.Header) (*token.Processor, func() error, error) {
 	tpError := func() error { return nil }
 	context := core.NewEVMBlockContext(header, b.eth.BlockChain(), nil)
-	return token.NewProcessor(context, state), tpError, nil
+	return token.NewProcessor(context, state, b.eth.BlockChain()), tpError, nil
 }
 
 // GetVP retrieves the validator processor.

@@ -4069,7 +4069,7 @@ func (bc *BlockChain) EstimateGas(msg types.Message, header *types.Header) (uint
 		return 0, err
 	}
 
-	tokenProcessor := token.NewProcessor(blockContext, stateDb)
+	tokenProcessor := token.NewProcessor(blockContext, stateDb, bc)
 	validatorProcessor := validator.NewProcessor(blockContext, stateDb, bc)
 	txType := GetTxType(msg, validatorProcessor, tokenProcessor)
 
@@ -5483,7 +5483,7 @@ func (bc *BlockChain) GetEVM(msg Message, state *state.StateDB, header *types.He
 func (bc *BlockChain) GetTP(state *state.StateDB, header *types.Header) (*token.Processor, func() error, error) {
 	tpError := func() error { return nil }
 	ctx := NewEVMBlockContext(header, bc, nil)
-	return token.NewProcessor(ctx, state), tpError, nil
+	return token.NewProcessor(ctx, state, bc), tpError, nil
 }
 
 // GetVP retrieves the validator processor.

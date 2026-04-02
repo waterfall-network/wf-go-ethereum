@@ -182,7 +182,7 @@ func TestPrestateTracerCreate2(t *testing.T) {
 		t.Fatalf("failed to create call tracer: %v", err)
 	}
 	evm := vm.NewEVM(context, txContext, statedb, params.MainnetChainConfig, vm.Config{Debug: true, Tracer: tracer})
-	tp := token.NewProcessor(context, statedb)
+	tp := token.NewProcessor(context, statedb, nil)
 
 	msg, err := tx.AsMessage(signer, nil)
 	if err != nil {
@@ -264,7 +264,7 @@ func testCallTracer(tracer string, dirPath string, t *testing.T) {
 				t.Fatalf("failed to create call tracer: %v", err)
 			}
 			evm := vm.NewEVM(context, txContext, statedb, test.Genesis.Config, vm.Config{Debug: true, Tracer: tracer})
-			tp := token.NewProcessor(context, statedb)
+			tp := token.NewProcessor(context, statedb, nil)
 
 			msg, err := tx.AsMessage(signer, nil)
 			if err != nil {
@@ -377,7 +377,7 @@ func BenchmarkTransactionTrace(b *testing.B) {
 		//EnableReturnData: false,
 	})
 	evm := vm.NewEVM(context, txContext, statedb, params.AllEthashProtocolChanges, vm.Config{Debug: true, Tracer: tracer})
-	tp := token.NewProcessor(context, statedb)
+	tp := token.NewProcessor(context, statedb, nil)
 	vp := validator.NewProcessor(context, statedb, nil)
 	msg, err := tx.AsMessage(signer, nil)
 	if err != nil {
@@ -460,7 +460,7 @@ func benchTracer(tracerName string, test *callTracerTest, b *testing.B) {
 		b.Fatalf("failed to create call tracer: %v", err)
 	}
 	evm := vm.NewEVM(context, txContext, statedb, test.Genesis.Config, vm.Config{Debug: true, Tracer: tracer})
-	tp := token.NewProcessor(context, statedb)
+	tp := token.NewProcessor(context, statedb, nil)
 
 	b.ReportAllocs()
 	b.ResetTimer()

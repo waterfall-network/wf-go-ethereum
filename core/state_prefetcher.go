@@ -52,7 +52,7 @@ func (p *statePrefetcher) Prefetch(block *types.Block, statedb *state.StateDB, c
 		gaspool            = new(GasPool).AddGas(block.GasLimit())
 		blockContext       = NewEVMBlockContext(header, p.bc, nil)
 		evm                = vm.NewEVM(blockContext, vm.TxContext{}, statedb, p.config, cfg)
-		tokenProcessor     = token.NewProcessor(blockContext, statedb)
+		tokenProcessor     = token.NewProcessor(blockContext, statedb, p.bc)
 		validatorProcessor = validator.NewProcessor(blockContext, statedb, p.bc)
 		signer             = types.MakeSigner(p.config)
 	)

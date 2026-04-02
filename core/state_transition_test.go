@@ -85,7 +85,7 @@ func init() {
 	db.CreateAccount(to)
 	db.SetBalance(to, big.NewInt(10000000000000000))
 	stateDB = db
-	tokenProcessor = token.NewProcessor(vm.BlockContext{}, stateDB)
+	tokenProcessor = token.NewProcessor(vm.BlockContext{}, stateDB, nil)
 }
 
 //func TestTransitionDb(t *testing.T) {

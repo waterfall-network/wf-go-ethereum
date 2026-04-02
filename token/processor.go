@@ -25,6 +25,7 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/vm"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/crypto"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/log"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/token/operation"
 	tokenStorage "gitlab.waterfall.network/waterfall/protocol/gwat/token/storage"
 )
@@ -118,17 +119,23 @@ type Ref interface {
 // Processor is a processor of all token related operations.
 // All transaction related operations that mutates state of the token are called using Call method.
 // Methods of the operation name are used for getting state of the token.
+type blockchain interface {
+	Config() *params.ChainConfig
+}
+
 type Processor struct {
 	state        vm.StateDB
 	ctx          vm.BlockContext
+	bc           blockchain
 	eventEmmiter *EventEmmiter
 }
 
 // NewProcessor creates new token processor
-func NewProcessor(blockCtx vm.BlockContext, stateDb vm.StateDB) *Processor {
+func NewProcessor(blockCtx vm.BlockContext, stateDb vm.StateDB, bc blockchain) *Processor {
 	return &Processor{
 		ctx:          blockCtx,
 		state:        stateDb,
+		bc:           bc,
 		eventEmmiter: NewEventEmmiter(stateDb),
 	}
 }
@@ -883,7 +890,11 @@ func (p *Processor) burn(caller Ref, token common.Address, op operation.Burn) ([
 	}
 
 	// Empty value for the owner
-	err = writeToMap(storage, OwnersField, tokenId.Bytes(), []byte{})
+	ownerValue := []byte{}
+	if p.bc != nil && p.bc.Config().IsForkSlotValSyncProc(p.ctx.Slot) {
+		ownerValue = common.Address{}.Bytes()
+	}
+	err = writeToMap(storage, OwnersField, tokenId.Bytes(), ownerValue)
 	if err != nil {
 		return nil, err
 	}
