@@ -305,7 +305,7 @@ func init() {
 	db.CreateAccount(to)
 	db.SetBalance(to, big.NewInt(10000000000000000))
 	stateDB = db
-	rawTokenProcessor = token.NewProcessor(vm.BlockContext{}, stateDB)
+	rawTokenProcessor = token.NewProcessor(vm.BlockContext{}, stateDB, nil)
 	tokenProcessor = NewTokenProcessorAdapter(rawTokenProcessor)
 }
 

@@ -5567,7 +5567,7 @@ func (bc *BlockChain) GetEVM(msg Message, state *state.StateDB, header *types.He
 func (bc *BlockChain) GetTP(statedb *state.StateDB, header *types.Header) (iface.TokenProcessor, func() error, error) {
 	noop := func() error { return nil }
 	ctx := NewEVMBlockContext(header, bc, nil)
-	tp, _ := bc.newProcessors(ctx, statedb)
+	tp, _ := bc.newProcessors(ctx, statedb, bc)
 	return tp, noop, nil
 }
 

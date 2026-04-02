@@ -72,7 +72,7 @@ func init() {
 		GasLimit:    uint64(6000000),
 	}
 
-	processor = NewProcessor(ctx, stateDb)
+	processor = NewProcessor(ctx, stateDb, nil)
 
 	operator = common.BytesToAddress(testutils.RandomData(20))
 	address = common.BytesToAddress(testutils.RandomData(20))

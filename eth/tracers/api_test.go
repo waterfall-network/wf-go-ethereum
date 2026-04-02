@@ -174,7 +174,7 @@ func (b *testBackend) StateAtTransaction(ctx context.Context, block *types.Block
 			return msg, context, statedb, nil
 		}
 		vmenv := vm.NewEVM(context, txContext, statedb, b.chainConfig, vm.Config{})
-		tp := token.NewProcessor(context, statedb)
+		tp := token.NewProcessor(context, statedb, b.chain)
 		vp := validator.NewProcessor(context, statedb, b.chain)
 		if _, err := core.ApplyMessage(vmenv, tp, vp, msg, new(core.GasPool).AddGas(tx.Gas())); err != nil {
 			return nil, vm.BlockContext{}, nil, fmt.Errorf("transaction %#x failed: %v", tx.Hash(), err)

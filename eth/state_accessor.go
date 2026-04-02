@@ -196,7 +196,7 @@ func (eth *Ethereum) stateAtTransaction(block *types.Block, txIndex int, reexec 
 		}
 		// Not yet the searched for transaction, execute on top of the current state
 		vmenv := vm.NewEVM(context, txContext, statedb, eth.blockchain.Config(), vm.Config{})
-		tp := core.NewTokenProcessorAdapter(token.NewProcessor(context, statedb))
+		tp := core.NewTokenProcessorAdapter(token.NewProcessor(context, statedb, eth.BlockChain()))
 		vp := core.NewValidatorProcessorAdapter(validator.NewProcessor(context, statedb, eth.BlockChain()))
 		statedb.SetTxContext(tx.Hash(), idx)
 		if _, err := core.ApplyMessage(vmenv, tp, vp, msg, new(core.GasPool).AddGas(tx.Gas())); err != nil {

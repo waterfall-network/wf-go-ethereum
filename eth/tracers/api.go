@@ -528,7 +528,7 @@ func (api *API) IntermediateRoots(ctx context.Context, hash common.Hash, config 
 			msg, _    = tx.AsMessage(signer, block.BaseFee())
 			txContext = core.NewEVMTxContext(msg)
 			vmenv     = vm.NewEVM(vmctx, txContext, statedb, chainConfig, vm.Config{})
-			tp        = core.NewTokenProcessorAdapter(token.NewProcessor(vmctx, statedb))
+			tp        = core.NewTokenProcessorAdapter(token.NewProcessor(vmctx, statedb, api.backend.Blockchain()))
 			vp        = core.NewValidatorProcessorAdapter(validator.NewProcessor(vmctx, statedb, api.backend.Blockchain()))
 		)
 		statedb.SetTxContext(tx.Hash(), i)
@@ -617,7 +617,7 @@ func (api *API) traceBlock(ctx context.Context, block *types.Block, config *Trac
 		msg, _ := tx.AsMessage(signer, block.BaseFee())
 		statedb.SetTxContext(tx.Hash(), i)
 		vmenv := vm.NewEVM(blockCtx, core.NewEVMTxContext(msg), statedb, api.backend.ChainConfig(), vm.Config{})
-		tp := core.NewTokenProcessorAdapter(token.NewProcessor(blockCtx, statedb))
+		tp := core.NewTokenProcessorAdapter(token.NewProcessor(blockCtx, statedb, api.backend.Blockchain()))
 		vp := core.NewValidatorProcessorAdapter(validator.NewProcessor(blockCtx, statedb, api.backend.Blockchain()))
 		if _, err := core.ApplyMessage(vmenv, tp, vp, msg, new(core.GasPool).AddGas(msg.Gas())); err != nil {
 			failed = err
@@ -743,7 +743,7 @@ func (api *API) standardTraceBlockToFile(ctx context.Context, block *types.Block
 		}
 		// Execute the transaction and flush any traces to disk
 		vmenv := vm.NewEVM(vmctx, txContext, statedb, chainConfig, vmConf)
-		tp := core.NewTokenProcessorAdapter(token.NewProcessor(vmctx, statedb))
+		tp := core.NewTokenProcessorAdapter(token.NewProcessor(vmctx, statedb, api.backend.Blockchain()))
 		vp := core.NewValidatorProcessorAdapter(validator.NewProcessor(vmctx, statedb, api.backend.Blockchain()))
 		statedb.SetTxContext(tx.Hash(), i)
 		_, err = core.ApplyMessage(vmenv, tp, vp, msg, new(core.GasPool).AddGas(msg.Gas()))
@@ -910,7 +910,7 @@ func (api *API) traceTx(ctx context.Context, message core.Message, txctx *Contex
 	}
 	// Run the transaction with tracing enabled.
 	vmenv := vm.NewEVM(vmctx, txContext, statedb, api.backend.ChainConfig(), vm.Config{Debug: true, Tracer: tracer, NoBaseFee: true})
-	tp := core.NewTokenProcessorAdapter(token.NewProcessor(vmctx, statedb))
+	tp := core.NewTokenProcessorAdapter(token.NewProcessor(vmctx, statedb, api.backend.Blockchain()))
 	vp := core.NewValidatorProcessorAdapter(validator.NewProcessor(vmctx, statedb, api.backend.Blockchain()))
 
 	// Call Prepare to clear out the statedb access list
