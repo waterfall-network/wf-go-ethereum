@@ -4911,7 +4911,7 @@ func (bc *BlockChain) newProcessors(blockCtx vm.BlockContext, statedb *state.Sta
 		return bc.tokenProcessorFactory.New(ifaceCtx, ifaceState),
 			bc.validatorProcessorFactory.New(ifaceCtx, ifaceState)
 	}
-	tp := token.NewProcessor(blockCtx, statedb)
+	tp := token.NewProcessor(blockCtx, statedb, bc)
 	vp := validator.NewProcessor(blockCtx, statedb, bc)
 	return NewTokenProcessorAdapter(tp), NewValidatorProcessorAdapter(vp)
 }
@@ -5567,7 +5567,7 @@ func (bc *BlockChain) GetEVM(msg Message, state *state.StateDB, header *types.He
 func (bc *BlockChain) GetTP(statedb *state.StateDB, header *types.Header) (iface.TokenProcessor, func() error, error) {
 	noop := func() error { return nil }
 	ctx := NewEVMBlockContext(header, bc, nil)
-	tp, _ := bc.newProcessors(ctx, statedb, bc)
+	tp, _ := bc.newProcessors(ctx, statedb)
 	return tp, noop, nil
 }
 
