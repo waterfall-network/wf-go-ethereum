@@ -270,17 +270,6 @@ func wfValidatorSyncMap(src map[gwatcommon.Hash]*gwatcoretypes.ValidatorSync) ma
 	return dst
 }
 
-func gwatValidatorSyncMap(src map[wfcommon.Hash]*wftypes.ValidatorSync) map[gwatcommon.Hash]*gwatcoretypes.ValidatorSync {
-	if src == nil {
-		return nil
-	}
-	dst := make(map[gwatcommon.Hash]*gwatcoretypes.ValidatorSync, len(src))
-	for k, v := range src {
-		dst[gwatHash(k)] = gwatValidatorSync(v)
-	}
-	return dst
-}
-
 // ---------- Era ----------
 
 func wfEra(e *gwaterra.Era) *wfera.Era {
