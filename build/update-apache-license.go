@@ -1,4 +1,4 @@
-// Copyright 2024   Blue Wave Inc.
+// Copyright 2026 Digital Clever Solution Inc.
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -67,7 +67,7 @@ var (
 )
 
 var licenseT = template.Must(template.New("").Parse(`
-// Copyright 2024   Blue Wave Inc.
+// Copyright 2026 Digital Clever Solution Inc.
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
