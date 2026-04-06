@@ -19,17 +19,14 @@ stages:
 
 .job_build:
   script: &job_build |-
-    export CGO_CFLAGS="-O -D__BLST_PORTABLE__"
-    export CGO_CFLAGS_ALLOW="-O -D__BLST_PORTABLE__"
+    export CGO_CFLAGS="-O2 -D__BLST_PORTABLE__"
+    export CGO_CFLAGS_ALLOW="-O2 -D__BLST_PORTABLE__"
     cp -r params/version.go /tmp/version.go
     sed -i "s/\\\u2692/${CI_COMMIT_SHORT_SHA}/g" params/version.go
     go version
     go run build/ci.go install ./cmd/gwat ./cmd/bootnode
     mkdir -p ./dist
-    cp ./build/bin/bootnode ./dist/gwat-bootnode
-    cp ./build/bin/gwat ./dist/gwat
-    GOFLAGS="-tags=tracing" go run build/ci.go install ./cmd/gwat
-    cp ./build/bin/gwat ./dist/gwat-tracing
+    go build -buildmode=plugin -o ./dist/gwat.so ./cmd/gwat-plugin/
     cp -r /tmp/version.go params/version.go
 
 lint:
@@ -72,8 +69,7 @@ build branch:
     name: "$CI_PROJECT_NAME-$CI_COMMIT_REF_NAME"
     paths:
       - dist/gwat-bootnode
-      - dist/gwat
-      - dist/gwat-tracing
+      - dist/gwat.so
 
 build latest:
   stage: build
@@ -87,8 +83,7 @@ build latest:
     name: "$CI_PROJECT_NAME-latest"
     paths:
       - dist/gwat-bootnode
-      - dist/gwat
-      - dist/gwat-tracing
+      - dist/gwat.so
 
 release tag:
   stage: build
@@ -102,5 +97,4 @@ release tag:
     name: "$CI_PROJECT_NAME-$CI_BUILD_TAG"
     paths:
       - dist/gwat-bootnode
-      - dist/gwat
-      - dist/gwat-tracing
+      - dist/gwat.so
