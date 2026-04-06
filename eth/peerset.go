@@ -188,7 +188,7 @@ func (ps *peerSet) peersWithoutBlock(hash common.Hash) []*ethPeer {
 
 	list := make([]*ethPeer, 0, len(ps.peers))
 	for _, p := range ps.peers {
-		if !p.KnownBlock(hash) {
+		if !p.KnownBlock(hash) { //nolint:typecheck
 			list = append(list, p)
 		}
 	}
@@ -203,7 +203,7 @@ func (ps *peerSet) peersWithoutTransaction(hash common.Hash) []*ethPeer {
 
 	list := make([]*ethPeer, 0, len(ps.peers))
 	for _, p := range ps.peers {
-		if !p.KnownTransaction(hash) {
+		if !p.KnownTransaction(hash) { //nolint:typecheck
 			list = append(list, p)
 		}
 	}
@@ -234,7 +234,7 @@ func (ps *peerSet) close() {
 	defer ps.lock.Unlock()
 
 	for _, p := range ps.peers {
-		p.Disconnect(p2p.DiscQuitting)
+		p.Disconnect(p2p.DiscQuitting) //nolint:typecheck
 	}
 	ps.closed = true
 }

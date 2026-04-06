@@ -18,7 +18,7 @@ package eth
 
 import (
 	"errors"
-	"fmt"
+	"fmt" //nolint:typecheck
 	"sync/atomic"
 	"time"
 

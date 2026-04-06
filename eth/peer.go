@@ -44,9 +44,9 @@ type ethPeer struct {
 
 // info gathers and returns some `eth` protocol metadata known about a peer.
 func (p *ethPeer) info() *ethPeerInfo {
-	lastFinNr := p.GetDagInfo()
+	lastFinNr := p.GetDagInfo() //nolint:typecheck
 	return &ethPeerInfo{
-		Version:   p.Version(),
+		Version:   p.Version(), //nolint:typecheck
 		LastFinNr: lastFinNr,
 		//Dag:       dag,
 	}
@@ -66,6 +66,6 @@ type snapPeer struct {
 // info gathers and returns some `snap` protocol metadata known about a peer.
 func (p *snapPeer) info() *snapPeerInfo {
 	return &snapPeerInfo{
-		Version: p.Version(),
+		Version: p.Version(), //nolint:typecheck
 	}
 }
