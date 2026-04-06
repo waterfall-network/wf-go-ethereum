@@ -29,6 +29,7 @@ import (
 
 	"gitlab.waterfall.network/waterfall/protocol/gwat/cmd/utils"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/internal/debug"
+	"gitlab.waterfall.network/waterfall/protocol/gwat/internal/gwatapp"
 )
 
 // These tests are 'smoke tests' for the account related
@@ -352,11 +353,11 @@ Fatal: None of the listed files could be unlocked.
 func initTmpDbWithGenesis(t *testing.T) string {
 	app := cli.NewApp()
 
-	app.Flags = append(app.Flags, nodeFlags...)
-	app.Flags = append(app.Flags, rpcFlags...)
+	app.Flags = append(app.Flags, gwatapp.NodeFlags...)
+	app.Flags = append(app.Flags, gwatapp.RPCFlags...)
 	app.Flags = append(app.Flags, consoleFlags...)
 	app.Flags = append(app.Flags, debug.Flags...)
-	app.Flags = append(app.Flags, metricsFlags...)
+	app.Flags = append(app.Flags, gwatapp.MetricsFlags...)
 
 	tmpPath := tmpDatadirWithKeystore(t)
 

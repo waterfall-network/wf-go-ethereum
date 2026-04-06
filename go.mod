@@ -120,7 +120,7 @@ require (
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
 
-require gitlab.waterfall.network/waterfall/protocol/wf-types v0.0.0-00010101000000-000000000000
+require gitlab.waterfall.network/waterfall/protocol/wf-types v0.1.0
 
-// TODO: remove after wf-types is published with a real tag (e.g. v0.1.0)
-replace gitlab.waterfall.network/waterfall/protocol/wf-types => ../wf-types
+//// TODO: remove after wf-types is published with a real tag (e.g. v0.1.0)
+//replace gitlab.waterfall.network/waterfall/protocol/wf-types => ../wf-types

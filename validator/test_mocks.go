@@ -15,8 +15,8 @@ import (
 	ethdb "gitlab.waterfall.network/waterfall/protocol/gwat/ethdb"
 	params "gitlab.waterfall.network/waterfall/protocol/gwat/params"
 	era "gitlab.waterfall.network/waterfall/protocol/gwat/validator/era"
-	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/operation"
 	storage "gitlab.waterfall.network/waterfall/protocol/gwat/validator/storage"
+	"gitlab.waterfall.network/waterfall/protocol/wf-types/blockdag/iface"
 )
 
 // MockRef is a mock of Ref interface.
@@ -62,7 +62,7 @@ type Mockblockchain struct {
 	recorder *MockblockchainMockRecorder
 }
 
-func (m *Mockblockchain) FixValidatorSyncOpProcessing(processor *Processor, opData operation.Operation, txHash common.Hash, from, to common.Address) (isApplied bool, ret []byte, err error) {
+func (m *Mockblockchain) FixValidatorSyncOpProcessing(ctx iface.ProcessorCtx, opData iface.ValidatorSyncOpFix, txHash common.Hash, from, to common.Address) (isApplied bool, ret []byte, err error) {
 	return false, nil, nil
 }
 
