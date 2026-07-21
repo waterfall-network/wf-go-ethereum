@@ -290,7 +290,11 @@ func (w *blockChainWrapper) GetTransaction(txHash wfcommon.Hash) (*wftypes.Trans
 func (w *blockChainWrapper) GetTransactionReceipt(txHash wfcommon.Hash) (*wftypes.Receipt, wfcommon.Hash, uint64) {
 	rc, blHash, index := w.inner.GetTransactionReceipt(gwatHash(txHash))
 	if rc == nil {
-		return nil, wfcommon.Hash{}, 0
+		// The receipt of a tx of the block being processed is not written yet,
+		// while its TxLookup entry already resolves the block hash. Callers rely
+		// on blHash to detect a preceding validator op within the same block,
+		// so it must be propagated even when the receipt is not available.
+		return nil, wfHash(blHash), index
 	}
 	return &wftypes.Receipt{Status: rc.Status}, wfHash(blHash), index
 }
