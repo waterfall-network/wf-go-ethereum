@@ -18,15 +18,15 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/LFDT-Iguazu/iguazu-types/blockdag/iface"
+	wftypes "github.com/LFDT-Iguazu/iguazu-types/blockdag/types"
+	wfera "github.com/LFDT-Iguazu/iguazu-types/blockdag/types/era"
+	wfcommon "github.com/LFDT-Iguazu/iguazu-types/common"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/rawdb"
 	gwatcoretypes "gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
 	valStore "gitlab.waterfall.network/waterfall/protocol/gwat/validator/storage"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/validatorsync"
-	"gitlab.waterfall.network/waterfall/protocol/wf-types/blockdag/iface"
-	wftypes "gitlab.waterfall.network/waterfall/protocol/wf-types/blockdag/types"
-	wfera "gitlab.waterfall.network/waterfall/protocol/wf-types/blockdag/types/era"
-	wfcommon "gitlab.waterfall.network/waterfall/protocol/wf-types/common"
 )
 
 // blockChainWrapper wraps *core.BlockChain and implements both iface.BlockChain

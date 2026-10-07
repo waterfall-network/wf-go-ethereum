@@ -19,11 +19,11 @@ package core
 import (
 	"sync/atomic"
 
+	"github.com/LFDT-Iguazu/iguazu-types/blockdag/iface"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/state"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/vm"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
-	"gitlab.waterfall.network/waterfall/protocol/wf-types/blockdag/iface"
 )
 
 // statePrefetcher is a basic Prefetcher, which blindly executes a block on top

@@ -15,12 +15,12 @@
 package pluginimpl
 
 import (
+	wfcommon "github.com/LFDT-Iguazu/iguazu-types/common"
 	gwatdownloader "gitlab.waterfall.network/waterfall/protocol/gwat/eth/downloader"
-	wfcommon "gitlab.waterfall.network/waterfall/protocol/wf-types/common"
 )
 
 // downloaderWrapper wraps *gwatdownloader.Downloader to implement iface.Downloader.
-// gwat/common.Hash and wf-types/common.Hash are both [32]byte; conversions are zero-cost.
+// gwat/common.Hash and iguazu-types/common.Hash are both [32]byte; conversions are zero-cost.
 type downloaderWrapper struct{ inner *gwatdownloader.Downloader }
 
 func (w *downloaderWrapper) Synchronising() bool { return w.inner.Synchronising() }

@@ -22,6 +22,7 @@ import (
 	"math"
 	"math/big"
 
+	"github.com/LFDT-Iguazu/iguazu-types/blockdag/iface"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/consensus/misc"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
@@ -30,7 +31,6 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
 	tokenOp "gitlab.waterfall.network/waterfall/protocol/gwat/token/operation"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/operation"
-	"gitlab.waterfall.network/waterfall/protocol/wf-types/blockdag/iface"
 )
 
 var emptyCodeHash = crypto.Keccak256Hash(nil)

@@ -17,14 +17,14 @@ package operation
 import (
 	"math/big"
 
-	"gitlab.waterfall.network/waterfall/protocol/wf-types/blockdag/iface"
-	wftypes "gitlab.waterfall.network/waterfall/protocol/wf-types/blockdag/types"
-	wfcommon "gitlab.waterfall.network/waterfall/protocol/wf-types/common"
+	"github.com/LFDT-Iguazu/iguazu-types/blockdag/iface"
+	wftypes "github.com/LFDT-Iguazu/iguazu-types/blockdag/types"
+	wfcommon "github.com/LFDT-Iguazu/iguazu-types/common"
 )
 
 // valSyncIfaceAdapter adapts a gwat ValidatorSync to satisfy iface.ValidatorSyncOpFix.
 // Both types have the same method names and semantics; only the concrete hash/address
-// types differ (gwat/common vs wf-types/common — both are [32]byte / [20]byte).
+// types differ (gwat/common vs iguazu-types/common — both are [32]byte / [20]byte).
 type valSyncIfaceAdapter struct {
 	op ValidatorSync
 }
@@ -47,7 +47,7 @@ func (a *valSyncIfaceAdapter) Creator() wfcommon.Address {
 func (a *valSyncIfaceAdapter) Amount() *big.Int { return a.op.Amount() }
 
 // WrapForIface wraps a gwat ValidatorSync operation as iface.ValidatorSyncOpFix
-// so it can be passed across the gwat/wf-engine boundary.
+// so it can be passed across the gwat/iguazu-engine boundary.
 func WrapForIface(op ValidatorSync) iface.ValidatorSyncOpFix {
 	return &valSyncIfaceAdapter{op: op}
 }

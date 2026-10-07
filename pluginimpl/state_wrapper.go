@@ -17,10 +17,10 @@ package pluginimpl
 import (
 	"math/big"
 
+	"github.com/LFDT-Iguazu/iguazu-types/blockdag/iface"
 	gwatcommon "gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	gwatstate "gitlab.waterfall.network/waterfall/protocol/gwat/core/state"
 	gwatcoretypes "gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
-	"gitlab.waterfall.network/waterfall/protocol/wf-types/blockdag/iface"
 )
 
 // stateDBWrapper wraps *gwatstate.StateDB to implement iface.StateDB.

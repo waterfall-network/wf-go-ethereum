@@ -21,7 +21,7 @@ import (
 
 // DagServicer is the coordinator-facing consensus interface used by the RPC layer.
 // By default it is satisfied by gwat's internal *dag.Dag; when running as a plugin,
-// it is replaced by a wfDagAdapter that delegates to wf-engine's dag.
+// it is replaced by a wfDagAdapter that delegates to iguazu-engine's dag.
 type DagServicer interface {
 	HandleFinalize(data *types.FinalizationParams) *types.FinalizationResult
 	HandleCoordinatedState() *types.FinalizationResult

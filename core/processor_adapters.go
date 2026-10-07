@@ -17,6 +17,8 @@ package core
 import (
 	"math/big"
 
+	"github.com/LFDT-Iguazu/iguazu-types/blockdag/iface"
+	wfcommon "github.com/LFDT-Iguazu/iguazu-types/common"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/state"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
@@ -24,8 +26,6 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/token"
 	tokenOp "gitlab.waterfall.network/waterfall/protocol/gwat/token/operation"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/validator"
-	"gitlab.waterfall.network/waterfall/protocol/wf-types/blockdag/iface"
-	wfcommon "gitlab.waterfall.network/waterfall/protocol/wf-types/common"
 )
 
 // ── Token processor adapter ───────────────────────────────────────────────────
@@ -115,7 +115,7 @@ func (m *validatorMsg) TxHash() common.Hash { return m.txHash }
 // ── StateDB adapter (used by processor factories) ────────────────────────────
 
 // stateDBIfaceAdapter wraps gwat's *state.StateDB to implement iface.StateDB.
-// It is used when an external processor factory (e.g. from wf-engine) needs to
+// It is used when an external processor factory (e.g. from iguazu-engine) needs to
 // receive an iface.StateDB instead of gwat's concrete type.
 type stateDBIfaceAdapter struct {
 	inner *state.StateDB

@@ -715,7 +715,7 @@ func (d *Dag) StopWork() {
 
 // StopWorkLoop stops only the slot-ticker workloop without stopping the creator
 // or downloader. Used when the workloop is handed off to an external dag (e.g.
-// wf-engine) that needs to keep using creator and downloader.
+// iguazu-engine) that needs to keep using creator and downloader.
 func (d *Dag) StopWorkLoop() {
 	d.skipCleanup = true
 	d.exitChan <- struct{}{}

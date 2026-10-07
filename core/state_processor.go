@@ -19,6 +19,7 @@ package core
 import (
 	"fmt"
 
+	"github.com/LFDT-Iguazu/iguazu-types/blockdag/iface"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/state"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
@@ -26,7 +27,6 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/crypto"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/log"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
-	"gitlab.waterfall.network/waterfall/protocol/wf-types/blockdag/iface"
 )
 
 // StateProcessor is a basic Processor, which takes care of transitioning

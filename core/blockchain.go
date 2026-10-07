@@ -31,6 +31,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/LFDT-Iguazu/iguazu-types/blockdag/iface"
 	lru "github.com/hashicorp/golang-lru"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	commonMath "gitlab.waterfall.network/waterfall/protocol/gwat/common/math"
@@ -56,7 +57,6 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/era"
 	validatorOp "gitlab.waterfall.network/waterfall/protocol/gwat/validator/operation"
 	valStore "gitlab.waterfall.network/waterfall/protocol/gwat/validator/storage"
-	"gitlab.waterfall.network/waterfall/protocol/wf-types/blockdag/iface"
 )
 
 var (

@@ -8,6 +8,7 @@ import (
 	context "context"
 	reflect "reflect"
 
+	"github.com/LFDT-Iguazu/iguazu-types/blockdag/iface"
 	gomock "github.com/golang/mock/gomock"
 	common "gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	state "gitlab.waterfall.network/waterfall/protocol/gwat/core/state"
@@ -16,7 +17,6 @@ import (
 	params "gitlab.waterfall.network/waterfall/protocol/gwat/params"
 	era "gitlab.waterfall.network/waterfall/protocol/gwat/validator/era"
 	storage "gitlab.waterfall.network/waterfall/protocol/gwat/validator/storage"
-	"gitlab.waterfall.network/waterfall/protocol/wf-types/blockdag/iface"
 )
 
 // MockRef is a mock of Ref interface.

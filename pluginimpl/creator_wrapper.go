@@ -15,11 +15,11 @@
 package pluginimpl
 
 import (
+	wftypes "github.com/LFDT-Iguazu/iguazu-types/blockdag/types"
+	wfcommon "github.com/LFDT-Iguazu/iguazu-types/common"
 	gwatcommon "gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	gwatcoretypes "gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
 	dagcreator "gitlab.waterfall.network/waterfall/protocol/gwat/dag/creator"
-	wftypes "gitlab.waterfall.network/waterfall/protocol/wf-types/blockdag/types"
-	wfcommon "gitlab.waterfall.network/waterfall/protocol/wf-types/common"
 )
 
 // creatorWrapper wraps *dagcreator.Creator to implement iface.BlockCreator.

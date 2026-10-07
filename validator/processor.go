@@ -22,6 +22,8 @@ import (
 	"math"
 	"math/big"
 
+	"github.com/LFDT-Iguazu/iguazu-types/blockdag/iface"
+	wfcommon "github.com/LFDT-Iguazu/iguazu-types/common"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/rawdb"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/state"
@@ -34,8 +36,6 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/operation"
 	valStore "gitlab.waterfall.network/waterfall/protocol/gwat/validator/storage"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/txlog"
-	"gitlab.waterfall.network/waterfall/protocol/wf-types/blockdag/iface"
-	wfcommon "gitlab.waterfall.network/waterfall/protocol/wf-types/common"
 )
 
 var (
@@ -129,7 +129,7 @@ func NewProcessor(blockCtx vm.BlockContext, stateDb vm.StateDB, bc blockchain) *
 }
 
 // GetBlockContext returns the block context for the current block, converting
-// from gwat's vm.BlockContext to the wf-types iface.BlockContext.
+// from gwat's vm.BlockContext to the iguazu-types iface.BlockContext.
 // This satisfies the iface.ProcessorCtx interface used by chain_fixes.
 func (p *Processor) GetBlockContext() iface.BlockContext {
 	var random *[32]byte

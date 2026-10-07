@@ -21,6 +21,7 @@ import (
 	"math/big"
 	"testing"
 
+	"github.com/LFDT-Iguazu/iguazu-types/blockdag/iface"
 	"github.com/stretchr/testify/assert"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/rawdb"
@@ -38,7 +39,6 @@ import (
 	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/era"
 	valOperation "gitlab.waterfall.network/waterfall/protocol/gwat/validator/operation"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/validator/storage"
-	"gitlab.waterfall.network/waterfall/protocol/wf-types/blockdag/iface"
 )
 
 func TestProcessRewards(t *testing.T) {

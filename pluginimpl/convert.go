@@ -12,21 +12,21 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package pluginimpl wires gwat's concrete types to the wf-types/iface interfaces
-// so that gwat can be loaded as a plugin by wf-engine.
+// Package pluginimpl wires gwat's concrete types to the iguazu-types/iface interfaces
+// so that gwat can be loaded as a plugin by iguazu-engine.
 package pluginimpl
 
 import (
 	"math/big"
 
+	"github.com/LFDT-Iguazu/iguazu-types/blockdag/iface"
+	wftypes "github.com/LFDT-Iguazu/iguazu-types/blockdag/types"
+	wfera "github.com/LFDT-Iguazu/iguazu-types/blockdag/types/era"
+	wfcommon "github.com/LFDT-Iguazu/iguazu-types/common"
 	gwatcommon "gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	gwatcoretypes "gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
 	gwatparams "gitlab.waterfall.network/waterfall/protocol/gwat/params"
 	gwaterra "gitlab.waterfall.network/waterfall/protocol/gwat/validator/era"
-	"gitlab.waterfall.network/waterfall/protocol/wf-types/blockdag/iface"
-	wftypes "gitlab.waterfall.network/waterfall/protocol/wf-types/blockdag/types"
-	wfera "gitlab.waterfall.network/waterfall/protocol/wf-types/blockdag/types/era"
-	wfcommon "gitlab.waterfall.network/waterfall/protocol/wf-types/common"
 )
 
 // ---------- scalar / primitive conversions ----------

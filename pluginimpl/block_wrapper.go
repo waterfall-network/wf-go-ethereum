@@ -15,13 +15,13 @@
 package pluginimpl
 
 import (
+	"github.com/LFDT-Iguazu/iguazu-types/blockdag/iface"
+	wfcommon "github.com/LFDT-Iguazu/iguazu-types/common"
 	gwatcoretypes "gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
-	"gitlab.waterfall.network/waterfall/protocol/wf-types/blockdag/iface"
-	wfcommon "gitlab.waterfall.network/waterfall/protocol/wf-types/common"
 )
 
 // blockWrapper wraps *gwatcoretypes.Block to implement iface.Block.
-// gwat/common.Hash and wf-types/common.Hash are both [32]byte; the only
+// gwat/common.Hash and iguazu-types/common.Hash are both [32]byte; the only
 // difference is the named type, so conversions are zero-cost.
 type blockWrapper struct{ inner *gwatcoretypes.Block }
 

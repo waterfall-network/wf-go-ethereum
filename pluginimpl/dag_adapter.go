@@ -17,12 +17,12 @@ package pluginimpl
 import (
 	"math/big"
 
+	"github.com/LFDT-Iguazu/iguazu-types/blockdag/iface"
+	wfTypes "github.com/LFDT-Iguazu/iguazu-types/blockdag/types"
+	wfCommon "github.com/LFDT-Iguazu/iguazu-types/common"
 	gwatCommon "gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	gwatTypes "gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/internal/ethapi"
-	"gitlab.waterfall.network/waterfall/protocol/wf-types/blockdag/iface"
-	wfTypes "gitlab.waterfall.network/waterfall/protocol/wf-types/blockdag/types"
-	wfCommon "gitlab.waterfall.network/waterfall/protocol/wf-types/common"
 )
 
 // wfDagAdapter implements ethapi.DagServicer by delegating to an iface.Dag.
@@ -71,7 +71,7 @@ func (a *wfDagAdapter) HandleSyncSlotInfo(si gwatTypes.SlotInfo) (bool, error) {
 	})
 }
 
-// ---- gwat → wf-types conversions ----
+// ---- gwat → iguazu-types conversions ----
 
 func toWFHash(h gwatCommon.Hash) wfCommon.Hash { return wfCommon.Hash(h) }
 
@@ -148,7 +148,7 @@ func toWFFinParams(fp *gwatTypes.FinalizationParams) *wfTypes.FinalizationParams
 	return out
 }
 
-// ---- wf-types → gwat conversions ----
+// ---- iguazu-types → gwat conversions ----
 
 func toGwatHash(h wfCommon.Hash) gwatCommon.Hash { return gwatCommon.Hash(h) }
 

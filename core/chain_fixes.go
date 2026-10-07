@@ -17,12 +17,12 @@ package core
 import (
 	"fmt"
 
+	"github.com/LFDT-Iguazu/iguazu-types/blockdag/iface"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/common"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/core/types"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/log"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/params"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/validator"
-	"gitlab.waterfall.network/waterfall/protocol/wf-types/blockdag/iface"
 )
 
 func isMainnet(bc *BlockChain) bool {

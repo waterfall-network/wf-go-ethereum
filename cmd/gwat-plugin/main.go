@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// gwat-plugin builds gwat as a Go plugin (.so) that wf-engine can load via
+// gwat-plugin builds gwat as a Go plugin (.so) that iguazu-engine can load via
 // plugin.Open. The exported symbol GwatPlugin satisfies iface.GwatPlugin.
 //
 // Build with:
@@ -22,11 +22,11 @@
 package main
 
 import (
+	"github.com/LFDT-Iguazu/iguazu-types/blockdag/iface"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/pluginimpl"
-	"gitlab.waterfall.network/waterfall/protocol/wf-types/blockdag/iface"
 )
 
-// GwatPlugin is the symbol looked up by wf-engine's loader package.
+// GwatPlugin is the symbol looked up by iguazu-engine's loader package.
 // It must be a package-level variable of type iface.GwatPlugin (or *iface.GwatPlugin).
 var GwatPlugin iface.GwatPlugin = pluginimpl.New()
 

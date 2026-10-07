@@ -12,17 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Package pluginimpl wires gwat's concrete types to the wf-types/iface interfaces
-// so that gwat can be loaded as a plugin by wf-engine.
+// Package pluginimpl wires gwat's concrete types to the iguazu-types/iface interfaces
+// so that gwat can be loaded as a plugin by iguazu-engine.
 package pluginimpl
 
 import (
 	"fmt"
 
+	"github.com/LFDT-Iguazu/iguazu-types/blockdag/iface"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/eth"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/internal/gwatapp"
 	"gitlab.waterfall.network/waterfall/protocol/gwat/node"
-	"gitlab.waterfall.network/waterfall/protocol/wf-types/blockdag/iface"
 	"gopkg.in/urfave/cli.v1"
 )
 
@@ -62,7 +62,7 @@ func (p *GwatPluginImpl) Init(cfg *iface.NodeConfig) error {
 
 // Start starts gwat's background services (P2P networking, DAG work, etc.),
 // unlocks any accounts requested via --unlock / --password, and starts the
-// block creator so that wf-engine's dag can call Creator().RunBlockCreation.
+// block creator so that iguazu-engine's dag can call Creator().RunBlockCreation.
 func (p *GwatPluginImpl) Start() error {
 	if p.stack == nil {
 		return fmt.Errorf("pluginimpl: Start: plugin not initialized")
@@ -123,7 +123,7 @@ func (p *GwatPluginImpl) SetProcessorFactories(tp iface.TokenProcessorFactory, v
 	p.ethereum.BlockChain().SetProcessorFactories(tp, vp)
 }
 
-// SetDag replaces gwat's internal dag workloop with the provided wf-engine dag.
+// SetDag replaces gwat's internal dag workloop with the provided iguazu-engine dag.
 // Must be called after Start(). gwat stops its own dag and routes all coordinator
 // IPC calls to d via a thin type-conversion adapter.
 func (p *GwatPluginImpl) SetDag(d iface.Dag) {

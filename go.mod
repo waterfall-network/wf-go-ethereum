@@ -120,7 +120,7 @@ require (
 	rsc.io/tmplfunc v0.0.3 // indirect
 )
 
-require gitlab.waterfall.network/waterfall/protocol/wf-types v0.1.0
+require github.com/LFDT-Iguazu/iguazu-types v0.1.0
 
-//// TODO: remove after wf-types is published with a real tag (e.g. v0.1.0)
-//replace gitlab.waterfall.network/waterfall/protocol/wf-types => ../wf-types
+// Local checkout until iguazu-types is published at github.com/LFDT-Iguazu.
+replace github.com/LFDT-Iguazu/iguazu-types => ../iguazu-types
