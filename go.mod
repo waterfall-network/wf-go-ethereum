@@ -121,6 +121,3 @@ require (
 )
 
 require github.com/LFDT-Iguazu/iguazu-types v0.1.0
-
-// Local checkout until iguazu-types is published at github.com/LFDT-Iguazu.
-replace github.com/LFDT-Iguazu/iguazu-types => ../iguazu-types
