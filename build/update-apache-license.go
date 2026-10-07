@@ -1,4 +1,4 @@
-// Copyright 2026 Digital Clever Solution Inc.
+// Copyright 2026 Digital Clever Solution LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -67,7 +67,7 @@ var (
 )
 
 var licenseT = template.Must(template.New("").Parse(`
-// Copyright 2026 Digital Clever Solution Inc.
+// Copyright 2026 Digital Clever Solution LLC
 // 
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
